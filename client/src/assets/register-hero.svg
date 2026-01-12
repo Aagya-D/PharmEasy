@@ -1,0 +1,75 @@
+<svg viewBox="0 0 1200 1600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="registerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10B981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#34D399;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#10B981;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="1600" fill="url(#registerGradient)"/>
+
+  <!-- Decorative circles -->
+  <circle cx="100" cy="200" r="150" fill="rgba(52, 211, 153, 0.1)"/>
+  <circle cx="1100" cy="400" r="200" fill="rgba(16, 185, 129, 0.08)"/>
+  <circle cx="600" cy="1400" r="180" fill="rgba(52, 211, 153, 0.12)"/>
+
+  <!-- User registration illustration -->
+  <!-- User icon - large -->
+  <circle cx="600" cy="400" r="120" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+  <circle cx="600" cy="320" r="70" fill="rgba(255,255,255,0.2)"/>
+  <path d="M 550 420 Q 550 460 600 480 Q 650 460 650 420" fill="rgba(255,255,255,0.15)"/>
+
+  <!-- Connected users showing collaboration -->
+  <g opacity="0.3">
+    <circle cx="350" cy="600" r="50" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+    <circle cx="350" cy="550" r="35" fill="rgba(255,255,255,0.2)"/>
+    <path d="M 320 610 Q 320 640 350 650 Q 380 640 380 610" fill="rgba(255,255,255,0.15)"/>
+    
+    <circle cx="850" cy="600" r="50" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="2"/>
+    <circle cx="850" cy="550" r="35" fill="rgba(255,255,255,0.2)"/>
+    <path d="M 820 610 Q 820 640 850 650 Q 880 640 880 610" fill="rgba(255,255,255,0.15)"/>
+    
+    <!-- Connection lines -->
+    <line x1="400" y1="630" x2="800" y2="630" stroke="rgba(255,255,255,0.2)" stroke-width="2" stroke-dasharray="5,5"/>
+  </g>
+
+  <!-- Checkmarks for verified registration -->
+  <g opacity="0.4">
+    <circle cx="200" cy="900" r="40" fill="rgba(52, 211, 153, 0.3)" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
+    <path d="M 185 910 L 200 920 L 225 900" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="3" stroke-linecap="round"/>
+    
+    <circle cx="1000" cy="900" r="40" fill="rgba(52, 211, 153, 0.3)" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
+    <path d="M 985 910 L 1000 920 L 1025 900" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <!-- Pharmacy elements -->
+  <g opacity="0.25">
+    <!-- Prescription pad -->
+    <rect x="350" y="1100" width="120" height="140" rx="8" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+    <line x1="360" y1="1120" x2="460" y2="1120" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+    <line x1="360" y1="1145" x2="460" y2="1145" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+    <line x1="360" y1="1165" x2="460" y2="1165" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+    <line x1="360" y1="1185" x2="450" y2="1185" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+    
+    <!-- Medicine bottles -->
+    <rect x="750" y="1120" width="50" height="100" rx="6" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+    <rect x="820" y="1100" width="50" height="120" rx="6" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>
+  </g>
+
+  <!-- Text overlay -->
+  <text x="600" y="750" font-size="56" font-weight="700" fill="white" text-anchor="middle" letter-spacing="1">
+    JOIN THE COMMUNITY
+  </text>
+  <text x="600" y="830" font-size="32" font-weight="500" fill="rgba(255,255,255,0.8)" text-anchor="middle">
+    Register • Connect • Grow
+  </text>
+
+  <!-- Decorative accents -->
+  <line x1="300" y1="850" x2="900" y2="850" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+  <circle cx="600" cy="850" r="8" fill="url(#accentGradient)"/>
+</svg>

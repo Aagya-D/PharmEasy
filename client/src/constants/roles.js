@@ -1,0 +1,58 @@
+/**
+ * FIXED ROLE ID SYSTEM (Frontend)
+ *
+ * Hardcoded role IDs that match backend exactly:
+ * - ID 1: System Admin (not shown in registration)
+ * - ID 2: Pharmacy Admin (selectable)
+ * - ID 3: Patient (selectable)
+ *
+ * Design Principle:
+ * Frontend knows about valid registration roles without fetching them.
+ * This eliminates dynamic role loading and ensures consistency.
+ */
+
+export const ROLE_IDS = {
+  SYSTEM_ADMIN: 1,
+  PHARMACY_ADMIN: 2,
+  PATIENT: 3,
+};
+
+/**
+ * Registration role options
+ * These are the only roles users can select during registration
+ * Hardcoded here - no API call needed to fetch them
+ */
+export const REGISTRATION_ROLES = [
+  {
+    id: ROLE_IDS.PATIENT,
+    name: "PATIENT",
+    displayName: "Patient",
+    description: "Browse and order medicines from pharmacies",
+    icon: "Heart", // lucide-react icon name
+    color: "#10b981", // Green
+  },
+  {
+    id: ROLE_IDS.PHARMACY_ADMIN,
+    name: "PHARMACY_ADMIN",
+    displayName: "Pharmacy Administrator",
+    description: "Manage inventory and process orders",
+    icon: "Briefcase", // lucide-react icon name
+    color: "#3b82f6", // Blue
+  },
+];
+
+/**
+ * Helper function to get role by ID
+ * Fast lookup without API call
+ */
+export const getRoleById = (roleId) => {
+  return REGISTRATION_ROLES.find((role) => role.id === roleId);
+};
+
+/**
+ * Helper function to get role by name
+ * Useful for display purposes
+ */
+export const getRoleByName = (name) => {
+  return REGISTRATION_ROLES.find((role) => role.name === name);
+};

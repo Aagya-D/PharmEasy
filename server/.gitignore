@@ -1,0 +1,33 @@
+node_modules
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Keep environment variables out of version control
+.env
+.env.*
+!.env.example
+
+# Build output
+dist
+build
+
+# Test/coverage output
+coverage
+.nyc_output
+
+# Caches
+.eslintcache
+.cache
+
+# Prisma
+/generated/prisma
+prisma/*.db
+prisma/*.db-journal
+prisma/*.db-wal
+prisma/*.db-shm

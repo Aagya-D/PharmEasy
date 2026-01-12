@@ -1,0 +1,143 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+  engineType      = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// *
+///  * Role Model - Fixed, immutable role system with deterministic IDs
+///  * 
+///  * Role IDs are hardcoded and never change:
+///  * - ID 1: System Admin (backend-only, never exposed to users)
+///  * - ID 2: Pharmacy Admin (user-selectable during registration)
+///  * - ID 3: Patient (user-selectable during registration)
+///  * 
+///  * Design Rationale:
+///  * Using fixed integer IDs ensures:
+///  * 1. Fast lookups (no name-based resolution)
+///  * 2. Deterministic role assignment (ID always maps to same role)
+///  * 3. No runtime role discovery needed
+///  * 4. Simple frontend → backend → database flow
+///  * 5. Security: System Admin not exposed in registration UI
+///  * 
+///  * Seeding Strategy:
+///  * - Roles are seeded once during initial database setup
+///  * - Never created dynamically at runtime
+///  * - Migration ensures IDs are always 1, 2, 3 respectively
+model Role {
+  id          Int      @id
+  name        RoleType @unique
+  displayName String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  users       User[]
+
+  @@index([name])
+}
+
+/// *
+///  * User Model - Core user entity for PharmEasy
+///  * 
+///  * Role Assignment Flow:
+///  * 1. Frontend: User selects role (Patient=3 or Pharmacy Admin=2) during registration
+///  * 2. Frontend: Sends role ID directly to backend (no role lookup)
+///  * 3. Backend: Validates roleId is 2 or 3 (rejects 1 for security)
+///  * 4. Backend: Creates user with roleId directly (no role name resolution)
+///  * 5. Database: User.roleId foreign key links to Role.id
+///  * 
+///  * Why Direct ID Assignment:
+///  * - No role lookup query needed at registration time
+///  * - Role assignment is instant and deterministic
+///  * - Reduces database operations
+///  * - Eliminates "role not found" runtime errors
+///  * 
+///  * All users must verify email via OTP before login
+model User {
+  id             String               @id @default(cuid())
+  email          String               @unique
+  name           String
+  password       String
+  phone          String?
+  roleId         Int
+  isVerified     Boolean              @default(false)
+  verifiedAt     DateTime?
+  isActive       Boolean              @default(true)
+  lastLogin      DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  otpTokens      OTPToken[]
+  passwordResets PasswordResetToken[]
+  refreshTokens  RefreshToken[]
+  role           Role                 @relation(fields: [roleId], references: [id])
+
+  @@index([email])
+  @@index([roleId])
+  @@index([isVerified])
+}
+
+/// *
+///  * RefreshToken Model - Manages JWT refresh tokens
+///  * Enables token rotation and security tracking
+///  * Tokens are invalidated on logout
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  isRevoked Boolean   @default(false)
+  revokedAt DateTime?
+  userAgent String?
+  ipAddress String?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRevoked])
+}
+
+/// *
+///  * OTPToken Model - Email verification and OTP management
+///  * OTP is 6-digit numeric code sent via email
+///  * Each OTP is single-use and expires after 10 minutes
+model OTPToken {
+  id        String    @id @default(cuid())
+  userId    String
+  code      String
+  isUsed    Boolean   @default(false)
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isUsed])
+}
+
+/// *
+///  * PasswordResetToken Model - Secure password reset flow
+///  * Token is single-use and expires after 1 hour
+///  * Prevents brute-force password reset attacks
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  isUsed    Boolean   @default(false)
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isUsed])
+}
+
+enum RoleType {
+  PATIENT
+  PHARMACY_ADMIN
+  SYSTEM_ADMIN
+}
