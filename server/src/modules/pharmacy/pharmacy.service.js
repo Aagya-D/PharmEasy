@@ -21,8 +21,8 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
   const {
     pharmacyName,
     address,
-    latitude,
-    longitude,
+    latitude: rawLatitude,
+    longitude: rawLongitude,
     licenseNumber,
     licenseDocument,
     contactNumber,
@@ -33,12 +33,28 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
     throw new AppError("Missing required pharmacy details", 400);
   }
 
-  if (latitude !== undefined && (latitude < -90 || latitude > 90)) {
-    throw new AppError("Latitude must be between -90 and 90", 400);
+  // Convert latitude/longitude from string to Float (HTML forms send strings)
+  let latitude = null;
+  let longitude = null;
+
+  if (rawLatitude !== undefined && rawLatitude !== null && rawLatitude !== "") {
+    latitude = parseFloat(rawLatitude);
+    if (isNaN(latitude)) {
+      throw new AppError("Invalid latitude value. Must be a valid number.", 400);
+    }
+    if (latitude < -90 || latitude > 90) {
+      throw new AppError("Latitude must be between -90 and 90", 400);
+    }
   }
 
-  if (longitude !== undefined && (longitude < -180 || longitude > 180)) {
-    throw new AppError("Longitude must be between -180 and 180", 400);
+  if (rawLongitude !== undefined && rawLongitude !== null && rawLongitude !== "") {
+    longitude = parseFloat(rawLongitude);
+    if (isNaN(longitude)) {
+      throw new AppError("Invalid longitude value. Must be a valid number.", 400);
+    }
+    if (longitude < -180 || longitude > 180) {
+      throw new AppError("Longitude must be between -180 and 180", 400);
+    }
   }
 
   // Check if user exists and has correct role
@@ -98,8 +114,8 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
       userId,
       pharmacyName: pharmacyName.trim(),
       address: address.trim(),
-      latitude: latitude || 0.0,
-      longitude: longitude || 0.0,
+      latitude: latitude !== null ? latitude : 0.0,
+      longitude: longitude !== null ? longitude : 0.0,
       licenseNumber: licenseNumber.trim(),
       licenseDocument: licenseDocument || null,
       contactNumber: contactNumber.trim(),
