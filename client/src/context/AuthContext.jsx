@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useReducer, useEffect } from "react";
 import axios from "axios";
 import { api } from "../services/auth.api";
+import logger from "../utils/logger";
+import auditor from "../utils/auditor";
 
 const AuthContext = createContext(null);
 
@@ -34,13 +36,20 @@ const initialState = {
 
 // Reducer function
 function authReducer(state, action) {
+  // Log state change for audit
+  if (typeof window !== 'undefined' && window.__auditor) {
+    auditor.recordState(action.type, state, { ...state, ...action.payload });
+  }
+
   switch (action.type) {
     case ACTIONS.LOGIN_START:
     case ACTIONS.REGISTER_START:
+      logger.debug(`Auth action: ${action.type}`);
       return { ...state, isLoading: true, error: null };
 
     case ACTIONS.REGISTER_SUCCESS:
       // After register: user is pending OTP, NOT fully authenticated
+      logger.authEvent("REGISTER_SUCCESS", { userId: action.payload.user?.id });
       return {
         ...state,
         user: action.payload.user,
@@ -52,6 +61,8 @@ function authReducer(state, action) {
 
     case ACTIONS.OTP_VERIFY_SUCCESS:
       // After OTP verification: user is now fully authenticated
+      logger.authEvent("OTP_VERIFY_SUCCESS", { userId: action.payload.user?.id });
+      auditor.auditAuth(action.payload.user, "OTP_VERIFY");
       return {
         ...state,
         user: action.payload.user,
@@ -62,6 +73,11 @@ function authReducer(state, action) {
       };
 
     case ACTIONS.LOGIN_SUCCESS:
+      logger.authEvent("LOGIN_SUCCESS", { 
+        userId: action.payload.user?.id,
+        role: action.payload.user?.roleId 
+      });
+      auditor.auditAuth(action.payload.user, "LOGIN");
       return {
         ...state,
         user: action.payload.user,
@@ -75,6 +91,7 @@ function authReducer(state, action) {
     case ACTIONS.LOGIN_ERROR:
     case ACTIONS.REGISTER_ERROR:
     case ACTIONS.OTP_VERIFY_ERROR:
+      logger.error(`Auth error: ${action.type}`, action.payload);
       return {
         ...state,
         isLoading: false,
@@ -82,6 +99,7 @@ function authReducer(state, action) {
       };
 
     case ACTIONS.LOGOUT:
+      logger.authEvent("LOGOUT", { userId: state.user?.id });
       return {
         ...state,
         user: null,
@@ -121,6 +139,14 @@ function authReducer(state, action) {
 export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
+  // Initialize logger and auditor on mount
+  useEffect(() => {
+    if (state.user) {
+      logger.init(state.user.id, state.user.roleId);
+      auditor.init(state);
+    }
+  }, [state.user]);
+
   // Restore session from localStorage on mount
   useEffect(() => {
     const restoreSession = () => {
@@ -129,15 +155,20 @@ export function AuthProvider({ children }) {
 
       if (storedAccessToken && storedUser) {
         try {
+          const user = JSON.parse(storedUser);
+          logger.authEvent("SESSION_RESTORED", { userId: user.id });
+          auditor.auditAuth(user, "SESSION_RESTORE");
+          
           dispatch({
             type: ACTIONS.RESTORE_SESSION,
             payload: {
-              user: JSON.parse(storedUser),
+              user,
               accessToken: storedAccessToken,
               isAuthenticated: true,
             },
           });
         } catch (error) {
+          logger.error("Session restore failed", error);
           // Clear invalid stored data
           localStorage.removeItem("accessToken");
           localStorage.removeItem("user");
@@ -152,6 +183,7 @@ export function AuthProvider({ children }) {
           });
         }
       } else {
+        logger.info("No session to restore");
         dispatch({
           type: ACTIONS.RESTORE_SESSION,
           payload: {
@@ -171,19 +203,43 @@ export function AuthProvider({ children }) {
     // Request interceptor - add token to headers
     const requestInterceptor = api.interceptors.request.use(
       (config) => {
+        const startTime = performance.now();
+        config.metadata = { startTime };
+        
         if (state.accessToken) {
           config.headers.Authorization = `Bearer ${state.accessToken}`;
         }
+        
+        logger.apiCall(config.method?.toUpperCase(), config.url);
         return config;
       },
-      (error) => Promise.reject(error)
+      (error) => {
+        logger.apiError("REQUEST", error.config?.url, error);
+        return Promise.reject(error);
+      }
     );
 
     // Response interceptor - handle token refresh
     const responseInterceptor = api.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        const duration = performance.now() - response.config.metadata?.startTime;
+        logger.apiCall(
+          response.config.method?.toUpperCase(),
+          response.config.url,
+          response.status,
+          duration
+        );
+        return response;
+      },
       async (error) => {
         const originalRequest = error.config;
+
+        // Log API error
+        logger.apiError(
+          originalRequest?.method?.toUpperCase(),
+          originalRequest?.url,
+          error
+        );
 
         // If 401 and not already retried, try to refresh token
         if (error.response?.status === 401 && !originalRequest._retry) {
@@ -192,12 +248,14 @@ export function AuthProvider({ children }) {
           try {
             const refreshToken = localStorage.getItem("refreshToken");
             if (refreshToken) {
+              logger.info("Attempting token refresh");
               const response = await api.post("/auth/refresh", {
                 refreshToken,
               });
 
               const { accessToken } = response.data.data;
               localStorage.setItem("accessToken", accessToken);
+              logger.authEvent("TOKEN_REFRESHED");
 
               dispatch({
                 type: ACTIONS.REFRESH_TOKEN_SUCCESS,
@@ -230,14 +288,33 @@ export function AuthProvider({ children }) {
   // Login action
   const login = async (email, password) => {
     dispatch({ type: ACTIONS.LOGIN_START });
+    logger.userAction("LOGIN_ATTEMPT", { email });
+    
     try {
+      const timer = logger.startTimer("LOGIN_API_CALL");
       const response = await api.post("/auth/login", { email, password });
+      timer.stop();
 
-      // Backend returns: { message, user: { id, email, name, roleId, ... } }
-      // Tokens are in HTTP-only cookies
-      const user = response.data.user;
+      // Extract data from backend response
+      const { data } = response.data;
+      const user = {
+        id: data.userId,
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        roleId: data.roleId,
+        pharmacy: data.pharmacy,
+        isOnboarded: data.isOnboarded,
+        needsOnboarding: data.needsOnboarding,
+      };
 
-      // Store user info in localStorage
+      // Store tokens and user info
+      if (data.accessToken) {
+        localStorage.setItem("accessToken", data.accessToken);
+      }
+      if (data.refreshToken) {
+        localStorage.setItem("refreshToken", data.refreshToken);
+      }
       localStorage.setItem("user", JSON.stringify(user));
 
       // Clear any pending registration data
@@ -246,7 +323,7 @@ export function AuthProvider({ children }) {
 
       dispatch({
         type: ACTIONS.LOGIN_SUCCESS,
-        payload: { user, accessToken: null },
+        payload: { user, accessToken: data.accessToken },
       });
 
       return { success: true };
@@ -330,10 +407,25 @@ export function AuthProvider({ children }) {
         otp: otp,
       });
 
-      const apiResponse = response.data;
-      const user = apiResponse.user;
+      const { data } = response.data;
+      const user = {
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.name,
+        roleId: data.user.roleId,
+        role: data.user.role,
+        pharmacy: data.pharmacy,
+        isOnboarded: data.isOnboarded,
+        needsOnboarding: data.needsOnboarding,
+      };
 
-      // Store user info (but NOT accessToken as it's in cookies)
+      // Store tokens and user info
+      if (data.accessToken) {
+        localStorage.setItem("accessToken", data.accessToken);
+      }
+      if (data.refreshToken) {
+        localStorage.setItem("refreshToken", data.refreshToken);
+      }
       localStorage.setItem("user", JSON.stringify(user));
 
       // Clear pending registration data - OTP is verified
@@ -343,13 +435,8 @@ export function AuthProvider({ children }) {
       dispatch({
         type: ACTIONS.OTP_VERIFY_SUCCESS,
         payload: {
-          user: {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            roleId: user.roleId,
-          },
-          accessToken: null, // Tokens are in cookies
+          user,
+          accessToken: data.accessToken,
         },
       });
 

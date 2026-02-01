@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { AuthLayout } from "../components/AuthLayout";
-import { Button } from "../components/Button";
-import { useAuth } from "../context/AuthContext";
-import { authAPI } from "../services/auth.api";
-import verifyOtpHeroImage from "../assets/verify-otp-hero.svg";
+import { AuthLayout } from "../../components/AuthLayout";
+import { Button } from "../../components/Button";
+import { useAuth } from "../../context/AuthContext";
+import { authAPI } from "../../services/auth.api";
+import verifyOtpHeroImage from "../../assets/verify-otp-hero.svg";
 
 export function VerifyOtp() {
   const navigate = useNavigate();

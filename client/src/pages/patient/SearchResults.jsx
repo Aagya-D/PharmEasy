@@ -20,7 +20,7 @@ import {
   AlertCircle,
   AlertTriangle,
 } from "lucide-react";
-import { Navbar } from "../components/Navbar";
+import { Navbar } from "../../components/Navbar";
 
 /**
  * Medicine Search Results Page

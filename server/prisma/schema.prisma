@@ -9,25 +9,25 @@ datasource db {
 }
 
 /// *
-///  * Role Model - Fixed, immutable role system with deterministic IDs
-///  * 
-///  * Role IDs are hardcoded and never change:
-///  * - ID 1: System Admin (backend-only, never exposed to users)
-///  * - ID 2: Pharmacy Admin (user-selectable during registration)
-///  * - ID 3: Patient (user-selectable during registration)
-///  * 
-///  * Design Rationale:
-///  * Using fixed integer IDs ensures:
-///  * 1. Fast lookups (no name-based resolution)
-///  * 2. Deterministic role assignment (ID always maps to same role)
-///  * 3. No runtime role discovery needed
-///  * 4. Simple frontend → backend → database flow
-///  * 5. Security: System Admin not exposed in registration UI
-///  * 
-///  * Seeding Strategy:
-///  * - Roles are seeded once during initial database setup
-///  * - Never created dynamically at runtime
-///  * - Migration ensures IDs are always 1, 2, 3 respectively
+/// * Role Model - Fixed, immutable role system with deterministic IDs
+/// * 
+/// * Role IDs are hardcoded and never change:
+/// * - ID 1: System Admin (backend-only, never exposed to users)
+/// * - ID 2: Pharmacy Admin (user-selectable during registration)
+/// * - ID 3: Patient (user-selectable during registration)
+/// * 
+/// * Design Rationale:
+/// * Using fixed integer IDs ensures:
+/// * 1. Fast lookups (no name-based resolution)
+/// * 2. Deterministic role assignment (ID always maps to same role)
+/// * 3. No runtime role discovery needed
+/// * 4. Simple frontend → backend → database flow
+/// * 5. Security: System Admin not exposed in registration UI
+/// * 
+/// * Seeding Strategy:
+/// * - Roles are seeded once during initial database setup
+/// * - Never created dynamically at runtime
+/// * - Migration ensures IDs are always 1, 2, 3 respectively
 model Role {
   id          Int      @id
   name        RoleType @unique
@@ -41,22 +41,22 @@ model Role {
 }
 
 /// *
-///  * User Model - Core user entity for PharmEasy
-///  * 
-///  * Role Assignment Flow:
-///  * 1. Frontend: User selects role (Patient=3 or Pharmacy Admin=2) during registration
-///  * 2. Frontend: Sends role ID directly to backend (no role lookup)
-///  * 3. Backend: Validates roleId is 2 or 3 (rejects 1 for security)
-///  * 4. Backend: Creates user with roleId directly (no role name resolution)
-///  * 5. Database: User.roleId foreign key links to Role.id
-///  * 
-///  * Why Direct ID Assignment:
-///  * - No role lookup query needed at registration time
-///  * - Role assignment is instant and deterministic
-///  * - Reduces database operations
-///  * - Eliminates "role not found" runtime errors
-///  * 
-///  * All users must verify email via OTP before login
+/// * User Model - Core user entity for PharmEasy
+/// * 
+/// * Role Assignment Flow:
+/// * 1. Frontend: User selects role (Patient=3 or Pharmacy Admin=2) during registration
+/// * 2. Frontend: Sends role ID directly to backend (no role lookup)
+/// * 3. Backend: Validates roleId is 2 or 3 (rejects 1 for security)
+/// * 4. Backend: Creates user with roleId directly (no role name resolution)
+/// * 5. Database: User.roleId foreign key links to Role.id
+/// * 
+/// * Why Direct ID Assignment:
+/// * - No role lookup query needed at registration time
+/// * - Role assignment is instant and deterministic
+/// * - Reduces database operations
+/// * - Eliminates "role not found" runtime errors
+/// * 
+/// * All users must verify email via OTP before login
 model User {
   id             String               @id @default(cuid())
   email          String               @unique
@@ -72,6 +72,7 @@ model User {
   updatedAt      DateTime             @updatedAt
   otpTokens      OTPToken[]
   passwordResets PasswordResetToken[]
+  pharmacy       Pharmacy?
   refreshTokens  RefreshToken[]
   role           Role                 @relation(fields: [roleId], references: [id])
 
@@ -81,9 +82,9 @@ model User {
 }
 
 /// *
-///  * RefreshToken Model - Manages JWT refresh tokens
-///  * Enables token rotation and security tracking
-///  * Tokens are invalidated on logout
+/// * RefreshToken Model - Manages JWT refresh tokens
+/// * Enables token rotation and security tracking
+/// * Tokens are invalidated on logout
 model RefreshToken {
   id        String    @id @default(cuid())
   userId    String
@@ -101,9 +102,9 @@ model RefreshToken {
 }
 
 /// *
-///  * OTPToken Model - Email verification and OTP management
-///  * OTP is 6-digit numeric code sent via email
-///  * Each OTP is single-use and expires after 10 minutes
+/// * OTPToken Model - Email verification and OTP management
+/// * OTP is 6-digit numeric code sent via email
+/// * Each OTP is single-use and expires after 10 minutes
 model OTPToken {
   id        String    @id @default(cuid())
   userId    String
@@ -119,9 +120,9 @@ model OTPToken {
 }
 
 /// *
-///  * PasswordResetToken Model - Secure password reset flow
-///  * Token is single-use and expires after 1 hour
-///  * Prevents brute-force password reset attacks
+/// * PasswordResetToken Model - Secure password reset flow
+/// * Token is single-use and expires after 1 hour
+/// * Prevents brute-force password reset attacks
 model PasswordResetToken {
   id        String    @id @default(cuid())
   userId    String
@@ -136,8 +137,51 @@ model PasswordResetToken {
   @@index([isUsed])
 }
 
+/// *
+/// * Pharmacy Model - Pharmacy information and verification
+/// * 
+/// * Two-Step Pharmacy Registration:
+/// * 1. User registers with roleId=2 (PHARMACY_ADMIN)
+/// * 2. After authentication, user submits pharmacy onboarding
+/// * 3. SystemAdmin verifies or rejects the pharmacy
+/// * 4. Only VERIFIED pharmacies can access inventory & SOS features
+/// * 
+/// * Verification Status Flow:
+/// * PENDING_VERIFICATION → VERIFIED (approved by admin)
+/// * PENDING_VERIFICATION → REJECTED (rejected by admin)
+/// * REJECTED → cannot re-register without admin action
+model Pharmacy {
+  id                 String         @id @default(cuid())
+  userId             String         @unique
+  pharmacyName       String
+  address            String
+  latitude           Float
+  longitude          Float
+  licenseNumber      String         @unique
+  licenseDocument    String?
+  contactNumber      String
+  verificationStatus PharmacyStatus @default(PENDING_VERIFICATION)
+  verifiedAt         DateTime?
+  verifiedBy         String?
+  rejectionReason    String?
+  rejectedAt         DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([verificationStatus])
+  @@index([licenseNumber])
+}
+
 enum RoleType {
   PATIENT
   PHARMACY_ADMIN
   SYSTEM_ADMIN
+}
+
+enum PharmacyStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
 }

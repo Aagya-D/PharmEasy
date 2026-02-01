@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { AuthLayout } from "../components/AuthLayout";
-import { Input } from "../components/Input";
-import { Button } from "../components/Button";
-import { authAPI } from "../services/auth.api";
-import forgotPasswordHeroImage from "../assets/forgot-password-hero.svg";
+import { AuthLayout } from "../../components/AuthLayout";
+import { Input } from "../../components/Input";
+import { Button } from "../../components/Button";
+import { authAPI } from "../../services/auth.api";
+import forgotPasswordHeroImage from "../../assets/forgot-password-hero.svg";
 
 export function ForgotPassword() {
   const navigate = useNavigate();

@@ -12,18 +12,18 @@
  * 2. User selects role (Patient or Pharmacy Admin)
  * 3. Frontend sends: { email, password, firstName, lastName, roleId }
  * 4. Backend receives roleId directly, validates it's 2 or 3, creates user
- * 5. Redirect to OTP verification
+ * 5. Redirect to OTP verification for user
  */
 
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { AuthLayout } from "../components/AuthLayout";
-import { Input } from "../components/Input";
-import { Button } from "../components/Button";
-import { RoleCard } from "../components/RoleCard";
-import { useAuth } from "../context/AuthContext";
-import { REGISTRATION_ROLES } from "../constants/roles";
-import registerHeroImage from "../assets/register-hero.svg";
+import { AuthLayout } from "../../components/AuthLayout";
+import { Input } from "../../components/Input";
+import { Button } from "../../components/Button";
+import { RoleCard } from "../../components/RoleCard";
+import { useAuth } from "../../context/AuthContext";
+import { REGISTRATION_ROLES } from "../../constants/roles";
+import registerHeroImage from "../../assets/register-hero.svg";
 
 export function Register() {
   const navigate = useNavigate();

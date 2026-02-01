@@ -2,12 +2,11 @@ import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { routes } from "./routes/AppRoutes";
-import PharmacyDashboard from "./pages/PharmacyDashboard";
-import PatientPortal from "./pages/PatientPortal";
+import StateMonitor from "./components/StateMonitor";
 
 /**
  * Main App Component
- * Centralized routing configuration
+ * Centralized routing with state monitoring
  */
 function App() {
   return (
@@ -17,10 +16,10 @@ function App() {
           {routes.map((route, index) => (
             <Route key={index} path={route.path} element={route.element} />
           ))}
-          {/* <Route path="/PharmacyDashboard" element={<PharmacyDashboard />} />
-        <Route path="/EmergencySOS" element={<EmergencySOS />} /> */}
-        {/* <Route path="../pages/PatientPortal" element={<PatientPortal />} />  */}
         </Routes>
+        
+        {/* Development-only state monitor (Ctrl+Shift+L to toggle) */}
+        <StateMonitor />
       </AuthProvider>
     </BrowserRouter>
   );

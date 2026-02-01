@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { AuthLayout } from "../components/AuthLayout";
-import { useAuth } from "../context/AuthContext";
+import { AuthLayout } from "../../components/AuthLayout";
+import { useAuth } from "../../context/AuthContext";
 import { Eye, EyeOff } from "lucide-react";
-import pharmacyImage from "../assets/image.png";
+import pharmacyImage from "../../assets/image.png";
 
 export function Login() {
   const navigate = useNavigate();

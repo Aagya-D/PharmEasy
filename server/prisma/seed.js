@@ -2,6 +2,7 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
+import bcrypt from "bcrypt";
 
 // Initialize Prisma with adapter
 const pool = new Pool({
@@ -97,6 +98,49 @@ async function main() {
       console.log(`      → ${role.description}\n`);
     });
 
+    // ============================================
+    // SEED SYSTEM ADMIN USER
+    // ============================================
+    console.log("👤 Seeding System Admin User...\n");
+
+    const adminEmail = process.env.SYSTEM_ADMIN_EMAIL || "admin@pharmeasy.com";
+    const adminPassword = process.env.SYSTEM_ADMIN_PASSWORD || "Admin@123";
+    const adminName = process.env.SYSTEM_ADMIN_NAME || "System Administrator";
+
+    // Check if admin already exists
+    const existingAdmin = await prisma.user.findUnique({
+      where: { email: adminEmail },
+    });
+
+    if (existingAdmin) {
+      console.log(`✓ System Admin already exists: ${adminEmail}`);
+      console.log(`   User ID: ${existingAdmin.id}`);
+      console.log(`   Role ID: ${existingAdmin.roleId}\n`);
+    } else {
+      // Hash admin password
+      const hashedPassword = await bcrypt.hash(adminPassword, 10);
+
+      // Create system admin user
+      const adminUser = await prisma.user.create({
+        data: {
+          email: adminEmail,
+          name: adminName,
+          password: hashedPassword,
+          roleId: 1, // SYSTEM_ADMIN
+          isVerified: true,
+          verifiedAt: new Date(),
+          isActive: true,
+        },
+      });
+
+      console.log(`✓ Created System Admin User`);
+      console.log(`   Email: ${adminUser.email}`);
+      console.log(`   User ID: ${adminUser.id}`);
+      console.log(`   Role ID: ${adminUser.roleId}`);
+      console.log(`   Password: ${adminPassword}\n`);
+      console.log(`⚠️  IMPORTANT: Change admin password after first login!\n`);
+    }
+
     console.log("📝 Registration Role Selection (Frontend):");
     console.log("   User selects: Patient (ID 3) or Pharmacy Admin (ID 2)");
     console.log("   System Admin (ID 1) is backend-only\n");
@@ -107,6 +151,11 @@ async function main() {
     console.log("   3. Backend validates roleId is 2 or 3");
     console.log("   4. Backend creates user with roleId directly");
     console.log("   5. No role lookup query needed\n");
+
+    console.log("✅ Seeding completed successfully!\n");
+    console.log("🔐 Admin Login Credentials:");
+    console.log(`   Email: ${adminEmail}`);
+    console.log(`   Password: ${adminPassword}\n`);
   } catch (error) {
     console.error("❌ Seed failed:", error);
     throw error;

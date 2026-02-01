@@ -32,7 +32,7 @@ export const register = async (req, res, next) => {
         ? `${firstName} ${lastName}`
         : firstName || lastName);
 
-    // Pass all details to service for Redis storage
+    // Call the correct service method
     const result = await userService.registerUser({
       email,
       password,
@@ -77,11 +77,16 @@ export const verifyEmailOTP = async (req, res, next) => {
       otp,
     });
 
-    const accessToken = generateAccessToken({
-      userId: user.id,
-      roleId: user.role_type_id,
-    });
-    const refreshToken = generateRefreshToken({ userId: user.id });
+    // Get pharmacy status if user is pharmacy admin
+    const pharmacyStatus = user.pharmacy?.verificationStatus || null;
+
+    // Generate tokens with pharmacy status
+    const accessToken = generateAccessToken(
+      user.id,
+      user.role.name,
+      pharmacyStatus
+    );
+    const refreshToken = generateRefreshToken(user.id);
 
     await userService.saveRefreshToken(user.id, refreshToken);
 
@@ -95,14 +100,27 @@ export const verifyEmailOTP = async (req, res, next) => {
     });
 
     res.status(201).json({
+      success: true,
       message: "Email verified successfully.",
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        roleId: user.role_type_id,
-        accountStatus: user.accountStatus,
-        onboardingComplete: user.onboardingComplete,
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          roleId: user.roleId,
+          role: user.role.name,
+          isVerified: user.isVerified,
+        },
+        pharmacy: user.pharmacy ? {
+          id: user.pharmacy.id,
+          pharmacyName: user.pharmacy.pharmacyName,
+          verificationStatus: user.pharmacy.verificationStatus,
+          isOnboarded: true,
+        } : null,
+        isOnboarded: user.pharmacy ? true : false,
+        needsOnboarding: user.roleId === 2 && !user.pharmacy,
+        accessToken,
+        refreshToken,
       },
     });
   } catch (err) {
@@ -120,39 +138,34 @@ export const login = async (req, res, next) => {
       throw new ValidationError("Email and password are required.");
     }
 
-    // 2. AUTHENTICATE USER
-    const user = await userService.authenticateUser(email, password);
+    // 2. AUTHENTICATE USER AND GET TOKENS
+    const result = await userService.authenticateUser(email, password);
 
-    // 3. GENERATE TOKENS
-    const accessToken = generateAccessToken({
-      userId: user.id,
-      roleId: user.role_type_id,
-    });
-    const refreshToken = generateRefreshToken({ userId: user.id });
-
-    // 4. SAVE REFRESH TOKEN TO DATABASE
-    await userService.saveRefreshToken(user.id, refreshToken);
-
-    // 5. SET SECURE COOKIES
-    res.cookie("access_token", accessToken, {
+    // 3. SET SECURE COOKIES
+    res.cookie("access_token", result.accessToken, {
       ...COOKIE_OPTIONS,
       maxAge: 1000 * 60 * 15,
     });
-    res.cookie("refresh_token", refreshToken, {
+    res.cookie("refresh_token", result.refreshToken, {
       ...COOKIE_OPTIONS,
       maxAge: 1000 * 60 * 60 * 24 * 30,
     });
 
-    // 6. RETURN USER DATA (WITHOUT PASSWORD)
-    const { password: _, ...userWithoutPassword } = user;
-
-    res.json({
+    // 4. RETURN USER DATA
+    res.status(200).json({
+      success: true,
       message: "Login successful",
-      user: {
-        ...userWithoutPassword,
-        roleId: user.role_type_id, // Map role_type_id to roleId for frontend consistency
-        onboardingComplete: user.onboardingComplete,
-        accountStatus: user.accountStatus,
+      data: {
+        userId: result.userId,
+        email: result.email,
+        name: result.name,
+        role: result.role,
+        roleId: result.roleId,
+        pharmacy: result.pharmacy,
+        isOnboarded: result.isOnboarded,
+        needsOnboarding: result.roleId === 2 && !result.pharmacy,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
       },
     });
   } catch (err) {
@@ -161,14 +174,14 @@ export const login = async (req, res, next) => {
       const { email } = req.body;
       try {
         // Send OTP to unverified email
-        await userService.resendOTP(email, "EMAIL_VERIFICATION");
+        await userService.resendOTP(email);
 
         // Return specific error so frontend knows to redirect to verify OTP
         return res.status(403).json({
           success: false,
           message: "Email not verified. OTP sent to your email.",
           code: "EMAIL_NOT_VERIFIED",
-          email: email, // Send email back so frontend can pre-fill verify OTP page
+          email: email,
         });
       } catch (otpErr) {
         // If OTP sending fails, return generic error
@@ -328,14 +341,24 @@ export const resetPassword = async (req, res, next) => {
 // ---------------- RESEND OTP ----------------
 export const resendOTP = async (req, res, next) => {
   try {
-    const { email, type } = req.body;
-    if (!email || !type)
-      return res.status(400).json({ message: "Email and type required" });
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Email is required" 
+      });
+    }
 
-    // Use the new service method that handles Pending vs Existing logic internally
-    await userService.resendOTP({ email, type });
+    const result = await userService.resendOTP(email);
 
-    res.json({ message: "OTP resent successfully" });
+    res.status(200).json({ 
+      success: true,
+      message: "OTP resent successfully",
+      data: {
+        userId: result.userId
+      }
+    });
   } catch (err) {
     next(err);
   }

@@ -177,13 +177,31 @@ export const verifyOTP = async (userIdOrEmail, otpCode) => {
     console.log(`[VERIFY OTP] Looking up user by email: ${normalizedEmail}`);
     user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
-      include: { role: true },
+      include: { 
+        role: true,
+        pharmacy: {
+          select: {
+            id: true,
+            pharmacyName: true,
+            verificationStatus: true,
+          }
+        }
+      },
     });
   } else {
     console.log(`[VERIFY OTP] Looking up user by ID: ${userIdOrEmail}`);
     user = await prisma.user.findUnique({
       where: { id: userIdOrEmail },
-      include: { role: true },
+      include: { 
+        role: true,
+        pharmacy: {
+          select: {
+            id: true,
+            pharmacyName: true,
+            verificationStatus: true,
+          }
+        }
+      },
     });
   }
 
@@ -319,7 +337,14 @@ export const login = async (
 
   const user = await prisma.user.findUnique({
     where: { email: normalizedEmail },
-    include: { role: true },
+    include: { 
+      role: true,
+      pharmacy: {
+        select: {
+          verificationStatus: true,
+        },
+      },
+    },
   });
 
   if (!user) {
@@ -344,8 +369,11 @@ export const login = async (
 
   console.log(`[LOGIN] Authenticated user: ${user.email}`);
 
-  // Generate tokens
-  const accessToken = generateAccessToken(user.id, user.role.name);
+  // Get pharmacy status for PHARMACY_ADMIN users
+  const pharmacyStatus = user.pharmacy?.verificationStatus || null;
+
+  // Generate tokens (include pharmacy status for pharmacy admins)
+  const accessToken = generateAccessToken(user.id, user.role.name, pharmacyStatus);
   const refreshToken = generateRefreshToken(user.id);
 
   // Store hashed refresh token
@@ -382,6 +410,14 @@ export const login = async (
     email: user.email,
     name: user.name,
     role: user.role.name,
+    roleId: user.roleId,
+    pharmacy: user.pharmacy ? {
+      id: user.pharmacy.id,
+      pharmacyName: user.pharmacy.pharmacyName,
+      verificationStatus: user.pharmacy.verificationStatus,
+      isOnboarded: true,
+    } : null,
+    isOnboarded: user.pharmacy ? true : false,
     accessToken,
     refreshToken,
     expiresIn: 900, // 15 minutes
@@ -435,15 +471,25 @@ export const refreshAccessToken = async (refreshToken) => {
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: { role: true },
+    include: { 
+      role: true,
+      pharmacy: {
+        select: {
+          verificationStatus: true,
+        },
+      },
+    },
   });
 
   if (!user) {
     throw new AppError("User not found", 404);
   }
 
-  // Generate new access token
-  const newAccessToken = generateAccessToken(user.id, user.role.name);
+  // Get pharmacy status for PHARMACY_ADMIN users
+  const pharmacyStatus = user.pharmacy?.verificationStatus || null;
+
+  // Generate new access token with pharmacy status
+  const newAccessToken = generateAccessToken(user.id, user.role.name, pharmacyStatus);
 
   console.log(`[REFRESH] New access token issued for user: ${userId}`);
 

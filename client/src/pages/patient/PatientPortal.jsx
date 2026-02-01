@@ -19,8 +19,8 @@ import {
   Star,
   CheckCircle,
 } from "lucide-react";
-import { Navbar } from "../components/Navbar";
-import { Footer } from "../components/Footer";
+import { Navbar } from "../../components/Navbar";
+import { Footer } from "../../components/Footer";
 
 /**
  * Global Landing Page - Patient Portal

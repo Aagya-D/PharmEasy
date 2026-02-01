@@ -2,27 +2,69 @@ import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-// Pages
+// Pages - Organized by module
 import Landing from "../pages/Landing";
-import Login from "../pages/Login";
-import Register from "../pages/Register";
-import VerifyOtp from "../pages/VerifyOtp";
-import ForgotPassword from "../pages/ForgotPassword";
-import ResetPassword from "../pages/ResetPassword";
 
-// New Pages
-import PatientPortal from "../pages/PatientPortal";
-import SearchResults from "../pages/SearchResults";
-import PharmacyDashboard from "../pages/PharmacyDashboard";
-import EmergencySOS from "../pages/EmergencySOS";
+// Auth Pages
+import Login from "../pages/auth/Login";
+import Register from "../pages/auth/Register";
+import VerifyOtp from "../pages/auth/VerifyOtp";
+import ForgotPassword from "../pages/auth/ForgotPassword";
+import ResetPassword from "../pages/auth/ResetPassword";
+
+// Patient Pages
+import PatientPortal from "../pages/patient/PatientPortal";
+import SearchResults from "../pages/patient/SearchResults";
+import EmergencySOS from "../pages/patient/EmergencySOS";
 import NotificationCenter from "../pages/NotificationCenter";
+
+// Pharmacy Pages
+import PharmacyDashboard from "../pages/pharmacy/PharmacyDashboard";
+import PharmacyOnboarding from "../pages/pharmacy/PharmacyOnboarding";
+import PharmacyPendingApproval from "../pages/pharmacy/PharmacyPendingApproval";
+
+// Admin Pages
+import AdminDashboardHome from "../pages/admin/AdminDashboardHome";
+import AdminPharmacies from "../pages/admin/AdminPharmacies";
+import AdminPharmacyDetails from "../pages/admin/AdminPharmacyDetails";
+import AdminUsers from "../pages/admin/AdminUsers";
+import AdminLogs from "../pages/admin/AdminLogs";
+import AdminSettings from "../pages/admin/AdminSettings";
 
 // Components
 import ProtectedRoute from "./ProtectedRoute";
+import { AdminRoute, PharmacyAdminRoute } from "./RoleProtectedRoute";
 import Layout from "../components/Layout";
 
-// Placeholder pages
+// Smart Dashboard Router - Routes users to their role-specific dashboard
 function Dashboard() {
+  const { user } = useAuth();
+
+  // Route based on roleId
+  if (user?.roleId === 1) {
+    // System Admin -> Admin Dashboard
+    return <Navigate to="/system-admin/dashboard" replace />;
+  } else if (user?.roleId === 2) {
+    // Pharmacy Admin -> Check onboarding status
+    if (!user.pharmacy) {
+      // Not onboarded yet
+      return <Navigate to="/pharmacy/onboard" replace />;
+    } else if (user.pharmacy.verificationStatus === "PENDING_VERIFICATION") {
+      // Pending approval
+      return <Navigate to="/pharmacy/pending-approval" replace />;
+    } else if (user.pharmacy.verificationStatus === "VERIFIED") {
+      // Verified -> Pharmacy Dashboard
+      return <Navigate to="/admin/dashboard" replace />;
+    } else if (user.pharmacy.verificationStatus === "REJECTED") {
+      // Rejected -> Show onboarding page with rejection message
+      return <Navigate to="/pharmacy/onboard" replace />;
+    }
+  } else if (user?.roleId === 3) {
+    // Patient -> Patient Portal
+    return <Navigate to="/patient" replace />;
+  }
+
+  // Fallback - Generic dashboard
   return (
     <Layout>
       <div
@@ -33,7 +75,7 @@ function Dashboard() {
         }}
       >
         <h1>Dashboard</h1>
-        <p>Your dashboard content goes here</p>
+        <p>Welcome to PharmEasy</p>
       </div>
     </Layout>
   );
@@ -175,6 +217,74 @@ export const routes = [
   {
     path: "/notifications",
     element: <NotificationCenter />,
+  },
+
+  // Pharmacy Onboarding Routes
+  {
+    path: "/pharmacy/onboard",
+    element: (
+      <PharmacyAdminRoute>
+        <PharmacyOnboarding />
+      </PharmacyAdminRoute>
+    ),
+  },
+  {
+    path: "/pharmacy/pending-approval",
+    element: (
+      <PharmacyAdminRoute>
+        <PharmacyPendingApproval />
+      </PharmacyAdminRoute>
+    ),
+  },
+
+  // Admin Dashboard Routes
+  {
+    path: "/system-admin/dashboard",
+    element: (
+      <AdminRoute>
+        <AdminDashboardHome />
+      </AdminRoute>
+    ),
+  },
+  {
+    path: "/system-admin/pharmacies",
+    element: (
+      <AdminRoute>
+        <AdminPharmacies />
+      </AdminRoute>
+    ),
+  },
+  {
+    path: "/system-admin/pharmacy/:id",
+    element: (
+      <AdminRoute>
+        <AdminPharmacyDetails />
+      </AdminRoute>
+    ),
+  },
+  {
+    path: "/system-admin/users",
+    element: (
+      <AdminRoute>
+        <AdminUsers />
+      </AdminRoute>
+    ),
+  },
+  {
+    path: "/system-admin/logs",
+    element: (
+      <AdminRoute>
+        <AdminLogs />
+      </AdminRoute>
+    ),
+  },
+  {
+    path: "/system-admin/settings",
+    element: (
+      <AdminRoute>
+        <AdminSettings />
+      </AdminRoute>
+    ),
   },
 
   // Pharmacy Admin Dashboard

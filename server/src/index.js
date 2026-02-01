@@ -9,6 +9,8 @@ import dotenv from "dotenv";
 import { prisma } from "./database/prisma.js";
 import { errorHandler, asyncHandler } from "./middlewares/errorHandler.js";
 import authRoutes from "./modules/auth/auth.routes.js";
+import pharmacyRoutes from "./modules/pharmacy/pharmacy.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
 
 // Load environment variables
 dotenv.config();
@@ -93,6 +95,13 @@ app.get(
 
 // Authentication routes
 app.use("/api/auth", authRoutes);
+
+// Pharmacy routes (onboarding & admin verification)
+app.use("/api/pharmacy", pharmacyRoutes);
+app.use("/api", pharmacyRoutes);
+
+// Admin routes (pharmacy approval/rejection)
+app.use("/api/admin", adminRoutes);
 
 // Root API endpoint
 app.get("/api", (req, res) => {

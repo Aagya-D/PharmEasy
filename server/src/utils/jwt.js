@@ -21,12 +21,20 @@ const TOKEN_EXPIRY = {
  * Generate Access Token (short-lived, for API requests)
  * @param {string} userId - User ID
  * @param {string|object} role - Role object or role name string
+ * @param {string} pharmacyStatus - Pharmacy verification status (optional)
  */
-export const generateAccessToken = (userId, role) => {
+export const generateAccessToken = (userId, role, pharmacyStatus = null) => {
   // Handle both role object and role name string
   const roleName = typeof role === "object" ? role.name : role;
 
-  return jwt.sign({ userId, role: roleName }, JWT_ACCESS_SECRET, {
+  const payload = { userId, role: roleName };
+  
+  // Include pharmacy status for PHARMACY_ADMIN users
+  if (pharmacyStatus) {
+    payload.pharmacyStatus = pharmacyStatus;
+  }
+
+  return jwt.sign(payload, JWT_ACCESS_SECRET, {
     expiresIn: TOKEN_EXPIRY.ACCESS,
   });
 };
