@@ -326,7 +326,7 @@ export function AuthProvider({ children }) {
         payload: { user, accessToken: data.accessToken },
       });
 
-      return { success: true };
+      return { success: true, user };
     } catch (error) {
       // Check for EMAIL_NOT_VERIFIED error code from backend
       const code = error.response?.data?.code;

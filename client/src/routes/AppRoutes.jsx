@@ -1,6 +1,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 // Pages - Organized by module
 import Landing from "../pages/Landing";
@@ -33,8 +34,63 @@ import AdminSettings from "../pages/admin/AdminSettings";
 
 // Components
 import ProtectedRoute from "./ProtectedRoute";
-import { AdminRoute, PharmacyAdminRoute } from "./RoleProtectedRoute";
 import Layout from "../components/Layout";
+
+// Unauthorized page component
+function UnauthorizedPage() {
+  return (
+    <Layout>
+      <div style={{ padding: "var(--spacing-xl)", textAlign: "center", maxWidth: "600px", margin: "0 auto" }}>
+        <h1 style={{ fontSize: "48px", marginBottom: "var(--spacing-md)" }}>🚫</h1>
+        <h2 style={{ marginBottom: "var(--spacing-md)" }}>Access Denied</h2>
+        <p style={{ color: "var(--color-text-secondary)", marginBottom: "var(--spacing-lg)" }}>
+          You don't have permission to access this page.
+        </p>
+        <button
+          onClick={() => window.location.href = "/dashboard"}
+          style={{
+            padding: "var(--spacing-md) var(--spacing-xl)",
+            backgroundColor: "var(--color-primary)",
+            color: "white",
+            border: "none",
+            borderRadius: "var(--border-radius-md)",
+            cursor: "pointer"
+          }}
+        >
+          Go to Dashboard
+        </button>
+      </div>
+    </Layout>
+  );
+}
+
+// Not Found page component
+function NotFoundPage() {
+  return (
+    <Layout>
+      <div style={{ padding: "var(--spacing-xl)", textAlign: "center", maxWidth: "600px", margin: "0 auto" }}>
+        <h1 style={{ fontSize: "72px", marginBottom: "var(--spacing-md)" }}>404</h1>
+        <h2 style={{ marginBottom: "var(--spacing-md)" }}>Page Not Found</h2>
+        <p style={{ color: "var(--color-text-secondary)", marginBottom: "var(--spacing-lg)" }}>
+          The page you're looking for doesn't exist.
+        </p>
+        <button
+          onClick={() => window.location.href = "/"}
+          style={{
+            padding: "var(--spacing-md) var(--spacing-xl)",
+            backgroundColor: "var(--color-primary)",
+            color: "white",
+            border: "none",
+            borderRadius: "var(--border-radius-md)",
+            cursor: "pointer"
+          }}
+        >
+          Go Home
+        </button>
+      </div>
+    </Layout>
+  );
+}
 
 // Smart Dashboard Router - Routes users to their role-specific dashboard
 function Dashboard() {
@@ -43,7 +99,7 @@ function Dashboard() {
   // Route based on roleId
   if (user?.roleId === 1) {
     // System Admin -> Admin Dashboard
-    return <Navigate to="/system-admin/dashboard" replace />;
+    return <Navigate to="/admin/dashboard" replace />;
   } else if (user?.roleId === 2) {
     // Pharmacy Admin -> Check onboarding status
     if (!user.pharmacy) {
@@ -54,7 +110,7 @@ function Dashboard() {
       return <Navigate to="/pharmacy/pending-approval" replace />;
     } else if (user.pharmacy.verificationStatus === "VERIFIED") {
       // Verified -> Pharmacy Dashboard
-      return <Navigate to="/admin/dashboard" replace />;
+      return <Navigate to="/pharmacy/dashboard" replace />;
     } else if (user.pharmacy.verificationStatus === "REJECTED") {
       // Rejected -> Show onboarding page with rejection message
       return <Navigate to="/pharmacy/onboard" replace />;
@@ -103,31 +159,7 @@ function PublicRoute({ children }) {
   const { isAuthenticated, isSessionRestoring } = useAuth();
 
   if (isSessionRestoring) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-          backgroundColor: "var(--color-bg-primary)",
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              width: "40px",
-              height: "40px",
-              border: "3px solid var(--color-border)",
-              borderTop: "3px solid var(--color-primary)",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-              margin: "0 auto",
-            }}
-          />
-        </div>
-      </div>
-    );
+    return <LoadingSpinner showText={false} />;
   }
 
   // If already authenticated, redirect to dashboard
@@ -139,11 +171,11 @@ function PublicRoute({ children }) {
 }
 
 /**
- * Route Configuration
- * Centralized routing rules for the application
+ * Route Configuration - Tree Structure
+ * Centralized routing rules with nested protected routes
  */
 export const routes = [
-  // Landing page - always accessible
+  // --- PUBLIC ZONE ---
   {
     path: "/",
     element: (
@@ -152,8 +184,6 @@ export const routes = [
       </Layout>
     ),
   },
-
-  // Public routes (redirects to dashboard if authenticated)
   {
     path: "/login",
     element: (
@@ -194,118 +224,100 @@ export const routes = [
       </PublicRoute>
     ),
   },
-
-  // Patient Portal (New Landing Page)
   {
-    path: "/patient",
-    element: <PatientPortal />,
+    path: "/unauthorized",
+    element: <UnauthorizedPage />,
   },
 
-  // Medicine Search Results
+  // --- PATIENT ZONE (Protected) ---
   {
-    path: "/search",
-    element: <SearchResults />,
+    path: "/",
+    element: <ProtectedRoute allowedRoles={['PATIENT']} />,
+    children: [
+      {
+        path: "search",
+        element: <SearchResults />,
+      },
+      {
+        path: "map",
+        element: <PatientPortal />, // Using PatientPortal as map page
+      },
+      {
+        path: "sos",
+        element: <EmergencySOS />,
+      },
+      {
+        path: "patient",
+        element: <PatientPortal />,
+      },
+      {
+        path: "notifications",
+        element: <NotificationCenter />,
+      },
+    ],
   },
 
-  // Emergency SOS
+  // --- PHARMACY ZONE (Protected) ---
   {
-    path: "/sos",
-    element: <EmergencySOS />,
+    path: "/pharmacy",
+    element: <ProtectedRoute allowedRoles={['PHARMACY']} />,
+    children: [
+      {
+        path: "dashboard",
+        element: <PharmacyDashboard />,
+      },
+      {
+        path: "inventory",
+        element: <PharmacyDashboard />, // Reusing dashboard for inventory
+      },
+      {
+        path: "onboard",
+        element: <PharmacyOnboarding />,
+      },
+      {
+        path: "pending-approval",
+        element: <PharmacyPendingApproval />,
+      },
+    ],
   },
 
-  // Notifications
+  // --- ADMIN ZONE (Protected) ---
   {
-    path: "/notifications",
-    element: <NotificationCenter />,
+    path: "/admin",
+    element: <ProtectedRoute allowedRoles={['ADMIN']} />,
+    children: [
+      {
+        path: "verify",
+        element: <AdminPharmacies />, // Using AdminPharmacies as verification page
+      },
+      {
+        path: "dashboard",
+        element: <AdminDashboardHome />,
+      },
+      {
+        path: "pharmacies",
+        element: <AdminPharmacies />,
+      },
+      {
+        path: "pharmacy/:id",
+        element: <AdminPharmacyDetails />,
+      },
+      {
+        path: "users",
+        element: <AdminUsers />,
+      },
+      {
+        path: "logs",
+        element: <AdminLogs />,
+      },
+      {
+        path: "settings",
+        element: <AdminSettings />,
+      },
+    ],
   },
 
-  // Pharmacy Onboarding Routes
-  {
-    path: "/pharmacy/onboard",
-    element: (
-      <PharmacyAdminRoute>
-        <PharmacyOnboarding />
-      </PharmacyAdminRoute>
-    ),
-  },
-  {
-    path: "/pharmacy/pending-approval",
-    element: (
-      <PharmacyAdminRoute>
-        <PharmacyPendingApproval />
-      </PharmacyAdminRoute>
-    ),
-  },
-
-  // Admin Dashboard Routes
-  {
-    path: "/system-admin/dashboard",
-    element: (
-      <AdminRoute>
-        <AdminDashboardHome />
-      </AdminRoute>
-    ),
-  },
-  {
-    path: "/system-admin/pharmacies",
-    element: (
-      <AdminRoute>
-        <AdminPharmacies />
-      </AdminRoute>
-    ),
-  },
-  {
-    path: "/system-admin/pharmacy/:id",
-    element: (
-      <AdminRoute>
-        <AdminPharmacyDetails />
-      </AdminRoute>
-    ),
-  },
-  {
-    path: "/system-admin/users",
-    element: (
-      <AdminRoute>
-        <AdminUsers />
-      </AdminRoute>
-    ),
-  },
-  {
-    path: "/system-admin/logs",
-    element: (
-      <AdminRoute>
-        <AdminLogs />
-      </AdminRoute>
-    ),
-  },
-  {
-    path: "/system-admin/settings",
-    element: (
-      <AdminRoute>
-        <AdminSettings />
-      </AdminRoute>
-    ),
-  },
-
-  // Pharmacy Admin Dashboard
-  {
-    path: "/admin/dashboard",
-    element: (
-      <ProtectedRoute>
-        <PharmacyDashboard />
-      </ProtectedRoute>
-    ),
-  },
-  {
-    path: "/admin/inventory",
-    element: (
-      <ProtectedRoute>
-        <PharmacyDashboard />
-      </ProtectedRoute>
-    ),
-  },
-
-  // Protected routes (require authentication)
+  // Smart Dashboard Router (for /dashboard redirect)
   {
     path: "/dashboard",
     element: (
@@ -314,6 +326,8 @@ export const routes = [
       </ProtectedRoute>
     ),
   },
+
+  // Profile (accessible to all authenticated users)
   {
     path: "/profile",
     element: (
@@ -323,10 +337,10 @@ export const routes = [
     ),
   },
 
-  // Catch-all - redirect to landing
+  // --- CATCH ALL ---
   {
     path: "*",
-    element: <Navigate to="/" replace />,
+    element: <NotFoundPage />,
   },
 ];
 

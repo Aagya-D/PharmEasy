@@ -1,48 +1,25 @@
 import React from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import LoadingSpinner from "../components/LoadingSpinner";
+
+// Role ID to role name mapping
+const ROLE_MAP = {
+  1: 'ADMIN',
+  2: 'PHARMACY',
+  3: 'PATIENT'
+};
 
 /**
  * Route guard component
- * Protects routes that require authentication
+ * Protects routes that require authentication and optional role validation
+ * @param {string[]} allowedRoles - Array of allowed role names (e.g., ['ADMIN', 'PHARMACY'])
  */
-export function ProtectedRoute({ children }) {
-  const { isAuthenticated, isOTPVerified, isSessionRestoring } = useAuth();
+export function ProtectedRoute({ allowedRoles, children }) {
+  const { isAuthenticated, isOTPVerified, isSessionRestoring, user } = useAuth();
 
   if (isSessionRestoring) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-          backgroundColor: "var(--color-bg-primary)",
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              width: "40px",
-              height: "40px",
-              border: "3px solid var(--color-border)",
-              borderTop: "3px solid var(--color-primary)",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-              margin: "0 auto",
-            }}
-          />
-          <p
-            style={{
-              marginTop: "var(--spacing-md)",
-              color: "var(--color-text-secondary)",
-            }}
-          >
-            Loading...
-          </p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner />;
   }
 
   // ✅ CRITICAL: Check BOTH authentication AND OTP verification
@@ -50,7 +27,18 @@ export function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  return children;
+  // ✅ Role-based access control
+  if (allowedRoles && allowedRoles.length > 0) {
+    const userRole = ROLE_MAP[user?.roleId];
+    
+    if (!userRole || !allowedRoles.includes(userRole)) {
+      console.log('[ProtectedRoute] Access denied - User role:', userRole, 'Allowed:', allowedRoles);
+      return <Navigate to="/unauthorized" replace />;
+    }
+  }
+
+  // Use Outlet for nested routes, children for direct wrapping
+  return children || <Outlet />;
 }
 
 export default ProtectedRoute;

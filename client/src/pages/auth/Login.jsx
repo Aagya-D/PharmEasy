@@ -29,7 +29,21 @@ export function Login() {
     try {
       const result = await login(email, password);
       if (result.success) {
-        navigate("/dashboard");
+        // Role-based redirect after successful login
+        const { user } = result;
+        if (user?.roleId === 3) {
+          // PATIENT → Search page
+          navigate("/search");
+        } else if (user?.roleId === 2) {
+          // PHARMACY → Pharmacy dashboard
+          navigate("/pharmacy/dashboard");
+        } else if (user?.roleId === 1) {
+          // ADMIN → Admin verification page
+          navigate("/admin/verify");
+        } else {
+          // Fallback to smart dashboard router
+          navigate("/dashboard");
+        }
       } else if (result.code === "EMAIL_NOT_VERIFIED") {
         // Redirect to verify OTP page with email pre-filled
         navigate("/verify-otp", {
