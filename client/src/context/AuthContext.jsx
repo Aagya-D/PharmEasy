@@ -147,55 +147,25 @@ export function AuthProvider({ children }) {
     }
   }, [state.user]);
 
-  // Restore session from localStorage on mount
+  // ✅ DISABLED: No automatic session restoration
+  // Landing page always shows public version until user clicks login
   useEffect(() => {
-    const restoreSession = () => {
-      const storedAccessToken = localStorage.getItem("accessToken");
-      const storedUser = localStorage.getItem("user");
-
-      if (storedAccessToken && storedUser) {
-        try {
-          const user = JSON.parse(storedUser);
-          logger.authEvent("SESSION_RESTORED", { userId: user.id });
-          auditor.auditAuth(user, "SESSION_RESTORE");
-          
-          dispatch({
-            type: ACTIONS.RESTORE_SESSION,
-            payload: {
-              user,
-              accessToken: storedAccessToken,
-              isAuthenticated: true,
-            },
-          });
-        } catch (error) {
-          logger.error("Session restore failed", error);
-          // Clear invalid stored data
-          localStorage.removeItem("accessToken");
-          localStorage.removeItem("user");
-          localStorage.removeItem("refreshToken");
-          dispatch({
-            type: ACTIONS.RESTORE_SESSION,
-            payload: {
-              user: null,
-              accessToken: null,
-              isAuthenticated: false,
-            },
-          });
-        }
-      } else {
-        logger.info("No session to restore");
-        dispatch({
-          type: ACTIONS.RESTORE_SESSION,
-          payload: {
-            user: null,
-            accessToken: null,
-            isAuthenticated: false,
-          },
-        });
-      }
+    const disableAutoRestore = () => {
+      logger.info("Auto-restore disabled - landing page shows public view");
+      
+      // Always start with unauthenticated state
+      dispatch({
+        type: ACTIONS.RESTORE_SESSION,
+        payload: {
+          user: null,
+          accessToken: null,
+          isAuthenticated: false,
+          isOTPVerified: false,
+        },
+      });
     };
 
-    restoreSession();
+    disableAutoRestore();
   }, []);
 
   // Setup axios interceptors

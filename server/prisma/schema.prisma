@@ -57,6 +57,11 @@ model Role {
 /// * - Eliminates "role not found" runtime errors
 /// * 
 /// * All users must verify email via OTP before login
+/// * 
+/// * User Status Flow:
+/// * - PATIENT (roleId=3): Status defaults to APPROVED
+/// * - PHARMACY (roleId=2): Status defaults to PENDING until admin approves
+/// * - ADMIN (roleId=1): Status defaults to APPROVED
 model User {
   id             String               @id @default(cuid())
   email          String               @unique
@@ -64,6 +69,7 @@ model User {
   password       String
   phone          String?
   roleId         Int
+  status         UserStatus           @default(APPROVED)
   isVerified     Boolean              @default(false)
   verifiedAt     DateTime?
   isActive       Boolean              @default(true)
@@ -79,6 +85,7 @@ model User {
   @@index([email])
   @@index([roleId])
   @@index([isVerified])
+  @@index([status])
 }
 
 /// *
@@ -178,6 +185,12 @@ enum RoleType {
   PATIENT
   PHARMACY_ADMIN
   SYSTEM_ADMIN
+}
+
+enum UserStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum PharmacyStatus {
