@@ -67,14 +67,7 @@ export function ForgotPassword() {
       <form onSubmit={handleSubmit}>
         {error && (
           <div
-            style={{
-              padding: "var(--spacing-md)",
-              backgroundColor: "var(--color-error-light)",
-              color: "var(--color-error)",
-              borderRadius: "var(--radius-md)",
-              marginBottom: "var(--spacing-lg)",
-              fontSize: "var(--font-size-sm)",
-            }}
+            className="p-4 bg-[var(--color-error-light)] text-[var(--color-error)] rounded-lg mb-6 text-sm"
             role="alert"
           >
             {error}
@@ -83,14 +76,7 @@ export function ForgotPassword() {
 
         {success && (
           <div
-            style={{
-              padding: "var(--spacing-md)",
-              backgroundColor: "var(--color-success-light)",
-              color: "var(--color-success)",
-              borderRadius: "var(--radius-md)",
-              marginBottom: "var(--spacing-lg)",
-              fontSize: "var(--font-size-sm)",
-            }}
+            className="p-4 bg-[var(--color-success-light)] text-[var(--color-success)] rounded-lg mb-6 text-sm"
             role="status"
           >
             {success}
@@ -112,26 +98,11 @@ export function ForgotPassword() {
         </Button>
 
         <div
-          style={{
-            marginTop: "var(--spacing-lg)",
-            textAlign: "center",
-          }}
+          className="mt-6 text-center"
         >
           <Link
             to="/login"
-            style={{
-              fontSize: "var(--font-size-sm)",
-              color: "var(--color-primary)",
-              fontWeight: "var(--font-weight-medium)",
-              textDecoration: "none",
-              transition: "color var(--transition-fast)",
-            }}
-            onMouseEnter={(e) =>
-              (e.target.style.color = "var(--color-primary-dark)")
-            }
-            onMouseLeave={(e) =>
-              (e.target.style.color = "var(--color-primary)")
-            }
+            className="text-sm text-[var(--color-primary)] font-medium no-underline transition-colors hover:text-[var(--color-primary-dark)]"
           >
             Back to login
           </Link>

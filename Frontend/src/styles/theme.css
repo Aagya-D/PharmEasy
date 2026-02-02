@@ -1,0 +1,169 @@
+/**
+ * PHARMEASY DESIGN TOKENS
+ * Tailwind CSS v4 - Theme Configuration
+ * 
+ * This file defines all design tokens as CSS custom properties.
+ * Tailwind v4 automatically recognizes these variables.
+ */
+
+@import "tailwindcss";
+
+/* ============================================================
+   THEME: Healthcare & Medical Focus
+   ============================================================ */
+
+@theme {
+  /* COLORS - Healthcare Palette */
+  --color-primary: #0891b2;
+  --color-primary-hover: #06b6d4;
+  --color-primary-active: #0e7490;
+  --color-primary-light: #f0f9fc;
+  
+  --color-secondary: #6366f1;
+  --color-secondary-hover: #818cf8;
+  --color-secondary-active: #4f46e5;
+  
+  /* STATUS COLORS */
+  --color-success: #10b981;
+  --color-success-light: #d1fae5;
+  --color-success-dark: #059669;
+  
+  --color-error: #ef4444;
+  --color-error-light: #fee2e2;
+  --color-error-dark: #dc2626;
+  
+  --color-warning: #f59e0b;
+  --color-warning-light: #fef3c7;
+  --color-warning-dark: #d97706;
+  
+  --color-info: #3b82f6;
+  --color-info-light: #dbeafe;
+  --color-info-dark: #1d4ed8;
+  
+  /* NEUTRAL COLORS */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f8fafc;
+  --color-bg-tertiary: #f1f5f9;
+  
+  --color-text-primary: #1e293b;
+  --color-text-secondary: #475569;
+  --color-text-tertiary: #78909c;
+  --color-text-muted: #cbd5e1;
+  
+  --color-border: #e2e8f0;
+  --color-border-dark: #cbd5e1;
+  
+  /* SPACING SCALE */
+  --spacing-xs: 0.25rem;    /* 4px */
+  --spacing-sm: 0.5rem;     /* 8px */
+  --spacing-md: 1rem;       /* 16px */
+  --spacing-lg: 1.5rem;     /* 24px */
+  --spacing-xl: 2rem;       /* 32px */
+  --spacing-2xl: 3rem;      /* 48px */
+  --spacing-3xl: 4rem;      /* 64px */
+  
+  /* BORDER RADIUS */
+  --radius-sm: 0.25rem;     /* 4px */
+  --radius-md: 0.5rem;      /* 8px */
+  --radius-lg: 0.75rem;     /* 12px */
+  --radius-xl: 1rem;        /* 16px */
+  --radius-2xl: 1.5rem;     /* 24px */
+  --radius-full: 9999px;
+  
+  /* SHADOWS */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+  
+  /* TYPOGRAPHY */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-heading: "Plus Jakarta Sans", sans-serif;
+  
+  /* TRANSITIONS */
+  --transition-fast: 150ms;
+  --transition-normal: 200ms;
+  --transition-slow: 300ms;
+  
+  /* Z-INDEX SCALE */
+  --z-dropdown: 1000;
+  --z-sticky: 1100;
+  --z-fixed: 1200;
+  --z-modal-backdrop: 1300;
+  --z-modal: 1400;
+  --z-popover: 1500;
+  --z-tooltip: 1600;
+}
+
+/* ============================================================
+   BASE STYLES
+   ============================================================ */
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-bg-primary text-text-primary font-sans antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-semibold;
+  }
+}
+
+/* ============================================================
+   COMPONENT UTILITIES
+   ============================================================ */
+
+@layer components {
+  /* Button Base */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+  
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-primary-hover active:bg-primary-active focus:ring-primary;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary text-white hover:bg-secondary-hover active:bg-secondary-active focus:ring-secondary;
+  }
+  
+  .btn-ghost {
+    @apply bg-transparent text-text-primary hover:bg-bg-secondary active:bg-bg-tertiary;
+  }
+  
+  /* Input Base */
+  .input {
+    @apply w-full rounded-lg border border-border bg-white px-4 py-2.5 text-sm text-text-primary placeholder:text-text-tertiary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  
+  /* Card */
+  .card {
+    @apply rounded-xl border border-border bg-white p-6 shadow-sm;
+  }
+  
+  /* Alert Variants */
+  .alert {
+    @apply rounded-lg p-4 text-sm font-medium;
+  }
+  
+  .alert-success {
+    @apply bg-success-light text-success-dark border border-success/20;
+  }
+  
+  .alert-error {
+    @apply bg-error-light text-error-dark border border-error/20;
+  }
+  
+  .alert-warning {
+    @apply bg-warning-light text-warning-dark border border-warning/20;
+  }
+  
+  .alert-info {
+    @apply bg-info-light text-info-dark border border-info/20;
+  }
+}
+

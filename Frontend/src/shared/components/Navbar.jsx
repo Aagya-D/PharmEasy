@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import { 
   Menu, 
   X, 
@@ -19,7 +19,7 @@ import {
  * Enhanced Navigation Bar with Tailwind
  * Sticky header with responsive design and smooth interactions
  */
-export function NavbarEnhanced() {
+export function Navbar() {
   const { isAuthenticated, logout, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -260,4 +260,4 @@ export function NavbarEnhanced() {
   );
 }
 
-export default NavbarEnhanced;
+export default Navbar;

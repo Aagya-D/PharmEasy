@@ -74,20 +74,12 @@ export function Login() {
     >
       <form
         onSubmit={handleSubmit}
-        style={{ display: "flex", flexDirection: "column", gap: "20px" }}
+        className="flex flex-col gap-5"
       >
         {/* Error Alert */}
         {error && (
           <div
-            style={{
-              padding: "12px 16px",
-              backgroundColor: "rgba(239, 68, 68, 0.08)",
-              color: "rgb(220, 38, 38)",
-              borderRadius: "8px",
-              fontSize: "13px",
-              fontWeight: "500",
-              border: "1px solid rgba(239, 68, 68, 0.15)",
-            }}
+            className="px-4 py-3 bg-red-50 text-red-600 rounded-lg text-sm font-medium border border-red-100"
             role="alert"
           >
             {error}
@@ -97,15 +89,7 @@ export function Login() {
         {/* Email Field */}
         <div>
           <label
-            style={{
-              display: "block",
-              fontSize: "13px",
-              fontWeight: "600",
-              color: "var(--color-text-primary)",
-              marginBottom: "8px",
-              textTransform: "uppercase",
-              letterSpacing: "0.3px",
-            }}
+            className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2 uppercase tracking-wide"
           >
             Email
           </label>
@@ -115,52 +99,19 @@ export function Login() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={isLoading}
-            style={{
-              width: "100%",
-              padding: "12px 14px",
-              fontSize: "14px",
-              border: "1px solid var(--color-border)",
-              borderRadius: "8px",
-              backgroundColor: "var(--color-bg-secondary)",
-              color: "var(--color-text-primary)",
-              transition: "all 200ms ease",
-              boxSizing: "border-box",
-              fontWeight: "400",
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = "var(--color-primary)";
-              e.target.style.boxShadow = "0 0 0 3px rgba(59, 130, 246, 0.08)";
-              e.target.style.backgroundColor = "var(--color-bg-primary)";
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = "var(--color-border)";
-              e.target.style.boxShadow = "none";
-              e.target.style.backgroundColor = "var(--color-bg-secondary)";
-            }}
+            className="w-full px-3.5 py-3 text-sm border border-[var(--color-border)] rounded-lg bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)] transition-all duration-200 box-border font-normal focus:border-[var(--color-primary)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.08)] focus:bg-[var(--color-bg-primary)] focus:outline-none"
           />
         </div>
 
         {/* Password Field */}
         <div>
           <label
-            style={{
-              display: "block",
-              fontSize: "13px",
-              fontWeight: "600",
-              color: "var(--color-text-primary)",
-              marginBottom: "8px",
-              textTransform: "uppercase",
-              letterSpacing: "0.3px",
-            }}
+            className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2 uppercase tracking-wide"
           >
             Password
           </label>
           <div
-            style={{
-              position: "relative",
-              display: "flex",
-              alignItems: "center",
-            }}
+            className="relative flex items-center"
           >
             <input
               type={showPassword ? "text" : "password"}
@@ -168,52 +119,12 @@ export function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}
-              style={{
-                width: "100%",
-                padding: "12px 14px",
-                paddingRight: "40px",
-                fontSize: "14px",
-                border: "1px solid var(--color-border)",
-                borderRadius: "8px",
-                backgroundColor: "var(--color-bg-secondary)",
-                color: "var(--color-text-primary)",
-                transition: "all 200ms ease",
-                boxSizing: "border-box",
-                fontWeight: "400",
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = "var(--color-primary)";
-                e.target.style.boxShadow = "0 0 0 3px rgba(59, 130, 246, 0.08)";
-                e.target.style.backgroundColor = "var(--color-bg-primary)";
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = "var(--color-border)";
-                e.target.style.boxShadow = "none";
-                e.target.style.backgroundColor = "var(--color-bg-secondary)";
-              }}
+              className="w-full py-3 pl-3.5 pr-10 text-sm border border-[var(--color-border)] rounded-lg bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)] transition-all duration-200 box-border font-normal focus:border-[var(--color-primary)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.08)] focus:bg-[var(--color-bg-primary)] focus:outline-none"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              style={{
-                position: "absolute",
-                right: "12px",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: "var(--color-text-secondary)",
-                padding: "6px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transition: "color 200ms ease",
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.color = "var(--color-primary)";
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.color = "var(--color-text-secondary)";
-              }}
+              className="absolute right-3 bg-transparent border-none cursor-pointer text-[var(--color-text-secondary)] p-1.5 flex items-center justify-center transition-colors duration-200 hover:text-[var(--color-primary)]"
             >
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
@@ -221,22 +132,10 @@ export function Login() {
         </div>
 
         {/* Forgot Password Link */}
-        <div style={{ textAlign: "right" }}>
+        <div className="text-right">
           <Link
             to="/forgot-password"
-            style={{
-              fontSize: "13px",
-              color: "var(--color-primary)",
-              fontWeight: "600",
-              textDecoration: "none",
-              transition: "color 200ms ease",
-            }}
-            onMouseEnter={(e) =>
-              (e.target.style.color = "var(--color-primary-dark)")
-            }
-            onMouseLeave={(e) =>
-              (e.target.style.color = "var(--color-primary)")
-            }
+            className="text-sm text-[var(--color-primary)] font-semibold no-underline transition-colors duration-200 hover:text-[var(--color-primary-dark)]"
           >
             Forgot password?
           </Link>
@@ -246,63 +145,19 @@ export function Login() {
         <button
           type="submit"
           disabled={isLoading}
-          style={{
-            width: "100%",
-            padding: "12px 16px",
-            backgroundColor: "var(--color-primary)",
-            color: "white",
-            border: "none",
-            borderRadius: "8px",
-            fontSize: "14px",
-            fontWeight: "600",
-            cursor: isLoading ? "not-allowed" : "pointer",
-            transition: "all 200ms ease",
-            opacity: isLoading ? 0.75 : 1,
-            marginTop: "8px",
-          }}
-          onMouseEnter={(e) => {
-            if (!isLoading) {
-              e.target.style.backgroundColor = "var(--color-primary-dark)";
-              e.target.style.transform = "translateY(-1px)";
-              e.target.style.boxShadow = "0 4px 12px rgba(59, 130, 246, 0.25)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!isLoading) {
-              e.target.style.backgroundColor = "var(--color-primary)";
-              e.target.style.transform = "translateY(0)";
-              e.target.style.boxShadow = "none";
-            }
-          }}
+          className={`w-full px-4 py-3 bg-[var(--color-primary)] text-white border-none rounded-lg text-sm font-semibold transition-all duration-200 mt-2 ${isLoading ? "cursor-not-allowed opacity-75" : "cursor-pointer hover:bg-[var(--color-primary-dark)] hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(59,130,246,0.25)]"}`}
         >
           {isLoading ? "Signing in..." : "Sign In"}
         </button>
 
         {/* Sign Up Link */}
         <div
-          style={{
-            textAlign: "center",
-            fontSize: "14px",
-            color: "var(--color-text-secondary)",
-            fontWeight: "400",
-            marginTop: "8px",
-          }}
+          className="text-center text-sm text-[var(--color-text-secondary)] font-normal mt-2"
         >
           Don't have an account?{" "}
           <Link
             to="/register"
-            style={{
-              color: "var(--color-primary)",
-              fontWeight: "600",
-              textDecoration: "none",
-              transition: "color 200ms ease",
-            }}
-            onMouseEnter={(e) =>
-              (e.target.style.color = "var(--color-primary-dark)")
-            }
-            onMouseLeave={(e) =>
-              (e.target.style.color = "var(--color-primary)")
-            }
+            className="text-[var(--color-primary)] font-semibold no-underline transition-colors duration-200 hover:text-[var(--color-primary-dark)]"
           >
             Sign Up
           </Link>

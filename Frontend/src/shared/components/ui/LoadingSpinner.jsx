@@ -7,32 +7,15 @@ import React from "react";
 export function LoadingSpinner({ showText = true }) {
   return (
     <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        height: "100vh",
-        backgroundColor: "var(--color-bg-primary)",
-      }}
+      className="flex justify-center items-center h-screen bg-[var(--color-bg-primary)]"
     >
-      <div style={{ textAlign: "center" }}>
+      <div className="text-center">
         <div
-          style={{
-            width: "40px",
-            height: "40px",
-            border: "3px solid var(--color-border)",
-            borderTop: "3px solid var(--color-primary)",
-            borderRadius: "50%",
-            animation: "spin 1s linear infinite",
-            margin: "0 auto",
-          }}
+          className="w-10 h-10 border-3 border-[var(--color-border)] border-t-[var(--color-primary)] rounded-full animate-spin mx-auto"
         />
         {showText && (
           <p
-            style={{
-              marginTop: "var(--spacing-md)",
-              color: "var(--color-text-secondary)",
-            }}
+            className="mt-4 text-[var(--color-text-secondary)]"
           >
             Loading...
           </p>

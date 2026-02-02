@@ -8,7 +8,7 @@ import { FinalCTASection } from "../components/FinalCTASection";
 
 function Landing() {
   return (
-    <div style={{ backgroundColor: "var(--color-bg-primary)" }}>
+    <div className="bg-[var(--color-bg-primary)]">
       <HeroSection />
       <ProblemSection />
       <FeaturesSection />

@@ -9,18 +9,11 @@ import { Footer } from "./Footer";
 export function Layout({ children }) {
   return (
     <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        minHeight: "100vh",
-      }}
+      className="flex flex-col min-h-screen"
     >
       <Navbar />
       <main
-        style={{
-          flex: 1,
-          width: "100%",
-        }}
+        className="flex-1 w-full"
       >
         {children}
       </main>

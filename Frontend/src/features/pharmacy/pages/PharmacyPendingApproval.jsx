@@ -10,24 +10,11 @@ const PharmacyPendingApproval = () => {
   if (!pharmacy) {
     return (
       <Layout>
-        <div style={{
-          maxWidth: "800px",
-          margin: "0 auto",
-          padding: "var(--spacing-xl)",
-          textAlign: "center",
-        }}>
+        <div className="max-w-[800px] mx-auto p-6 text-center">
           <p>No pharmacy data found.</p>
           <button
             onClick={() => navigate("/pharmacy/onboard")}
-            style={{
-              marginTop: "var(--spacing-md)",
-              padding: "var(--spacing-sm) var(--spacing-lg)",
-              backgroundColor: "var(--color-primary)",
-              color: "white",
-              border: "none",
-              borderRadius: "var(--radius-md)",
-              cursor: "pointer",
-            }}
+            className="mt-4 px-6 py-2 bg-[var(--color-primary)] text-white border-none rounded-lg cursor-pointer"
           >
             Go to Onboarding
           </button>
@@ -38,29 +25,10 @@ const PharmacyPendingApproval = () => {
 
   return (
     <Layout>
-      <div style={{
-        maxWidth: "800px",
-        margin: "0 auto",
-        padding: "var(--spacing-xl)",
-      }}>
-        <div style={{
-          backgroundColor: "var(--color-bg-secondary)",
-          borderRadius: "var(--radius-lg)",
-          padding: "var(--spacing-xl)",
-          border: "1px solid var(--color-border)",
-          textAlign: "center",
-        }}>
+      <div className="max-w-[800px] mx-auto p-6">
+        <div className="bg-[var(--color-bg-secondary)] rounded-xl p-6 border border-[var(--color-border)] text-center">
           {/* Success Icon */}
-          <div style={{
-            width: "80px",
-            height: "80px",
-            margin: "0 auto var(--spacing-lg)",
-            backgroundColor: "rgba(251, 191, 36, 0.1)",
-            borderRadius: "50%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}>
+          <div className="w-20 h-20 mx-auto mb-6 bg-[rgba(251,191,36,0.1)] rounded-full flex items-center justify-center">
             <svg
               width="40"
               height="40"
@@ -76,100 +44,48 @@ const PharmacyPendingApproval = () => {
             </svg>
           </div>
 
-          <h1 style={{
-            fontSize: "var(--font-size-2xl)",
-            marginBottom: "var(--spacing-md)",
-            color: "var(--color-text-primary)",
-          }}>
+          <h1 className="text-2xl mb-4 text-[var(--color-text-primary)]">
             Pharmacy Submitted Successfully!
           </h1>
 
-          <p style={{
-            color: "var(--color-text-secondary)",
-            marginBottom: "var(--spacing-xl)",
-            lineHeight: "1.6",
-            fontSize: "var(--font-size-lg)",
-          }}>
+          <p className="text-[var(--color-text-secondary)] mb-6 leading-relaxed text-lg">
             Your pharmacy registration has been submitted and is pending admin verification.
           </p>
 
           {/* Pharmacy Details */}
-          <div style={{
-            backgroundColor: "var(--color-bg-primary)",
-            borderRadius: "var(--radius-md)",
-            padding: "var(--spacing-lg)",
-            marginBottom: "var(--spacing-xl)",
-            textAlign: "left",
-          }}>
-            <div style={{ marginBottom: "var(--spacing-md)" }}>
-              <p style={{
-                fontWeight: "600",
-                color: "var(--color-text-secondary)",
-                marginBottom: "var(--spacing-xs)",
-                fontSize: "var(--font-size-sm)",
-              }}>
+          <div className="bg-[var(--color-bg-primary)] rounded-lg p-6 mb-6 text-left">
+            <div className="mb-4">
+              <p className="font-semibold text-[var(--color-text-secondary)] mb-2 text-sm">
                 Pharmacy Name
               </p>
-              <p style={{
-                fontSize: "var(--font-size-lg)",
-                color: "var(--color-text-primary)",
-                fontWeight: "600",
-              }}>
+              <p className="text-lg text-[var(--color-text-primary)] font-semibold">
                 {pharmacy.pharmacyName}
               </p>
             </div>
 
-            <div style={{ marginBottom: "var(--spacing-md)" }}>
-              <p style={{
-                fontWeight: "600",
-                color: "var(--color-text-secondary)",
-                marginBottom: "var(--spacing-xs)",
-                fontSize: "var(--font-size-sm)",
-              }}>
+            <div className="mb-4">
+              <p className="font-semibold text-[var(--color-text-secondary)] mb-2 text-sm">
                 License Number
               </p>
-              <p style={{ color: "var(--color-text-primary)" }}>
+              <p className="text-[var(--color-text-primary)]">
                 {pharmacy.licenseNumber}
               </p>
             </div>
 
             <div>
-              <p style={{
-                fontWeight: "600",
-                color: "var(--color-text-secondary)",
-                marginBottom: "var(--spacing-xs)",
-                fontSize: "var(--font-size-sm)",
-              }}>
+              <p className="font-semibold text-[var(--color-text-secondary)] mb-2 text-sm">
                 Status
               </p>
-              <div style={{
-                display: "inline-block",
-                padding: "var(--spacing-xs) var(--spacing-md)",
-                borderRadius: "var(--radius-full)",
-                backgroundColor: "rgba(251, 191, 36, 0.1)",
-                color: "rgb(251, 191, 36)",
-                fontWeight: "600",
-                fontSize: "var(--font-size-sm)",
-              }}>
+              <div className="inline-block px-4 py-2 rounded-full bg-[rgba(251,191,36,0.1)] text-[rgb(251,191,36)] font-semibold text-sm">
                 Pending Verification
               </div>
             </div>
           </div>
 
           {/* Info Box */}
-          <div style={{
-            backgroundColor: "rgba(59, 130, 246, 0.1)",
-            border: "1px solid rgba(59, 130, 246, 0.3)",
-            borderRadius: "var(--radius-md)",
-            padding: "var(--spacing-md)",
-            marginBottom: "var(--spacing-lg)",
-          }}>
-            <p style={{
-              color: "var(--color-text-secondary)",
-              lineHeight: "1.6",
-              fontSize: "var(--font-size-sm)",
-            }}>
-              <strong style={{ color: "var(--color-text-primary)" }}>What happens next?</strong>
+          <div className="bg-[rgba(59,130,246,0.1)] border border-[rgba(59,130,246,0.3)] rounded-lg p-4 mb-6">
+            <p className="text-[var(--color-text-secondary)] leading-relaxed text-sm">
+              <strong className="text-[var(--color-text-primary)]">What happens next?</strong>
               <br />
               Our admin team will review your pharmacy details and supporting documents. 
               You will receive a notification once your pharmacy is verified. This typically takes 1-2 business days.
@@ -179,19 +95,7 @@ const PharmacyPendingApproval = () => {
           {/* Action Button */}
           <button
             onClick={() => navigate("/dashboard")}
-            style={{
-              padding: "var(--spacing-md) var(--spacing-xl)",
-              backgroundColor: "var(--color-primary)",
-              color: "white",
-              border: "none",
-              borderRadius: "var(--radius-md)",
-              fontSize: "var(--font-size-base)",
-              fontWeight: "600",
-              cursor: "pointer",
-              transition: "background-color 0.2s",
-            }}
-            onMouseEnter={(e) => e.target.style.opacity = "0.9"}
-            onMouseLeave={(e) => e.target.style.opacity = "1"}
+            className="px-6 py-4 bg-[var(--color-primary)] text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-opacity hover:opacity-90"
           >
             Go to Dashboard
           </button>

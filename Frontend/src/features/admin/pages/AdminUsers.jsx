@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../../context/AuthContext";
 import { Users as UsersIcon, Search, Shield, CheckCircle } from "lucide-react";
 import AdminLayout from "../components/AdminLayout";
-import { api } from "../../../core/services/auth.service";
+import httpClient from "../../../core/services/httpClient";
 
 const AdminUsers = () => {
   const navigate = useNavigate();
@@ -29,7 +29,7 @@ const AdminUsers = () => {
     setError(null);
     try {
       const token = localStorage.getItem("accessToken");
-      const response = await api.get("/admin/users", {
+      const response = await httpClient.get("/admin/users", {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUsers(response.data.data || []);

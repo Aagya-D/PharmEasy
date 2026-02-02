@@ -40,22 +40,15 @@ import Layout from "../shared/layouts/Layout";
 function UnauthorizedPage() {
   return (
     <Layout>
-      <div style={{ padding: "var(--spacing-xl)", textAlign: "center", maxWidth: "600px", margin: "0 auto" }}>
-        <h1 style={{ fontSize: "48px", marginBottom: "var(--spacing-md)" }}>🚫</h1>
-        <h2 style={{ marginBottom: "var(--spacing-md)" }}>Access Denied</h2>
-        <p style={{ color: "var(--color-text-secondary)", marginBottom: "var(--spacing-lg)" }}>
+      <div className="p-6 text-center max-w-[600px] mx-auto">
+        <h1 className="text-5xl mb-4">🚫</h1>
+        <h2 className="mb-4">Access Denied</h2>
+        <p className="text-[var(--color-text-secondary)] mb-6">
           You don't have permission to access this page.
         </p>
         <button
           onClick={() => window.location.href = "/dashboard"}
-          style={{
-            padding: "var(--spacing-md) var(--spacing-xl)",
-            backgroundColor: "var(--color-primary)",
-            color: "white",
-            border: "none",
-            borderRadius: "var(--border-radius-md)",
-            cursor: "pointer"
-          }}
+          className="px-6 py-4 bg-[var(--color-primary)] text-white border-none rounded-lg cursor-pointer"
         >
           Go to Dashboard
         </button>
@@ -68,22 +61,15 @@ function UnauthorizedPage() {
 function NotFoundPage() {
   return (
     <Layout>
-      <div style={{ padding: "var(--spacing-xl)", textAlign: "center", maxWidth: "600px", margin: "0 auto" }}>
-        <h1 style={{ fontSize: "72px", marginBottom: "var(--spacing-md)" }}>404</h1>
-        <h2 style={{ marginBottom: "var(--spacing-md)" }}>Page Not Found</h2>
-        <p style={{ color: "var(--color-text-secondary)", marginBottom: "var(--spacing-lg)" }}>
+      <div className="p-6 text-center max-w-[600px] mx-auto">
+        <h1 className="text-7xl mb-4">404</h1>
+        <h2 className="mb-4">Page Not Found</h2>
+        <p className="text-[var(--color-text-secondary)] mb-6">
           The page you're looking for doesn't exist.
         </p>
         <button
           onClick={() => window.location.href = "/"}
-          style={{
-            padding: "var(--spacing-md) var(--spacing-xl)",
-            backgroundColor: "var(--color-primary)",
-            color: "white",
-            border: "none",
-            borderRadius: "var(--border-radius-md)",
-            cursor: "pointer"
-          }}
+          className="px-6 py-4 bg-[var(--color-primary)] text-white border-none rounded-lg cursor-pointer"
         >
           Go Home
         </button>
@@ -124,11 +110,7 @@ function Dashboard() {
   return (
     <Layout>
       <div
-        style={{
-          padding: "var(--spacing-xl)",
-          maxWidth: "1200px",
-          margin: "0 auto",
-        }}
+        className="p-6 max-w-[1200px] mx-auto"
       >
         <h1>Dashboard</h1>
         <p>Welcome to PharmEasy</p>
@@ -141,11 +123,7 @@ function Profile() {
   return (
     <Layout>
       <div
-        style={{
-          padding: "var(--spacing-xl)",
-          maxWidth: "1200px",
-          margin: "0 auto",
-        }}
+        className="p-6 max-w-[1200px] mx-auto"
       >
         <h1>My Profile</h1>
         <p>Your profile content goes here</p>

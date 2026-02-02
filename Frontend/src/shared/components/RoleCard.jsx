@@ -25,69 +25,40 @@ export function RoleCard({ role, selected, onChange }) {
     <button
       type="button"
       onClick={() => onChange(role.id)}
+      className={`relative p-6 rounded-xl cursor-pointer transition-all text-center w-full ${
+        selected
+          ? `border-2`
+          : `border border-[var(--color-border)] hover:border-[var(--color-text-tertiary)] hover:bg-[var(--color-bg-secondary)]`
+      } ${selected ? `bg-opacity-10` : `bg-[var(--color-bg-primary)]`}`}
       style={{
-        position: "relative",
-        padding: "var(--spacing-lg)",
-        border: selected
-          ? `2px solid ${color}`
-          : "1px solid var(--color-border)",
-        borderRadius: "var(--radius-lg)",
-        backgroundColor: selected ? `${color}10` : "var(--color-bg-primary)",
-        cursor: "pointer",
-        transition: "all var(--transition-normal)",
-        textAlign: "center",
-        width: "100%",
-      }}
-      onMouseEnter={(e) => {
-        if (!selected) {
-          e.currentTarget.style.borderColor = "var(--color-text-tertiary)";
-          e.currentTarget.style.backgroundColor = "var(--color-bg-secondary)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!selected) {
-          e.currentTarget.style.borderColor = "var(--color-border)";
-          e.currentTarget.style.backgroundColor = "var(--color-bg-primary)";
-        }
+        borderColor: selected ? color : undefined,
+        backgroundColor: selected ? `${color}10` : undefined,
       }}
     >
       {/* Selected indicator */}
       {selected && (
         <div
-          style={{
-            position: "absolute",
-            top: "-8px",
-            right: "-8px",
-          }}
+          className="absolute -top-2 -right-2"
         >
           <CheckCircle2 size={24} color={color} fill={color} />
         </div>
       )}
 
       {/* Icon */}
-      <div style={{ marginBottom: "var(--spacing-md)" }}>
+      <div className="mb-4">
         <RoleIcon size={32} color={color} />
       </div>
 
       {/* Title */}
       <h3
-        style={{
-          fontSize: "var(--font-size-base)",
-          fontWeight: "var(--font-weight-semibold)",
-          color: "var(--color-text-primary)",
-          marginBottom: "var(--spacing-xs)",
-        }}
+        className="text-base font-semibold text-[var(--color-text-primary)] mb-2"
       >
         {role.displayName}
       </h3>
 
       {/* Description */}
       <p
-        style={{
-          fontSize: "var(--font-size-sm)",
-          color: "var(--color-text-secondary)",
-          lineHeight: "var(--line-height-normal)",
-        }}
+        className="text-sm text-[var(--color-text-secondary)] leading-normal"
       >
         {role.description}
       </p>

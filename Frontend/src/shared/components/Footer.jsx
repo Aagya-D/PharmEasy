@@ -8,41 +8,20 @@ import { Link } from "react-router-dom";
 export function Footer() {
   return (
     <footer
-      style={{
-        backgroundColor: "var(--color-bg-secondary)",
-        borderTop: "1px solid var(--color-border)",
-        padding: "var(--spacing-2xl) var(--spacing-xl)",
-        marginTop: "var(--spacing-3xl)",
-      }}
+      className="bg-[var(--color-bg-secondary)] border-t border-[var(--color-border)] px-6 py-12 mt-16"
     >
       <div
-        style={{
-          maxWidth: "1200px",
-          margin: "0 auto",
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: "var(--spacing-xl)",
-          marginBottom: "var(--spacing-2xl)",
-        }}
+        className="max-w-[1200px] mx-auto grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-6 mb-12"
       >
         {/* Brand */}
         <div>
           <div
-            style={{
-              fontSize: "var(--font-size-lg)",
-              fontWeight: "var(--font-weight-bold)",
-              color: "var(--color-primary)",
-              marginBottom: "var(--spacing-sm)",
-            }}
+            className="text-lg font-bold text-[var(--color-primary)] mb-2"
           >
             PharmEasy
           </div>
           <p
-            style={{
-              fontSize: "var(--font-size-sm)",
-              color: "var(--color-text-secondary)",
-              lineHeight: "var(--line-height-relaxed)",
-            }}
+            className="text-sm text-[var(--color-text-secondary)] leading-relaxed"
           >
             Making essential medicines accessible to everyone, everywhere.
           </p>
@@ -51,50 +30,23 @@ export function Footer() {
         {/* Quick Links */}
         <div>
           <h4
-            style={{
-              fontSize: "var(--font-size-base)",
-              fontWeight: "var(--font-weight-semibold)",
-              color: "var(--color-text-primary)",
-              marginBottom: "var(--spacing-md)",
-            }}
+            className="text-base font-semibold text-[var(--color-text-primary)] mb-4"
           >
             Quick Links
           </h4>
-          <ul style={{ listStyle: "none" }}>
-            <li style={{ marginBottom: "var(--spacing-sm)" }}>
+          <ul className="list-none">
+            <li className="mb-2">
               <Link
                 to="/"
-                style={{
-                  fontSize: "var(--font-size-sm)",
-                  color: "var(--color-text-secondary)",
-                  textDecoration: "none",
-                  transition: "color var(--transition-fast)",
-                }}
-                onMouseEnter={(e) =>
-                  (e.target.style.color = "var(--color-primary)")
-                }
-                onMouseLeave={(e) =>
-                  (e.target.style.color = "var(--color-text-secondary)")
-                }
+                className="text-sm text-[var(--color-text-secondary)] no-underline transition-colors hover:text-[var(--color-primary)]"
               >
                 Home
               </Link>
             </li>
-            <li style={{ marginBottom: "var(--spacing-sm)" }}>
+            <li className="mb-2">
               <Link
                 to="/login"
-                style={{
-                  fontSize: "var(--font-size-sm)",
-                  color: "var(--color-text-secondary)",
-                  textDecoration: "none",
-                  transition: "color var(--transition-fast)",
-                }}
-                onMouseEnter={(e) =>
-                  (e.target.style.color = "var(--color-primary)")
-                }
-                onMouseLeave={(e) =>
-                  (e.target.style.color = "var(--color-text-secondary)")
-                }
+                className="text-sm text-[var(--color-text-secondary)] no-underline transition-colors hover:text-[var(--color-primary)]"
               >
                 Sign In
               </Link>
@@ -102,18 +54,7 @@ export function Footer() {
             <li>
               <Link
                 to="/register"
-                style={{
-                  fontSize: "var(--font-size-sm)",
-                  color: "var(--color-text-secondary)",
-                  textDecoration: "none",
-                  transition: "color var(--transition-fast)",
-                }}
-                onMouseEnter={(e) =>
-                  (e.target.style.color = "var(--color-primary)")
-                }
-                onMouseLeave={(e) =>
-                  (e.target.style.color = "var(--color-text-secondary)")
-                }
+                className="text-sm text-[var(--color-text-secondary)] no-underline transition-colors hover:text-[var(--color-primary)]"
               >
                 Sign Up
               </Link>
@@ -124,21 +65,12 @@ export function Footer() {
         {/* About */}
         <div>
           <h4
-            style={{
-              fontSize: "var(--font-size-base)",
-              fontWeight: "var(--font-weight-semibold)",
-              color: "var(--color-text-primary)",
-              marginBottom: "var(--spacing-md)",
-            }}
+            className="text-base font-semibold text-[var(--color-text-primary)] mb-4"
           >
             About
           </h4>
           <p
-            style={{
-              fontSize: "var(--font-size-sm)",
-              color: "var(--color-text-secondary)",
-              lineHeight: "var(--line-height-normal)",
-            }}
+            className="text-sm text-[var(--color-text-secondary)] leading-normal"
           >
             PharmEasy is an academic project designed to solve real-world
             medicine availability challenges.
@@ -148,17 +80,10 @@ export function Footer() {
 
       {/* Copyright */}
       <div
-        style={{
-          borderTop: "1px solid var(--color-border)",
-          paddingTop: "var(--spacing-lg)",
-          textAlign: "center",
-        }}
+        className="border-t border-[var(--color-border)] pt-6 text-center"
       >
         <p
-          style={{
-            fontSize: "var(--font-size-sm)",
-            color: "var(--color-text-tertiary)",
-          }}
+          className="text-sm text-[var(--color-text-tertiary)]"
         >
           © 2025 PharmEasy. All rights reserved. Academic project.
         </p>

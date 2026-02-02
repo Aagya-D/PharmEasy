@@ -150,23 +150,10 @@ const PharmacyOnboarding = () => {
   if (checkingStatus) {
     return (
       <Layout>
-        <div style={{ 
-          display: "flex", 
-          justifyContent: "center", 
-          alignItems: "center", 
-          minHeight: "60vh" 
-        }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{
-              width: "40px",
-              height: "40px",
-              border: "3px solid var(--color-border)",
-              borderTop: "3px solid var(--color-primary)",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-              margin: "0 auto",
-            }} />
-            <p style={{ marginTop: "var(--spacing-md)", color: "var(--color-text-secondary)" }}>
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="text-center">
+            <div className="w-10 h-10 border-3 border-[var(--color-border)] border-t-[var(--color-primary)] rounded-full animate-spin mx-auto" />
+            <p className="mt-4 text-[var(--color-text-secondary)]">
               Checking pharmacy status...
             </p>
           </div>
@@ -183,70 +170,31 @@ const PharmacyOnboarding = () => {
     if (status === "REJECTED") {
       return (
         <Layout>
-          <div style={{
-            maxWidth: "800px",
-            margin: "0 auto",
-            padding: "var(--spacing-xl)",
-          }}>
-            <div style={{
-              backgroundColor: "#FEF2F2",
-              borderRadius: "var(--radius-lg)",
-              padding: "var(--spacing-xl)",
-              border: "2px solid #FCA5A5",
-            }}>
-              <h1 style={{ 
-                fontSize: "var(--font-size-2xl)", 
-                marginBottom: "var(--spacing-md)",
-                color: "#991B1B",
-              }}>
+          <div className="max-w-[800px] mx-auto p-6">
+            <div className="bg-[#FEF2F2] rounded-xl p-6 border-2 border-[#FCA5A5]">
+              <h1 className="text-2xl mb-4 text-[#991B1B]">
                 Pharmacy Registration Rejected
               </h1>
               
-              <p style={{ 
-                fontSize: "var(--font-size-lg)", 
-                marginBottom: "var(--spacing-lg)",
-                color: "#7F1D1D",
-              }}>
+              <p className="text-lg mb-6 text-[#7F1D1D]">
                 Your pharmacy registration was rejected by the system administrator.
               </p>
 
               {existingPharmacy.rejectionReason && (
-                <div style={{
-                  backgroundColor: "white",
-                  padding: "var(--spacing-md)",
-                  borderRadius: "var(--radius-md)",
-                  marginBottom: "var(--spacing-lg)",
-                }}>
-                  <h3 style={{ 
-                    fontSize: "var(--font-size-md)", 
-                    marginBottom: "var(--spacing-sm)",
-                    color: "#991B1B",
-                    fontWeight: "600",
-                  }}>
+                <div className="bg-white p-4 rounded-lg mb-6">
+                  <h3 className="text-base mb-2 text-[#991B1B] font-semibold">
                     Rejection Reason:
                   </h3>
-                  <p style={{ color: "#7F1D1D" }}>
+                  <p className="text-[#7F1D1D]">
                     {existingPharmacy.rejectionReason}
                   </p>
                 </div>
               )}
 
-              <div style={{
-                display: "flex",
-                gap: "var(--spacing-md)",
-              }}>
+              <div className="flex gap-4">
                 <button
                   onClick={() => navigate("/dashboard")}
-                  style={{
-                    padding: "var(--spacing-sm) var(--spacing-lg)",
-                    backgroundColor: "#DC2626",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "var(--radius-md)",
-                    fontSize: "var(--font-size-md)",
-                    cursor: "pointer",
-                    fontWeight: "600",
-                  }}
+                  className="px-6 py-2 bg-[#DC2626] text-white border-none rounded-lg text-base cursor-pointer font-semibold"
                 >
                   Go to Dashboard
                 </button>
@@ -272,76 +220,47 @@ const PharmacyOnboarding = () => {
     // If PENDING or VERIFIED, redirect to appropriate page
     return (
       <Layout>
-        <div style={{
-          maxWidth: "800px",
-          margin: "0 auto",
-          padding: "var(--spacing-xl)",
-        }}>
-          <div style={{
-            backgroundColor: "var(--color-bg-secondary)",
-            borderRadius: "var(--radius-lg)",
-            padding: "var(--spacing-xl)",
-            border: "1px solid var(--color-border)",
-          }}>
-            <h1 style={{ 
-              fontSize: "var(--font-size-2xl)", 
-              marginBottom: "var(--spacing-lg)",
-              color: "var(--color-text-primary)",
-            }}>
+        <div className="max-w-[800px] mx-auto p-6">
+          <div className="bg-[var(--color-bg-secondary)] rounded-xl p-6 border border-[var(--color-border)]">
+            <h1 className="text-2xl mb-6 text-[var(--color-text-primary)]">
               Pharmacy Already Registered
             </h1>
 
-            <div style={{ marginBottom: "var(--spacing-lg)" }}>
-              <div style={{
-                display: "inline-block",
-                padding: "var(--spacing-sm) var(--spacing-md)",
-                borderRadius: "var(--radius-full)",
-                backgroundColor: existingPharmacy.verificationStatus === "VERIFIED" 
-                  ? "rgba(34, 197, 94, 0.1)" 
+            <div className="mb-6">
+              <div className={`inline-block px-4 py-2 rounded-full font-semibold text-sm ${
+                existingPharmacy.verificationStatus === "VERIFIED"
+                  ? "bg-[rgba(34,197,94,0.1)] text-[rgb(34,197,94)]"
                   : existingPharmacy.verificationStatus === "REJECTED"
-                  ? "rgba(239, 68, 68, 0.1)"
-                  : "rgba(251, 191, 36, 0.1)",
-                color: existingPharmacy.verificationStatus === "VERIFIED"
-                  ? "rgb(34, 197, 94)"
-                  : existingPharmacy.verificationStatus === "REJECTED"
-                  ? "rgb(239, 68, 68)"
-                  : "rgb(251, 191, 36)",
-                fontWeight: "600",
-                fontSize: "var(--font-size-sm)",
-              }}>
+                  ? "bg-[rgba(239,68,68,0.1)] text-[rgb(239,68,68)]"
+                  : "bg-[rgba(251,191,36,0.1)] text-[rgb(251,191,36)]"
+              }`}>
                 {existingPharmacy.verificationStatus === "PENDING_VERIFICATION" && "Pending Verification"}
                 {existingPharmacy.verificationStatus === "VERIFIED" && "✓ Verified"}
                 {existingPharmacy.verificationStatus === "REJECTED" && "✗ Rejected"}
               </div>
             </div>
 
-            <div style={{ marginBottom: "var(--spacing-md)" }}>
-              <p style={{ fontWeight: "600", color: "var(--color-text-secondary)", marginBottom: "var(--spacing-xs)" }}>
+            <div className="mb-4">
+              <p className="font-semibold text-[var(--color-text-secondary)] mb-2">
                 Pharmacy Name
               </p>
-              <p style={{ fontSize: "var(--font-size-lg)", color: "var(--color-text-primary)" }}>
+              <p className="text-lg text-[var(--color-text-primary)]">
                 {existingPharmacy.pharmacyName}
               </p>
             </div>
 
-            <div style={{ marginBottom: "var(--spacing-md)" }}>
-              <p style={{ fontWeight: "600", color: "var(--color-text-secondary)", marginBottom: "var(--spacing-xs)" }}>
+            <div className="mb-4">
+              <p className="font-semibold text-[var(--color-text-secondary)] mb-2">
                 License Number
               </p>
-              <p style={{ color: "var(--color-text-primary)" }}>
+              <p className="text-[var(--color-text-primary)]">
                 {existingPharmacy.licenseNumber}
               </p>
             </div>
 
             {existingPharmacy.verificationStatus === "PENDING_VERIFICATION" && (
-              <div style={{
-                marginTop: "var(--spacing-lg)",
-                padding: "var(--spacing-md)",
-                backgroundColor: "rgba(251, 191, 36, 0.1)",
-                borderRadius: "var(--radius-md)",
-                border: "1px solid rgba(251, 191, 36, 0.3)",
-              }}>
-                <p style={{ color: "var(--color-text-secondary)", lineHeight: "1.6" }}>
+              <div className="mt-6 p-4 bg-[rgba(251,191,36,0.1)] rounded-lg border border-[rgba(251,191,36,0.3)]">
+                <p className="text-[var(--color-text-secondary)] leading-relaxed">
                   Your pharmacy registration is under review by our admin team. 
                   You will receive a notification once your pharmacy is verified.
                 </p>
@@ -349,20 +268,14 @@ const PharmacyOnboarding = () => {
             )}
 
             {existingPharmacy.verificationStatus === "REJECTED" && existingPharmacy.rejectionReason && (
-              <div style={{
-                marginTop: "var(--spacing-lg)",
-                padding: "var(--spacing-md)",
-                backgroundColor: "rgba(239, 68, 68, 0.1)",
-                borderRadius: "var(--radius-md)",
-                border: "1px solid rgba(239, 68, 68, 0.3)",
-              }}>
-                <p style={{ fontWeight: "600", marginBottom: "var(--spacing-xs)", color: "rgb(239, 68, 68)" }}>
+              <div className="mt-6 p-4 bg-[rgba(239,68,68,0.1)] rounded-lg border border-[rgba(239,68,68,0.3)]">
+                <p className="font-semibold mb-2 text-[rgb(239,68,68)]">
                   Rejection Reason:
                 </p>
-                <p style={{ color: "var(--color-text-secondary)", lineHeight: "1.6" }}>
+                <p className="text-[var(--color-text-secondary)] leading-relaxed">
                   {existingPharmacy.rejectionReason}
                 </p>
-                <p style={{ marginTop: "var(--spacing-md)", color: "var(--color-text-secondary)", fontSize: "var(--font-size-sm)" }}>
+                <p className="mt-4 text-[var(--color-text-secondary)] text-sm">
                   Please contact support for assistance.
                 </p>
               </div>
@@ -375,41 +288,17 @@ const PharmacyOnboarding = () => {
 
   return (
     <Layout>
-      <div style={{
-        maxWidth: "800px",
-        margin: "0 auto",
-        padding: "var(--spacing-xl)",
-      }}>
-        <div style={{
-          backgroundColor: "var(--color-bg-secondary)",
-          borderRadius: "var(--radius-lg)",
-          padding: "var(--spacing-xl)",
-          border: "1px solid var(--color-border)",
-        }}>
-          <h1 style={{ 
-            fontSize: "var(--font-size-2xl)", 
-            marginBottom: "var(--spacing-sm)",
-            color: "var(--color-text-primary)",
-          }}>
+      <div className="max-w-[800px] mx-auto p-6">
+        <div className="bg-[var(--color-bg-secondary)] rounded-xl p-6 border border-[var(--color-border)]">
+          <h1 className="text-2xl mb-2 text-[var(--color-text-primary)]">
             Pharmacy Onboarding
           </h1>
-          <p style={{ 
-            color: "var(--color-text-secondary)", 
-            marginBottom: "var(--spacing-xl)",
-            lineHeight: "1.6",
-          }}>
+          <p className="text-[var(--color-text-secondary)] mb-6 leading-relaxed">
             Complete your pharmacy registration to start managing inventory and responding to emergency requests.
           </p>
 
           {error && (
-            <div style={{
-              padding: "var(--spacing-md)",
-              marginBottom: "var(--spacing-lg)",
-              backgroundColor: "rgba(239, 68, 68, 0.1)",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              borderRadius: "var(--radius-md)",
-              color: "rgb(239, 68, 68)",
-            }}>
+            <div className="p-4 mb-6 bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.3)] rounded-lg text-[rgb(239,68,68)]">
               {error}
             </div>
           )}

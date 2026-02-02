@@ -30,64 +30,23 @@ export function Button({
       type={type}
       disabled={isDisabled}
       onClick={onClick}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "var(--spacing-sm)",
-        width: "100%",
-        padding: "var(--spacing-md) var(--spacing-lg)",
-        fontSize: "var(--font-size-base)",
-        fontWeight: "var(--font-weight-medium)",
-        borderRadius: "var(--radius-md)",
-        border: "none",
-        cursor: isDisabled ? "not-allowed" : "pointer",
-        transition: "all var(--transition-fast)",
-        backgroundColor: isPrimary
+      className={`flex items-center justify-center gap-2 w-full px-6 py-4 text-base font-medium rounded-lg border-none transition-all ${
+        isDisabled ? "cursor-not-allowed" : "cursor-pointer"
+      } ${
+        isPrimary
           ? isDisabled
-            ? "var(--color-primary-light)"
-            : "var(--color-primary)"
+            ? "bg-[var(--color-primary-light)] text-white"
+            : "bg-[var(--color-primary)] text-white shadow-[var(--shadow-md)] hover:bg-[var(--color-primary-dark)] hover:-translate-y-px"
           : isDisabled
-          ? "var(--color-border)"
-          : "var(--color-bg-secondary)",
-        color: isPrimary
-          ? "white"
-          : isDisabled
-          ? "var(--color-text-tertiary)"
-          : "var(--color-text-primary)",
-        boxShadow: isPrimary && !isDisabled ? "var(--shadow-md)" : "none",
-      }}
-      onMouseEnter={(e) => {
-        if (!isDisabled && isPrimary) {
-          e.target.style.backgroundColor = "var(--color-primary-dark)";
-          e.target.style.transform = "translateY(-1px)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isDisabled && isPrimary) {
-          e.target.style.backgroundColor = "var(--color-primary)";
-          e.target.style.transform = "translateY(0)";
-        }
-      }}
-      onFocus={(e) => {
-        if (!isDisabled) {
-          e.target.style.outline = "2px solid var(--color-primary)";
-          e.target.style.outlineOffset = "2px";
-        }
-      }}
-      onBlur={(e) => {
-        e.target.style.outline = "none";
-        e.target.style.outlineOffset = "0";
-      }}
-      className={className}
+          ? "bg-[var(--color-border)] text-[var(--color-text-tertiary)]"
+          : "bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)]"
+      } focus:outline-[var(--color-primary)] focus:outline-2 focus:outline-offset-2 ${className || ""}`}
       {...props}
     >
       {loading && (
         <Loader2
           size={18}
-          style={{
-            animation: "spin 1s linear infinite",
-          }}
+          className="animate-spin"
         />
       )}
       <span>{children}</span>

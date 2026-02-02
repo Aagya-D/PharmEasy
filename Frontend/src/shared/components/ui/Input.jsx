@@ -30,13 +30,7 @@ export function Input({
       {label && (
         <label
           htmlFor={inputId}
-          style={{
-            display: "block",
-            fontSize: "var(--font-size-sm)",
-            fontWeight: "var(--font-weight-medium)",
-            color: "var(--color-text-primary)",
-            marginBottom: "var(--spacing-xs)",
-          }}
+          className="block text-sm font-medium text-[var(--color-text-primary)] mb-2"
         >
           {label}
         </label>
@@ -49,46 +43,21 @@ export function Input({
         value={value}
         onChange={onChange}
         disabled={disabled}
-        style={{
-          width: "100%",
-          padding: "var(--spacing-md)",
-          fontSize: "var(--font-size-base)",
-          border: error
-            ? "1px solid var(--color-error)"
-            : "1px solid var(--color-border)",
-          borderRadius: "var(--radius-md)",
-          transition:
-            "border-color var(--transition-fast), box-shadow var(--transition-fast)",
-          backgroundColor: disabled
-            ? "var(--color-bg-secondary)"
-            : "var(--color-bg-primary)",
-          color: disabled
-            ? "var(--color-text-tertiary)"
-            : "var(--color-text-primary)",
-          fontFamily: "var(--font-family-base)",
-        }}
-        onFocus={(e) => {
-          if (!error && !disabled) {
-            e.target.style.borderColor = "var(--color-primary)";
-            e.target.style.boxShadow = "0 0 0 3px rgba(8, 145, 178, 0.1)";
-          }
-        }}
-        onBlur={(e) => {
-          e.target.style.borderColor = error
-            ? "var(--color-error)"
-            : "var(--color-border)";
-          e.target.style.boxShadow = "none";
-        }}
+        className={`w-full p-4 text-base rounded-lg transition-all font-[var(--font-family-base)] ${
+          error
+            ? "border border-[var(--color-error)]"
+            : "border border-[var(--color-border)] focus:border-[var(--color-primary)] focus:shadow-[0_0_0_3px_rgba(8,145,178,0.1)]"
+        } ${
+          disabled
+            ? "bg-[var(--color-bg-secondary)] text-[var(--color-text-tertiary)]"
+            : "bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]"
+        } focus:outline-none`}
         {...props}
       />
 
       {error && (
         <p
-          style={{
-            fontSize: "var(--font-size-sm)",
-            color: "var(--color-error)",
-            marginTop: "var(--spacing-xs)",
-          }}
+          className="text-sm text-[var(--color-error)] mt-2"
           role="alert"
         >
           {error}
@@ -97,11 +66,7 @@ export function Input({
 
       {hint && !error && (
         <p
-          style={{
-            fontSize: "var(--font-size-sm)",
-            color: "var(--color-text-tertiary)",
-            marginTop: "var(--spacing-xs)",
-          }}
+          className="text-sm text-[var(--color-text-tertiary)] mt-2"
         >
           {hint}
         </p>

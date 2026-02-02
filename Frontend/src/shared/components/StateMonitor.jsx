@@ -48,44 +48,16 @@ export function StateMonitor() {
 
   return (
     <div
-      style={{
-        position: "fixed",
-        bottom: 0,
-        right: 0,
-        width: "400px",
-        height: "500px",
-        backgroundColor: "#1e1e1e",
-        color: "#d4d4d4",
-        border: "2px solid #007acc",
-        borderRadius: "8px 8px 0 0",
-        zIndex: 9999,
-        display: "flex",
-        flexDirection: "column",
-        fontFamily: "monospace",
-        fontSize: "12px",
-      }}
+      className="fixed bottom-0 right-0 w-[400px] h-[500px] bg-[#1e1e1e] text-[#d4d4d4] border-2 border-[#007acc] rounded-t-lg z-[9999] flex flex-col font-mono text-xs"
     >
       {/* Header */}
       <div
-        style={{
-          padding: "8px 12px",
-          backgroundColor: "#007acc",
-          color: "white",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
+        className="px-3 py-2 bg-[#007acc] text-white flex justify-between items-center"
       >
         <strong>PharmEasy State Monitor</strong>
         <button
           onClick={() => setIsVisible(false)}
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "white",
-            cursor: "pointer",
-            fontSize: "16px",
-          }}
+          className="bg-transparent border-none text-white cursor-pointer text-base"
         >
           ✕
         </button>
@@ -93,36 +65,18 @@ export function StateMonitor() {
 
       {/* Tabs */}
       <div
-        style={{
-          display: "flex",
-          backgroundColor: "#2d2d2d",
-          borderBottom: "1px solid #007acc",
-        }}
+        className="flex bg-[#2d2d2d] border-b border-[#007acc]"
       >
         {["state", "logs", "violations"].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            style={{
-              flex: 1,
-              padding: "8px",
-              backgroundColor: activeTab === tab ? "#007acc" : "transparent",
-              color: "white",
-              border: "none",
-              cursor: "pointer",
-              textTransform: "capitalize",
-            }}
+            className={`flex-1 p-2 text-white border-none cursor-pointer capitalize ${activeTab === tab ? "bg-[#007acc]" : "bg-transparent"}`}
           >
             {tab}
             {tab === "violations" && violations.length > 0 && (
               <span
-                style={{
-                  marginLeft: "4px",
-                  backgroundColor: "#f44336",
-                  padding: "2px 6px",
-                  borderRadius: "10px",
-                  fontSize: "10px",
-                }}
+                className="ml-1 bg-[#f44336] px-1.5 py-0.5 rounded-full text-[10px]"
               >
                 {violations.length}
               </span>
@@ -133,20 +87,16 @@ export function StateMonitor() {
 
       {/* Content */}
       <div
-        style={{
-          flex: 1,
-          overflow: "auto",
-          padding: "12px",
-        }}
+        className="flex-1 overflow-auto p-3"
       >
         {activeTab === "state" && (
           <div>
-            <div style={{ marginBottom: "12px" }}>
-              <strong style={{ color: "#4ec9b0" }}>Authentication</strong>
-              <div style={{ marginLeft: "12px", marginTop: "4px" }}>
+            <div className="mb-3">
+              <strong className="text-[#4ec9b0]">Authentication</strong>
+              <div className="ml-3 mt-1">
                 <div>
                   Authenticated:{" "}
-                  <span style={{ color: isAuthenticated ? "#4caf50" : "#f44336" }}>
+                  <span className={isAuthenticated ? "text-[#4caf50]" : "text-[#f44336]"}>
                     {isAuthenticated ? "✓" : "✗"}
                   </span>
                 </div>
@@ -157,9 +107,9 @@ export function StateMonitor() {
             </div>
 
             {user?.roleId === 2 && (
-              <div style={{ marginBottom: "12px" }}>
-                <strong style={{ color: "#4ec9b0" }}>Pharmacy Status</strong>
-                <div style={{ marginLeft: "12px", marginTop: "4px" }}>
+              <div className="mb-3">
+                <strong className="text-[#4ec9b0]">Pharmacy Status</strong>
+                <div className="ml-3 mt-1">
                   <div>Has Pharmacy: {user.pharmacy ? "✓" : "✗"}</div>
                   {user.pharmacy && (
                     <>
@@ -171,9 +121,9 @@ export function StateMonitor() {
               </div>
             )}
 
-            <div style={{ marginBottom: "12px" }}>
-              <strong style={{ color: "#4ec9b0" }}>Session</strong>
-              <div style={{ marginLeft: "12px", marginTop: "4px" }}>
+            <div className="mb-3">
+              <strong className="text-[#4ec9b0]">Session</strong>
+              <div className="ml-3 mt-1">
                 <div>Session ID: {logger.sessionId}</div>
                 <div>Initialized: {logger.initialized ? "✓" : "✗"}</div>
               </div>
@@ -184,15 +134,7 @@ export function StateMonitor() {
                 logger.exportLogs();
                 auditor.exportAudit();
               }}
-              style={{
-                marginTop: "8px",
-                padding: "6px 12px",
-                backgroundColor: "#007acc",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-              }}
+              className="mt-2 px-3 py-1.5 bg-[#007acc] text-white border-none rounded cursor-pointer"
             >
               Export Logs & Audit
             </button>
@@ -202,45 +144,30 @@ export function StateMonitor() {
         {activeTab === "logs" && (
           <div>
             {logs.length === 0 ? (
-              <div style={{ color: "#888" }}>No logs yet</div>
+              <div className="text-[#888]">No logs yet</div>
             ) : (
               logs.map((log, index) => (
                 <div
                   key={index}
-                  style={{
-                    marginBottom: "8px",
-                    padding: "6px",
-                    backgroundColor: "#2d2d2d",
-                    borderRadius: "4px",
-                    borderLeft: `3px solid ${
-                      log.level === "ERROR"
-                        ? "#f44336"
-                        : log.level === "WARN"
-                        ? "#ff9800"
-                        : log.level === "INFO"
-                        ? "#2196f3"
-                        : "#4caf50"
-                    }`,
-                  }}
+                  className={`mb-2 p-1.5 bg-[#2d2d2d] rounded border-l-[3px] ${
+                    log.level === "ERROR"
+                      ? "border-l-[#f44336]"
+                      : log.level === "WARN"
+                      ? "border-l-[#ff9800]"
+                      : log.level === "INFO"
+                      ? "border-l-[#2196f3]"
+                      : "border-l-[#4caf50]"
+                  }`}
                 >
                   <div
-                    style={{
-                      fontSize: "10px",
-                      color: "#888",
-                      marginBottom: "2px",
-                    }}
+                    className="text-[10px] text-[#888] mb-0.5"
                   >
                     {new Date(log.timestamp).toLocaleTimeString()}
                   </div>
-                  <div style={{ fontWeight: "bold" }}>{log.message}</div>
+                  <div className="font-bold">{log.message}</div>
                   {Object.keys(log.data).length > 0 && (
                     <pre
-                      style={{
-                        marginTop: "4px",
-                        fontSize: "10px",
-                        color: "#ce9178",
-                        overflow: "auto",
-                      }}
+                      className="mt-1 text-[10px] text-[#ce9178] overflow-auto"
                     >
                       {JSON.stringify(log.data, null, 2)}
                     </pre>
@@ -254,38 +181,23 @@ export function StateMonitor() {
         {activeTab === "violations" && (
           <div>
             {violations.length === 0 ? (
-              <div style={{ color: "#4caf50" }}>No violations detected ✓</div>
+              <div className="text-[#4caf50]">No violations detected ✓</div>
             ) : (
               violations.map((violation, index) => (
                 <div
                   key={index}
-                  style={{
-                    marginBottom: "8px",
-                    padding: "6px",
-                    backgroundColor: "#3d1f1f",
-                    borderRadius: "4px",
-                    borderLeft: "3px solid #f44336",
-                  }}
+                  className="mb-2 p-1.5 bg-[#3d1f1f] rounded border-l-[3px] border-l-[#f44336]"
                 >
-                  <div style={{ fontWeight: "bold", color: "#f44336" }}>
+                  <div className="font-bold text-[#f44336]">
                     {violation.type}
                   </div>
                   <div
-                    style={{
-                      fontSize: "10px",
-                      color: "#888",
-                      marginTop: "2px",
-                    }}
+                    className="text-[10px] text-[#888] mt-0.5"
                   >
                     {new Date(violation.timestamp).toLocaleString()}
                   </div>
                   <pre
-                    style={{
-                      marginTop: "4px",
-                      fontSize: "10px",
-                      color: "#ce9178",
-                      overflow: "auto",
-                    }}
+                    className="mt-1 text-[10px] text-[#ce9178] overflow-auto"
                   >
                     {JSON.stringify(violation.details, null, 2)}
                   </pre>
@@ -298,13 +210,7 @@ export function StateMonitor() {
 
       {/* Footer */}
       <div
-        style={{
-          padding: "6px 12px",
-          backgroundColor: "#2d2d2d",
-          borderTop: "1px solid #007acc",
-          fontSize: "10px",
-          color: "#888",
-        }}
+        className="px-3 py-1.5 bg-[#2d2d2d] border-t border-[#007acc] text-[10px] text-[#888]"
       >
         Press Ctrl+Shift+L to toggle | Development Mode Only
       </div>
