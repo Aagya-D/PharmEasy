@@ -3,6 +3,8 @@
  * Centralized error handling for all routes
  */
 
+import logger from '../utils/logger.js';
+
 export class AppError extends Error {
   constructor(message, statusCode) {
     super(message);
@@ -20,16 +22,20 @@ export const errorHandler = (err, req, res, next) => {
   let statusCode = err.statusCode || 500;
   let message = err.message || "Internal server error";
 
-  // Log error in development
-  if (process.env.NODE_ENV === "development") {
-    console.error("ERROR:", {
-      status: statusCode,
-      message,
-      path: req.path,
-      method: req.method,
-      stack: err.stack,
-    });
-  }
+  // Determine feature from request path
+  const feature = req.path.split('/').filter(Boolean)[1]?.toUpperCase() || 'API';
+
+  // Log error with full context
+  logger.error(feature, `${req.method} ${req.path} - ${message}`, {
+    statusCode,
+    message,
+    path: req.path,
+    method: req.method,
+    userId: req.user?.id,
+    stack: err.stack,
+    body: req.body,
+    query: req.query,
+  });
 
   // Handle validation errors
   if (err.name === "ValidationError") {

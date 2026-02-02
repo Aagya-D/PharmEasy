@@ -8,6 +8,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { prisma } from "./database/prisma.js";
 import { errorHandler, asyncHandler } from "./middlewares/errorHandler.js";
+import loggingMiddleware from "./middlewares/logger.middleware.js";
+import logger from "./utils/logger.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import pharmacyRoutes from "./modules/pharmacy/pharmacy.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
@@ -52,13 +54,8 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-// Request Logger (development)
-if (NODE_ENV === "development") {
-  app.use((req, res, next) => {
-    console.log(`${req.method} ${req.path}`);
-    next();
-  });
-}
+// Request/Response Logger (comprehensive)
+app.use(loggingMiddleware);
 
 // ============================================
 // HEALTH CHECK

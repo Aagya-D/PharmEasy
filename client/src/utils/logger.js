@@ -156,27 +156,47 @@ class Logger {
   }
 
   /**
-   * Log API calls
+   * Log API calls with enhanced formatting
    */
-  apiCall(method, url, status = null, responseTime = null) {
-    this.debug(`API: ${method} ${url}`, {
+  apiCall(method, url, statusOrData = null, responseTime = null, additionalData = {}) {
+    // Handle both old and new call signatures
+    let status = null;
+    let data = additionalData;
+    
+    if (typeof statusOrData === 'number') {
+      status = statusOrData;
+    } else if (typeof statusOrData === 'object') {
+      data = { ...statusOrData, ...additionalData };
+    }
+
+    const feature = data.feature || 'API';
+    const direction = status ? '←' : '→';
+    const statusText = status ? `[${status}]` : '';
+    const timeText = responseTime ? `(${responseTime}ms)` : '';
+    
+    this.debug(`${direction} ${feature} ${statusText} ${method} ${url} ${timeText}`.trim(), {
       method,
       url,
-      status,
-      responseTime,
+      ...(status && { status }),
+      ...(responseTime && { responseTime: `${responseTime}ms` }),
+      ...data,
     });
   }
 
   /**
-   * Log API errors
+   * Log API errors with enhanced formatting
    */
-  apiError(method, url, error) {
-    this.error(`API Error: ${method} ${url}`, {
+  apiError(method, url, errorData) {
+    const feature = errorData.feature || 'API';
+    const status = errorData.status || 'ERR';
+    const timeText = errorData.duration ? `(${errorData.duration}ms)` : '';
+    
+    this.error(`✖ ${feature} [${status}] ${method} ${url} ${timeText}`.trim(), {
       method,
       url,
-      status: error.response?.status,
-      message: error.response?.data?.message || error.message,
-      data: error.response?.data,
+      status: errorData.status,
+      message: errorData.message,
+      ...errorData,
     });
   }
 

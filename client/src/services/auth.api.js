@@ -1,4 +1,5 @@
 import axios from "axios";
+import logger from "../utils/logger";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -11,6 +12,105 @@ export const api = axios.create({
   },
   withCredentials: true,
 });
+
+/**
+ * Extract feature/module from URL
+ */
+const getFeature = (url) => {
+  const parts = url.split('/').filter(Boolean);
+  return (parts[0] || 'API').toUpperCase();
+};
+
+/**
+ * Filter sensitive data from logging
+ */
+const filterSensitiveData = (data) => {
+  if (!data || typeof data !== 'object') return data;
+  
+  const sensitiveFields = ['password', 'token', 'accessToken', 'refreshToken', 'otp'];
+  const filtered = { ...data };
+  
+  sensitiveFields.forEach(field => {
+    if (filtered[field]) {
+      filtered[field] = '[REDACTED]';
+    }
+  });
+  
+  return filtered;
+};
+
+/**
+ * Request Interceptor - Log all outgoing API calls
+ */
+api.interceptors.request.use(
+  (config) => {
+    // Store start time for duration calculation
+    config.metadata = { startTime: Date.now() };
+    
+    const feature = getFeature(config.url || '');
+    const method = config.method?.toUpperCase();
+    const url = config.url;
+    
+    // Log request
+    logger.apiCall(method, url, {
+      feature,
+      data: filterSensitiveData(config.data),
+      params: config.params,
+    });
+    
+    return config;
+  },
+  (error) => {
+    logger.error('[API] Request failed', error);
+    return Promise.reject(error);
+  }
+);
+
+/**
+ * Response Interceptor - Log all API responses and errors
+ */
+api.interceptors.response.use(
+  (response) => {
+    const duration = response.config.metadata?.startTime 
+      ? Date.now() - response.config.metadata.startTime 
+      : null;
+    
+    const feature = getFeature(response.config.url || '');
+    const method = response.config.method?.toUpperCase();
+    const url = response.config.url;
+    const status = response.status;
+    
+    // Log response
+    logger.apiCall(method, url, status, duration, {
+      feature,
+      success: response.data?.success,
+      data: filterSensitiveData(response.data),
+    });
+    
+    return response;
+  },
+  (error) => {
+    const duration = error.config?.metadata?.startTime 
+      ? Date.now() - error.config.metadata.startTime 
+      : null;
+    
+    const feature = getFeature(error.config?.url || '');
+    const method = error.config?.method?.toUpperCase();
+    const url = error.config?.url;
+    const status = error.response?.status;
+    
+    // Log error
+    logger.apiError(method, url, {
+      feature,
+      status,
+      duration,
+      message: error.response?.data?.message || error.message,
+      data: error.response?.data,
+    });
+    
+    return Promise.reject(error);
+  }
+);
 
 // API functions for authentication
 
