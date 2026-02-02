@@ -1,40 +1,40 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import LoadingSpinner from "../components/LoadingSpinner";
+import LoadingSpinner from "../shared/components/ui/LoadingSpinner";
 
-// Pages - Organized by module
-import Landing from "../pages/Landing";
+// Landing
+import Landing from "../features/landing/pages/Landing";
 
 // Auth Pages
-import Login from "../pages/auth/Login";
-import Register from "../pages/auth/Register";
-import VerifyOtp from "../pages/auth/VerifyOtp";
-import ForgotPassword from "../pages/auth/ForgotPassword";
-import ResetPassword from "../pages/auth/ResetPassword";
+import Login from "../features/auth/pages/Login";
+import Register from "../features/auth/pages/Register";
+import VerifyOtp from "../features/auth/pages/VerifyOtp";
+import ForgotPassword from "../features/auth/pages/ForgotPassword";
+import ResetPassword from "../features/auth/pages/ResetPassword";
 
 // Patient Pages
-import PatientPortal from "../pages/patient/PatientPortal";
-import SearchResults from "../pages/patient/SearchResults";
-import EmergencySOS from "../pages/patient/EmergencySOS";
-import NotificationCenter from "../pages/NotificationCenter";
+import PatientPortal from "../features/patient/pages/PatientPortal";
+import SearchResults from "../features/patient/pages/SearchResults";
+import EmergencySOS from "../features/patient/pages/EmergencySOS";
+import NotificationCenter from "../features/patient/pages/NotificationCenter";
 
 // Pharmacy Pages
-import PharmacyDashboard from "../pages/pharmacy/PharmacyDashboard";
-import PharmacyOnboarding from "../pages/pharmacy/PharmacyOnboarding";
-import PharmacyPendingApproval from "../pages/pharmacy/PharmacyPendingApproval";
+import PharmacyDashboard from "../features/pharmacy/pages/PharmacyDashboard";
+import PharmacyOnboarding from "../features/pharmacy/pages/PharmacyOnboarding";
+import PharmacyPendingApproval from "../features/pharmacy/pages/PharmacyPendingApproval";
 
 // Admin Pages
-import AdminDashboardHome from "../pages/admin/AdminDashboardHome";
-import AdminPharmacies from "../pages/admin/AdminPharmacies";
-import AdminPharmacyDetails from "../pages/admin/AdminPharmacyDetails";
-import AdminUsers from "../pages/admin/AdminUsers";
-import AdminLogs from "../pages/admin/AdminLogs";
-import AdminSettings from "../pages/admin/AdminSettings";
+import AdminDashboardHome from "../features/admin/pages/AdminDashboardHome";
+import AdminPharmacies from "../features/admin/pages/AdminPharmacies";
+import AdminPharmacyDetails from "../features/admin/pages/AdminPharmacyDetails";
+import AdminUsers from "../features/admin/pages/AdminUsers";
+import AdminLogs from "../features/admin/pages/AdminLogs";
+import AdminSettings from "../features/admin/pages/AdminSettings";
 
-// Components
+// Layouts & Components
 import ProtectedRoute from "./ProtectedRoute";
-import Layout from "../components/Layout";
+import Layout from "../shared/layouts/Layout";
 
 // Unauthorized page component
 function UnauthorizedPage() {

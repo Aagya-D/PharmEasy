@@ -2,7 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { routes } from "./routes/AppRoutes";
-import StateMonitor from "./components/StateMonitor";
+import StateMonitor from "./shared/components/StateMonitor";
 
 /**
  * Main App Component

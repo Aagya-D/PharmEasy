@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from "react";
-import axios from "axios";
-import { api } from "../services/auth.api";
+import authService from "../core/services/auth.service";
+import httpClient from "../core/services/httpClient";
 import logger from "../utils/logger";
 import auditor from "../utils/auditor";
 
@@ -171,7 +171,7 @@ export function AuthProvider({ children }) {
   // Setup axios interceptors
   useEffect(() => {
     // Request interceptor - add token to headers
-    const requestInterceptor = api.interceptors.request.use(
+    const requestInterceptor = httpClient.interceptors.request.use(
       (config) => {
         const startTime = performance.now();
         config.metadata = { startTime };
@@ -190,7 +190,7 @@ export function AuthProvider({ children }) {
     );
 
     // Response interceptor - handle token refresh
-    const responseInterceptor = api.interceptors.response.use(
+    const responseInterceptor = httpClient.interceptors.response.use(
       (response) => {
         const duration = performance.now() - response.config.metadata?.startTime;
         logger.apiCall(
@@ -219,7 +219,7 @@ export function AuthProvider({ children }) {
             const refreshToken = localStorage.getItem("refreshToken");
             if (refreshToken) {
               logger.info("Attempting token refresh");
-              const response = await api.post("/auth/refresh", {
+              const response = await authService.refreshToken({
                 refreshToken,
               });
 
@@ -250,8 +250,8 @@ export function AuthProvider({ children }) {
     );
 
     return () => {
-      api.interceptors.request.eject(requestInterceptor);
-      api.interceptors.response.eject(responseInterceptor);
+      httpClient.interceptors.request.eject(requestInterceptor);
+      httpClient.interceptors.response.eject(responseInterceptor);
     };
   }, [state.accessToken]);
 
@@ -262,7 +262,7 @@ export function AuthProvider({ children }) {
     
     try {
       const timer = logger.startTimer("LOGIN_API_CALL");
-      const response = await api.post("/auth/login", { email, password });
+      const response = await authService.login({ email, password });
       timer.stop();
 
       // Extract data from backend response
@@ -327,7 +327,7 @@ export function AuthProvider({ children }) {
   const register = async (userData) => {
     dispatch({ type: ACTIONS.REGISTER_START });
     try {
-      const response = await api.post("/auth/register", userData);
+      const response = await authService.register(userData);
 
       // Registration returns: { success, message, data: { userId, email, role } }
       const apiResponse = response.data;
@@ -372,7 +372,7 @@ export function AuthProvider({ children }) {
   const verifyOTP = async (email, otp) => {
     dispatch({ type: ACTIONS.OTP_VERIFY_START });
     try {
-      const response = await api.post("/auth/verify-otp", {
+      const response = await authService.verifyOTP({
         userId: email, // Backend accepts email as userId
         otp: otp,
       });
@@ -427,7 +427,7 @@ export function AuthProvider({ children }) {
     try {
       const refreshToken = localStorage.getItem("refreshToken");
       if (refreshToken) {
-        await api.post("/auth/logout", { refreshToken });
+        await authService.logout({ refreshToken });
       }
     } catch (error) {
       console.error("Logout error:", error);
