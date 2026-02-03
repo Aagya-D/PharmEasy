@@ -9,13 +9,25 @@ import StateMonitor from "./shared/components/StateMonitor";
  * Centralized routing with state monitoring
  */
 function App() {
+  // Helper to recursively render routes with children
+  const renderRoutes = (routeList) => {
+    return routeList.map((route, index) => {
+      if (route.children && route.children.length > 0) {
+        return (
+          <Route key={index} path={route.path} element={route.element}>
+            {renderRoutes(route.children)}
+          </Route>
+        );
+      }
+      return <Route key={index} path={route.path} element={route.element} />;
+    });
+  };
+
   return (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          {routes.map((route, index) => (
-            <Route key={index} path={route.path} element={route.element} />
-          ))}
+          {renderRoutes(routes)}
         </Routes>
         
         {/* Development-only state monitor (Ctrl+Shift+L to toggle) */}

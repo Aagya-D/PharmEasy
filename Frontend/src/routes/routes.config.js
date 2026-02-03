@@ -41,13 +41,43 @@ export const publicRoutes = [
 export const patientRoutes = [
   {
     path: "/patient",
-    name: "Patient Portal",
-    component: "features/patient/pages/PatientPortal",
+    name: "Patient Dashboard",
+    component: "features/patient/pages/Dashboard/PatientDashboard",
+    roleId: 3,
+  },
+  {
+    path: "/patient/orders",
+    name: "My Orders",
+    component: "features/patient/pages/Orders/OrdersPage",
+    roleId: 3,
+  },
+  {
+    path: "/patient/orders/:id",
+    name: "Order Details",
+    component: "features/patient/pages/Orders/OrderDetailsPage",
+    roleId: 3,
+  },
+  {
+    path: "/patient/medications",
+    name: "My Medications",
+    component: "features/patient/pages/Medications/MedicationsPage",
+    roleId: 3,
+  },
+  {
+    path: "/patient/prescriptions",
+    name: "My Prescriptions",
+    component: "features/patient/pages/Prescriptions/PrescriptionsPage",
+    roleId: 3,
+  },
+  {
+    path: "/patient/profile",
+    name: "My Profile",
+    component: "features/patient/pages/Profile/ProfilePage",
     roleId: 3,
   },
   {
     path: "/search",
-    name: "Search Results",
+    name: "Search Pharmacies",
     component: "features/patient/pages/SearchResults",
     roleId: 3,
   },

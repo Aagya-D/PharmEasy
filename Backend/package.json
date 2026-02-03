@@ -7,13 +7,15 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
+    "prod": "NODE_ENV=production node src/index.js",
+    "build:frontend": "cd ../Frontend && npm run build",
+    "build:all": "npm run build:frontend && echo \"Backend ready for production\"",
     "test": "echo \"Error: no test specified\" && exit 1",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "node prisma/seed.js",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio",
-    "build": "echo \"No build step required\""
+    "db:studio": "prisma studio"
   },
   "keywords": [
     "express",

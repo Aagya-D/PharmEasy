@@ -24,7 +24,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Navbar } from "../../../shared/components/Navbar";
+import Layout from "../../../shared/layouts/Layout";
 
 /**
  * Notification & Activity Center
@@ -241,8 +241,8 @@ export default function NotificationCenter() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
+    <Layout>
+      <div className="min-h-screen bg-gray-50">
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
@@ -766,7 +766,8 @@ export default function NotificationCenter() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </Layout>
   );
 }
 

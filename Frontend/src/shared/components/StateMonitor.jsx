@@ -4,9 +4,9 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { useAuth } from "../context/AuthContext";
-import logger from "../utils/logger";
-import auditor from "../utils/auditor";
+import { useAuth } from "../../context/AuthContext";
+import logger from "../../utils/logger";
+import auditor from "../../utils/auditor";
 
 export function StateMonitor() {
   const { user, isAuthenticated } = useAuth();

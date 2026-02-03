@@ -32,9 +32,9 @@ export const errorHandler = (err, req, res, next) => {
     path: req.path,
     method: req.method,
     userId: req.user?.id,
-    stack: err.stack,
-    body: req.body,
-    query: req.query,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+    body: process.env.NODE_ENV === 'development' ? req.body : undefined,
+    query: process.env.NODE_ENV === 'development' ? req.query : undefined,
   });
 
   // Handle validation errors
@@ -65,12 +65,18 @@ export const errorHandler = (err, req, res, next) => {
     message = "Resource not found";
   }
 
+  // CRITICAL: Ensure headers haven't been sent
+  if (res.headersSent) {
+    return next(err);
+  }
+
   // Send error response
   res.status(statusCode).json({
     success: false,
     error: {
       status: statusCode,
       message,
+      ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
     },
   });
 };

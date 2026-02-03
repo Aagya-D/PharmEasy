@@ -18,12 +18,14 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { AuthLayout } from "../components/AuthLayout";
-import { Input } from "../../../shared/components/ui/Input";
-import { Button } from "../../../shared/components/ui/Button";
+import { Input } from "../../../shared/components/ui";
+import { Button } from "../../../shared/components/ui";
+import { Alert } from "../../../shared/components/ui";
 import { RoleCard } from "../../../shared/components/RoleCard";
-import { useAuth } from "../../context/AuthContext";
-import { REGISTRATION_ROLES } from "../../../shared/constants/roles";
-import registerHeroImage from "../../assets/register-hero.svg";
+import { useAuth } from "../../../context/AuthContext";
+import { REGISTRATION_ROLES } from "../../../core/constants/roles";
+import { User, Mail, Lock, Shield } from "lucide-react";
+import registerHeroImage from "../../../assets/register-hero.svg";
 
 export function Register() {
   const navigate = useNavigate();
@@ -112,10 +114,16 @@ export function Register() {
         // Redirect to OTP verification with userId and email
         navigate("/verify-otp", { state: { email, userId: result.userId } });
       } else {
+        // ✅ FIX: Safely extract error message
         setError(result.error || "Registration failed");
       }
     } catch (err) {
-      setError("An unexpected error occurred");
+      // ✅ FIX: Safely extract error message from caught exception
+      const errorMessage = err?.message || err?.response?.data?.message || "An unexpected error occurred";
+      setError(errorMessage);
+      
+      // Log the error for debugging
+      console.error("[REGISTER] Unexpected error:", err);
     } finally {
       setIsLoading(false);
     }
@@ -129,36 +137,26 @@ export function Register() {
       slogan="Growing together as a community of healthcare professionals and patients committed to better pharmacy care."
       accentColor="#10B981"
     >
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Error Alert */}
         {error && (
-          <div
-            style={{
-              padding: "var(--spacing-md)",
-              backgroundColor: "var(--color-error-light)",
-              color: "var(--color-error)",
-              borderRadius: "var(--radius-md)",
-              marginBottom: "var(--spacing-lg)",
-              fontSize: "var(--font-size-sm)",
-            }}
-            role="alert"
-          >
-            {error}
-          </div>
+          <Alert 
+            type="error" 
+            message={error}
+            onDismiss={() => setError("")}
+          />
         )}
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "var(--spacing-md)",
-          }}
-        >
+        {/* Name Fields */}
+        <div className="grid grid-cols-2 gap-4">
           <Input
             label="First Name"
             placeholder="John"
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
             disabled={isLoading}
+            required
+            icon={<User size={18} />}
           />
           <Input
             label="Last Name"
@@ -166,9 +164,11 @@ export function Register() {
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
             disabled={isLoading}
+            required
           />
         </div>
 
+        {/* Email */}
         <Input
           label="Email Address"
           type="email"
@@ -176,24 +176,33 @@ export function Register() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={isLoading}
+          required
+          icon={<Mail size={18} />}
         />
 
-        <div>
-          <Input
-            label="Password"
-            type="password"
-            placeholder="Create a strong password"
-            value={password}
-            onChange={(e) => handlePasswordChange(e.target.value)}
-            disabled={isLoading}
-            error={
-              passwordErrors.length > 0
-                ? `Password must include: ${passwordErrors.join(", ")}`
-                : ""
-            }
-          />
-        </div>
+        {/* Password */}
+        <Input
+          label="Password"
+          type="password"
+          placeholder="Create a strong password"
+          value={password}
+          onChange={(e) => handlePasswordChange(e.target.value)}
+          disabled={isLoading}
+          required
+          icon={<Lock size={18} />}
+          error={
+            password && passwordErrors.length > 0
+              ? `Password must include: ${passwordErrors.join(", ")}`
+              : ""
+          }
+          hint={
+            !password
+              ? "Must be at least 8 characters with uppercase, lowercase, number and special character"
+              : ""
+          }
+        />
 
+        {/* Confirm Password */}
         <Input
           label="Confirm Password"
           type="password"
@@ -201,6 +210,8 @@ export function Register() {
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           disabled={isLoading}
+          required
+          icon={<Shield size={18} />}
           error={
             confirmPassword && password !== confirmPassword
               ? "Passwords do not match"
@@ -208,72 +219,48 @@ export function Register() {
           }
         />
 
-        {/* Role Selection - Hardcoded roles, no API call */}
-        <div style={{ marginBottom: "var(--spacing-lg)" }}>
-          <label
-            style={{
-              display: "block",
-              fontSize: "var(--font-size-sm)",
-              fontWeight: "var(--font-weight-medium)",
-              color: "var(--color-text-primary)",
-              marginBottom: "var(--spacing-md)",
-            }}
-          >
-            Select Your Role
+        {/* Role Selection */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-3">
+            Select Your Role <span className="text-red-500">*</span>
           </label>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: `repeat(${REGISTRATION_ROLES.length}, 1fr)`,
-              gap: "var(--spacing-md)",
-            }}
-          >
+          <div className={`grid grid-cols-${REGISTRATION_ROLES.length} gap-3`}>
             {REGISTRATION_ROLES.map((role) => (
               <RoleCard
                 key={role.id}
                 role={role}
                 selected={selectedRole === role.id}
                 onChange={setSelectedRole}
+                disabled={isLoading}
               />
             ))}
           </div>
         </div>
 
-        <Button type="submit" loading={isLoading}>
+        {/* Submit Button */}
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          loading={isLoading}
+          disabled={isLoading}
+          className="w-full"
+        >
           Create Account
         </Button>
 
-        <div
-          style={{
-            marginTop: "var(--spacing-lg)",
-            textAlign: "center",
-            fontSize: "var(--font-size-sm)",
-            color: "var(--color-text-secondary)",
-          }}
-        >
+        {/* Login Link */}
+        <p className="text-center text-sm text-slate-600 mt-6">
           Already have an account?{" "}
           <Link
             to="/login"
-            style={{
-              color: "var(--color-primary)",
-              fontWeight: "var(--font-weight-medium)",
-              textDecoration: "none",
-              transition: "color var(--transition-fast)",
-            }}
-            onMouseEnter={(e) =>
-              (e.target.style.color = "var(--color-primary-dark)")
-            }
-            onMouseLeave={(e) =>
-              (e.target.style.color = "var(--color-primary)")
-            }
+            className="text-cyan-600 font-semibold hover:text-cyan-700 transition-colors"
           >
-            Sign in here
+            Sign In
           </Link>
-        </div>
+        </p>
       </form>
     </AuthLayout>
   );
 }
-
-export default Register;
 

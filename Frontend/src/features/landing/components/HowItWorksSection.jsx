@@ -4,110 +4,41 @@ export function HowItWorksSection() {
   return (
     <section
       id="how-it-works"
-      style={{
-        padding: "var(--spacing-3xl) var(--spacing-xl)",
-        backgroundColor: "var(--color-bg-secondary)",
-      }}
+      className="px-6 py-20 bg-gray-50"
     >
-      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        <h2
-          style={{
-            fontSize: "var(--font-size-2xl)",
-            fontWeight: "var(--font-weight-bold)",
-            color: "var(--color-text-primary)",
-            marginBottom: "var(--spacing-2xl)",
-            textAlign: "center",
-          }}
-        >
+      <div className="max-w-7xl mx-auto">
+        <h2 className="text-4xl font-bold text-gray-900 mb-16 text-center">
           How It Works
         </h2>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-            gap: "var(--spacing-xl)",
-          }}
-        >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Patient Flow */}
-          <div
-            style={{
-              padding: "var(--spacing-xl)",
-              backgroundColor: "var(--color-bg-primary)",
-              borderRadius: "var(--radius-lg)",
-              border: "2px solid var(--color-info-light)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--spacing-md)",
-                marginBottom: "var(--spacing-lg)",
-              }}
-            >
-              <User size={28} color="var(--color-info)" />
-              <h3
-                style={{
-                  fontSize: "var(--font-size-lg)",
-                  fontWeight: "var(--font-weight-semibold)",
-                  color: "var(--color-info)",
-                  margin: 0,
-                }}
-              >
+          <div className="p-8 bg-white rounded-xl border-2 border-blue-200">
+            <div className="flex items-center gap-4 mb-6">
+              <User size={28} className="text-blue-600" />
+              <h3 className="text-lg font-semibold text-blue-600 m-0">
                 Patient Workflow
               </h3>
             </div>
 
             {[
-              "Search Medicine",
-              "View Nearby Pharmacies",
-              "Check Real-Time Stock",
-              "Get Directions or SOS",
-              "Receive Notifications",
-            ].map((step, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: "flex",
-                  gap: "var(--spacing-md)",
-                  marginBottom: idx < 4 ? "var(--spacing-lg)" : "0",
-                }}
-              >
-                <div
-                  style={{
-                    minWidth: "32px",
-                    height: "32px",
-                    backgroundColor: "var(--color-info)",
-                    color: "white",
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: "var(--font-weight-bold)",
-                    fontSize: "var(--font-size-sm)",
-                  }}
-                >
+              { step: "Search Medicine", desc: null },
+              { step: "View Nearby Pharmacies", desc: null },
+              { step: "Check Real-Time Stock", desc: null },
+              { step: "Get Directions or SOS", desc: "Submit SOS if unavailable" },
+              { step: "Receive Notifications", desc: null },
+            ].map((item, idx) => (
+              <div key={idx} className={`flex gap-4 ${idx < 4 ? 'mb-6' : ''}`}>
+                <div className="min-w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
                   {idx + 1}
                 </div>
                 <div>
-                  <p
-                    style={{
-                      fontWeight: "var(--font-weight-medium)",
-                      color: "var(--color-text-primary)",
-                      marginBottom: "var(--spacing-xs)",
-                    }}
-                  >
-                    {step}
+                  <p className="font-medium text-gray-900 mb-1">
+                    {item.step}
                   </p>
-                  {idx === 3 && (
-                    <p
-                      style={{
-                        fontSize: "var(--font-size-sm)",
-                        color: "var(--color-text-secondary)",
-                      }}
-                    >
-                      Submit SOS if unavailable
+                  {item.desc && (
+                    <p className="text-sm text-gray-600">
+                      {item.desc}
                     </p>
                   )}
                 </div>
@@ -116,84 +47,32 @@ export function HowItWorksSection() {
           </div>
 
           {/* Pharmacy Admin Flow */}
-          <div
-            style={{
-              padding: "var(--spacing-xl)",
-              backgroundColor: "var(--color-bg-primary)",
-              borderRadius: "var(--radius-lg)",
-              border: "2px solid var(--color-success-light)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--spacing-md)",
-                marginBottom: "var(--spacing-lg)",
-              }}
-            >
-              <Stethoscope size={28} color="var(--color-success)" />
-              <h3
-                style={{
-                  fontSize: "var(--font-size-lg)",
-                  fontWeight: "var(--font-weight-semibold)",
-                  color: "var(--color-success)",
-                  margin: 0,
-                }}
-              >
+          <div className="p-8 bg-white rounded-xl border-2 border-green-200">
+            <div className="flex items-center gap-4 mb-6">
+              <Stethoscope size={28} className="text-green-600" />
+              <h3 className="text-lg font-semibold text-green-600 m-0">
                 Pharmacy Admin Workflow
               </h3>
             </div>
 
             {[
-              "Register & Verify Pharmacy",
-              "Upload/Manage Inventory",
-              "Set Stock Thresholds",
-              "Respond to SOS Requests",
-              "View Demand Analytics",
-            ].map((step, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: "flex",
-                  gap: "var(--spacing-md)",
-                  marginBottom: idx < 4 ? "var(--spacing-lg)" : "0",
-                }}
-              >
-                <div
-                  style={{
-                    minWidth: "32px",
-                    height: "32px",
-                    backgroundColor: "var(--color-success)",
-                    color: "white",
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: "var(--font-weight-bold)",
-                    fontSize: "var(--font-size-sm)",
-                  }}
-                >
+              { step: "Register & Verify Pharmacy", desc: null },
+              { step: "Upload/Manage Inventory", desc: null },
+              { step: "Set Stock Thresholds", desc: null },
+              { step: "Respond to SOS Requests", desc: "Real-time notifications" },
+              { step: "View Demand Analytics", desc: null },
+            ].map((item, idx) => (
+              <div key={idx} className={`flex gap-4 ${idx < 4 ? 'mb-6' : ''}`}>
+                <div className="min-w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
                   {idx + 1}
                 </div>
                 <div>
-                  <p
-                    style={{
-                      fontWeight: "var(--font-weight-medium)",
-                      color: "var(--color-text-primary)",
-                      marginBottom: "var(--spacing-xs)",
-                    }}
-                  >
-                    {step}
+                  <p className="font-medium text-gray-900 mb-1">
+                    {item.step}
                   </p>
-                  {idx === 3 && (
-                    <p
-                      style={{
-                        fontSize: "var(--font-size-sm)",
-                        color: "var(--color-text-secondary)",
-                      }}
-                    >
-                      Real-time notifications
+                  {item.desc && (
+                    <p className="text-sm text-gray-600">
+                      {item.desc}
                     </p>
                   )}
                 </div>
@@ -202,31 +81,10 @@ export function HowItWorksSection() {
           </div>
 
           {/* System Admin Flow */}
-          <div
-            style={{
-              padding: "var(--spacing-xl)",
-              backgroundColor: "var(--color-bg-primary)",
-              borderRadius: "var(--radius-lg)",
-              border: "2px solid var(--color-warning-light)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--spacing-md)",
-                marginBottom: "var(--spacing-lg)",
-              }}
-            >
-              <Settings size={28} color="var(--color-warning)" />
-              <h3
-                style={{
-                  fontSize: "var(--font-size-lg)",
-                  fontWeight: "var(--font-weight-semibold)",
-                  color: "var(--color-warning)",
-                  margin: 0,
-                }}
-              >
+          <div className="p-8 bg-white rounded-xl border-2 border-yellow-200">
+            <div className="flex items-center gap-4 mb-6">
+              <Settings size={28} className="text-yellow-600" />
+              <h3 className="text-lg font-semibold text-yellow-600 m-0">
                 System Admin Workflow
               </h3>
             </div>
@@ -238,36 +96,11 @@ export function HowItWorksSection() {
               "Manage User Disputes",
               "Generate Reports",
             ].map((step, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: "flex",
-                  gap: "var(--spacing-md)",
-                  marginBottom: idx < 4 ? "var(--spacing-lg)" : "0",
-                }}
-              >
-                <div
-                  style={{
-                    minWidth: "32px",
-                    height: "32px",
-                    backgroundColor: "var(--color-warning)",
-                    color: "white",
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontWeight: "var(--font-weight-bold)",
-                    fontSize: "var(--font-size-sm)",
-                  }}
-                >
+              <div key={idx} className={`flex gap-4 ${idx < 4 ? 'mb-6' : ''}`}>
+                <div className="min-w-8 h-8 bg-yellow-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
                   {idx + 1}
                 </div>
-                <p
-                  style={{
-                    fontWeight: "var(--font-weight-medium)",
-                    color: "var(--color-text-primary)",
-                  }}
-                >
+                <p className="font-medium text-gray-900">
                   {step}
                 </p>
               </div>

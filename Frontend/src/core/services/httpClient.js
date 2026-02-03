@@ -66,7 +66,12 @@ httpClient.interceptors.request.use(
     return config;
   },
   (error) => {
-    logger.error('[HTTP] Request Error', { error: error.message });
+    // Safely log error - don't break on logger errors
+    try {
+      logger.error('[HTTP] Request Error', { error: error.message });
+    } catch (logError) {
+      console.error('[HTTP] Logger error:', logError.message);
+    }
     return Promise.reject(error);
   }
 );
@@ -78,12 +83,18 @@ httpClient.interceptors.response.use(
   (response) => {
     const feature = getFeature(response.config.url || '');
     
-    logger.success(`[${feature}] ${response.status} ${response.config.url}`, {
-      feature,
-      status: response.status,
-      url: response.config.url,
-      data: filterSensitiveData(response.data),
-    });
+    // Safely log success - don't break on logger errors
+    try {
+      logger.success(`[${feature}] ${response.status} ${response.config.url}`, {
+        feature,
+        status: response.status,
+        url: response.config.url,
+        data: filterSensitiveData(response.data),
+      });
+    } catch (logError) {
+      // Silent fail - logger errors should not break API success handlers
+      console.error('[HTTP] Logger error:', logError.message);
+    }
 
     return response;
   },
@@ -92,13 +103,19 @@ httpClient.interceptors.response.use(
     const status = error.response?.status;
     const message = error.response?.data?.message || error.message;
 
-    logger.error(`[${feature}] ${status || 'ERR'} ${error.config?.url || 'Unknown'}`, {
-      feature,
-      status,
-      url: error.config?.url,
-      message,
-      error: error.response?.data,
-    });
+    // Safely log error - don't break on logger errors
+    try {
+      logger.error(`[${feature}] ${status || 'ERR'} ${error.config?.url || 'Unknown'}`, {
+        feature,
+        status,
+        url: error.config?.url,
+        message,
+        error: error.response?.data,
+      });
+    } catch (logError) {
+      // Silent fail - logger errors should not break error handlers
+      console.error('[HTTP] Logger error:', logError.message);
+    }
 
     // Handle 401 Unauthorized - Auto logout
     if (status === 401) {

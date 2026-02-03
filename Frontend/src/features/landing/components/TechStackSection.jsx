@@ -30,82 +30,29 @@ export function TechStackSection() {
   };
 
   return (
-    <section
-      style={{
-        padding: "var(--spacing-3xl) var(--spacing-xl)",
-        backgroundColor: "var(--color-bg-secondary)",
-      }}
-    >
-      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        <h2
-          style={{
-            fontSize: "var(--font-size-2xl)",
-            fontWeight: "var(--font-weight-bold)",
-            color: "var(--color-text-primary)",
-            marginBottom: "var(--spacing-2xl)",
-            textAlign: "center",
-          }}
-        >
+    <section className="px-6 py-20 bg-gray-50">
+      <div className="max-w-7xl mx-auto">
+        <h2 className="text-4xl font-bold text-gray-900 mb-16 text-center">
           Technology Stack
         </h2>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-            gap: "var(--spacing-xl)",
-          }}
-        >
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {Object.entries(techStack).map(([category, technologies]) => (
             <div
               key={category}
-              style={{
-                padding: "var(--spacing-xl)",
-                backgroundColor: "var(--color-bg-primary)",
-                borderRadius: "var(--radius-lg)",
-                border: "2px solid var(--color-border)",
-                transition: "all 0.3s ease",
-              }}
+              className="p-8 bg-white rounded-xl border-2 border-gray-200 transition-all duration-300"
             >
-              <h3
-                style={{
-                  fontSize: "var(--font-size-lg)",
-                  fontWeight: "var(--font-weight-bold)",
-                  color: "var(--color-primary)",
-                  marginBottom: "var(--spacing-lg)",
-                  paddingBottom: "var(--spacing-md)",
-                  borderBottom: "2px solid var(--color-primary)",
-                }}
-              >
+              <h3 className="text-lg font-bold text-blue-600 mb-8 pb-4 border-b-2 border-blue-600">
                 {category}
               </h3>
 
-              <ul
-                style={{
-                  listStyle: "none",
-                  padding: "0",
-                  margin: "0",
-                }}
-              >
+              <ul className="list-none p-0 m-0">
                 {technologies.map((tech, idx) => (
                   <li
                     key={idx}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "var(--spacing-md)",
-                      marginBottom: "var(--spacing-md)",
-                      color: "var(--color-text-primary)",
-                      fontSize: "var(--font-size-sm)",
-                    }}
+                    className="flex items-center gap-4 mb-4 text-gray-900 text-sm"
                   >
-                    <span
-                      style={{
-                        color: "var(--color-success)",
-                        fontWeight: "var(--font-weight-bold)",
-                        fontSize: "1.2rem",
-                      }}
-                    >
+                    <span className="text-green-600 font-bold text-xl">
                       ✓
                     </span>
                     {tech}

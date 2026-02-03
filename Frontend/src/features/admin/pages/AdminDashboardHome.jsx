@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../../context/AuthContext";
 import { getAllPharmacies } from "../../../core/services/pharmacy.service";
 import { Package, CheckCircle, Clock, XCircle, Users, TrendingUp } from "lucide-react";
 import AdminLayout from "../components/AdminLayout";

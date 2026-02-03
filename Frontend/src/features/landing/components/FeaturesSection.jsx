@@ -11,44 +11,19 @@ export function FeaturesSection() {
   return (
     <section
       id="features"
-      style={{
-        padding: "var(--spacing-3xl) var(--spacing-xl)",
-        backgroundColor: "var(--color-bg-primary)",
-      }}
+      className="px-6 py-20 bg-white"
     >
-      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        <h2
-          style={{
-            fontSize: "var(--font-size-2xl)",
-            fontWeight: "var(--font-weight-bold)",
-            color: "var(--color-text-primary)",
-            marginBottom: "var(--spacing-md)",
-            textAlign: "center",
-          }}
-        >
+      <div className="max-w-7xl mx-auto">
+        <h2 className="text-4xl font-bold text-gray-900 mb-4 text-center">
           Powerful Features for Healthcare Access
         </h2>
 
-        <p
-          style={{
-            fontSize: "var(--font-size-base)",
-            color: "var(--color-text-secondary)",
-            maxWidth: "700px",
-            margin: "0 auto var(--spacing-2xl)",
-            textAlign: "center",
-          }}
-        >
+        <p className="text-base text-gray-600 max-w-3xl mx-auto mb-16 text-center">
           PharmEasy brings transparency, speed, and intelligence to
           pharmaceutical logistics.
         </p>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "var(--spacing-lg)",
-          }}
-        >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[
             {
               icon: MapPin,
@@ -85,46 +60,13 @@ export function FeaturesSection() {
             return (
               <div
                 key={idx}
-                style={{
-                  padding: "var(--spacing-lg)",
-                  backgroundColor: "var(--color-bg-secondary)",
-                  borderRadius: "var(--radius-lg)",
-                  border: "1px solid var(--color-border)",
-                  transition: "all var(--transition-normal)",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-4px)";
-                  e.currentTarget.style.boxShadow = "var(--shadow-md)";
-                  e.currentTarget.style.borderColor = "var(--color-primary)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "none";
-                  e.currentTarget.style.borderColor = "var(--color-border)";
-                }}
+                className="p-6 bg-gray-50 rounded-xl border border-gray-200 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-blue-600"
               >
-                <Icon
-                  size={32}
-                  color="var(--color-primary)"
-                  style={{ marginBottom: "var(--spacing-md)" }}
-                />
-                <h3
-                  style={{
-                    fontSize: "var(--font-size-base)",
-                    fontWeight: "var(--font-weight-semibold)",
-                    color: "var(--color-text-primary)",
-                    marginBottom: "var(--spacing-sm)",
-                  }}
-                >
+                <Icon size={32} className="text-blue-600 mb-4" />
+                <h3 className="text-base font-semibold text-gray-900 mb-3">
                   {feature.title}
                 </h3>
-                <p
-                  style={{
-                    fontSize: "var(--font-size-sm)",
-                    color: "var(--color-text-secondary)",
-                    lineHeight: "var(--line-height-normal)",
-                  }}
-                >
+                <p className="text-sm text-gray-600 leading-normal">
                   {feature.desc}
                 </p>
               </div>

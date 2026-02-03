@@ -1,7 +1,7 @@
 import React from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import LoadingSpinner from "../components/LoadingSpinner";
+import LoadingSpinner from "../shared/components/ui/LoadingSpinner";
 
 // Role ID to role name mapping
 const ROLE_MAP = {
@@ -16,14 +16,14 @@ const ROLE_MAP = {
  * @param {string[]} allowedRoles - Array of allowed role names (e.g., ['ADMIN', 'PHARMACY'])
  */
 export function ProtectedRoute({ allowedRoles, children }) {
-  const { isAuthenticated, isOTPVerified, isSessionRestoring, user } = useAuth();
+  const { isAuthenticated, isSessionRestoring, user } = useAuth();
 
   if (isSessionRestoring) {
     return <LoadingSpinner />;
   }
 
-  // ✅ CRITICAL: Check BOTH authentication AND OTP verification
-  if (!isAuthenticated || !isOTPVerified) {
+  // ✅ Check authentication - OTP verification is part of login flow
+  if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;
   }
 
@@ -32,13 +32,12 @@ export function ProtectedRoute({ allowedRoles, children }) {
     const userRole = ROLE_MAP[user?.roleId];
     
     if (!userRole || !allowedRoles.includes(userRole)) {
-      console.log('[ProtectedRoute] Access denied - User role:', userRole, 'Allowed:', allowedRoles);
       return <Navigate to="/unauthorized" replace />;
     }
   }
 
-  // Use Outlet for nested routes, children for direct wrapping
-  return children || <Outlet />;
+  // Render children (which should be <Outlet /> from route config)
+  return children;
 }
 
 export default ProtectedRoute;

@@ -19,8 +19,7 @@ import {
   Star,
   CheckCircle,
 } from "lucide-react";
-import { Navbar } from "../../../shared/components/Navbar";
-import { Footer } from "../../../shared/components/Footer";
+import Layout from "../../../shared/layouts/Layout";
 
 /**
  * Global Landing Page - Patient Portal
@@ -96,8 +95,8 @@ export default function PatientPortal() {
   ];
 
   return (
-    <div className="min-h-screen bg-white">
-      <Navbar />
+    <Layout>
+      <div className="min-h-screen bg-white">
 
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-blue-50 via-white to-cyan-50 overflow-hidden">
@@ -478,7 +477,8 @@ export default function PatientPortal() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </Layout>
   );
 }
 

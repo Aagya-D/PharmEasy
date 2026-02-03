@@ -107,13 +107,45 @@ class Logger {
 
   /**
    * ERROR: Critical errors that need immediate attention
+   * IMPORTANT: Always pass Error objects, never strings
    */
-  error(message, error = {}) {
-    this.log(LOG_LEVELS.ERROR, "ERROR", message, {
-      error: error.message || error,
-      stack: error.stack,
-      ...error,
-    });
+  error(message, error = null) {
+    // Safely extract error information
+    let errorData = {};
+    
+    if (error) {
+      if (typeof error === 'string') {
+        // ✅ Handle string errors safely (don't spread)
+        errorData = {
+          message: error,
+          stack: undefined,
+        };
+      } else if (error instanceof Error) {
+        // ✅ Handle Error objects properly
+        errorData = {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        };
+      } else if (typeof error === 'object' && error !== null) {
+        // ✅ Handle plain objects (Axios errors, etc)
+        errorData = {
+          message: error.message || JSON.stringify(error),
+          ...(error.code && { code: error.code }),
+          ...(error.status && { status: error.status }),
+          ...(error.response && { response: error.response }),
+        };
+      }
+    }
+
+    this.log(LOG_LEVELS.ERROR, "ERROR", message, errorData);
+  }
+
+  /**
+   * SUCCESS: Successful operations (alias for INFO with success context)
+   */
+  success(message, data = {}) {
+    this.log(LOG_LEVELS.INFO, "SUCCESS", message, data);
   }
 
   /**

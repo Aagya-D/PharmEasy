@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../../context/AuthContext";
 import { 
   LayoutDashboard, 
   Package, 
@@ -25,11 +25,11 @@ const AdminLayout = ({ children }) => {
   };
 
   const menuItems = [
-    { icon: LayoutDashboard, label: "Dashboard", path: "/system-admin/dashboard" },
-    { icon: Package, label: "Pharmacies", path: "/system-admin/pharmacies" },
-    { icon: Users, label: "Users", path: "/system-admin/users" },
-    { icon: FileText, label: "Activity Logs", path: "/system-admin/logs" },
-    { icon: Settings, label: "Settings", path: "/system-admin/settings" },
+    { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard" },
+    { icon: Package, label: "Pharmacies", path: "/admin/pharmacies" },
+    { icon: Users, label: "Users", path: "/admin/users" },
+    { icon: FileText, label: "Activity Logs", path: "/admin/logs" },
+    { icon: Settings, label: "Settings", path: "/admin/settings" },
   ];
 
   const isActive = (path) => location.pathname === path;

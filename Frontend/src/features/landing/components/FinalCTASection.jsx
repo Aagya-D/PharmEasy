@@ -1,102 +1,36 @@
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../../context/AuthContext";
 
 export function FinalCTASection() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
   return (
-    <section
-      style={{
-        padding: "var(--spacing-3xl) var(--spacing-xl)",
-        backgroundColor: "var(--color-bg-primary)",
-        textAlign: "center",
-      }}
-    >
-      <div style={{ maxWidth: "800px", margin: "0 auto" }}>
-        <h2
-          style={{
-            fontSize: "var(--font-size-2xl)",
-            fontWeight: "var(--font-weight-bold)",
-            color: "var(--color-text-primary)",
-            marginBottom: "var(--spacing-lg)",
-          }}
-        >
+    <section className="px-6 py-20 bg-white text-center">
+      <div className="max-w-3xl mx-auto">
+        <h2 className="text-4xl font-bold text-gray-900 mb-8">
           Ready to Transform Your Healthcare Experience?
         </h2>
 
-        <p
-          style={{
-            fontSize: "var(--font-size-base)",
-            color: "var(--color-text-secondary)",
-            marginBottom: "var(--spacing-2xl)",
-            lineHeight: "1.8",
-          }}
-        >
+        <p className="text-base text-gray-600 mb-16 leading-relaxed">
           Join thousands of patients and pharmacy partners who are already using
           PharmEasy to streamline their medication access and pharmacy
           operations.
         </p>
 
-        <div
-          style={{
-            display: "flex",
-            gap: "var(--spacing-lg)",
-            justifyContent: "center",
-            flexWrap: "wrap",
-            marginBottom: "var(--spacing-2xl)",
-          }}
-        >
+        <div className="flex gap-8 justify-center flex-wrap mb-16">
           {!isAuthenticated ? (
             <>
               <button
                 onClick={() => navigate("/register")}
-                style={{
-                  padding: "var(--spacing-md) var(--spacing-2xl)",
-                  backgroundColor: "var(--color-primary)",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "var(--radius-md)",
-                  fontSize: "var(--font-size-base)",
-                  fontWeight: "var(--font-weight-semibold)",
-                  cursor: "pointer",
-                  transition: "all 0.3s ease",
-                  boxShadow: "var(--shadow-md)",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                  e.currentTarget.style.boxShadow = "var(--shadow-lg)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "var(--shadow-md)";
-                }}
+                className="px-8 py-4 bg-blue-600 text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-all duration-300 shadow-md hover:-translate-y-1 hover:shadow-lg"
               >
                 Get Started Now
               </button>
 
               <button
                 onClick={() => navigate("/login")}
-                style={{
-                  padding: "var(--spacing-md) var(--spacing-2xl)",
-                  backgroundColor: "transparent",
-                  color: "var(--color-primary)",
-                  border: "2px solid var(--color-primary)",
-                  borderRadius: "var(--radius-md)",
-                  fontSize: "var(--font-size-base)",
-                  fontWeight: "var(--font-weight-semibold)",
-                  cursor: "pointer",
-                  transition: "all 0.3s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    "var(--color-primary)";
-                  e.currentTarget.style.color = "white";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                  e.currentTarget.style.color = "var(--color-primary)";
-                }}
+                className="px-8 py-4 bg-transparent text-blue-600 border-2 border-blue-600 rounded-lg text-base font-semibold cursor-pointer transition-all duration-300 hover:bg-blue-600 hover:text-white"
               >
                 Sign In
               </button>
@@ -104,38 +38,14 @@ export function FinalCTASection() {
           ) : (
             <button
               onClick={() => navigate("/dashboard")}
-              style={{
-                padding: "var(--spacing-md) var(--spacing-2xl)",
-                backgroundColor: "var(--color-primary)",
-                color: "white",
-                border: "none",
-                borderRadius: "var(--radius-md)",
-                fontSize: "var(--font-size-base)",
-                fontWeight: "var(--font-weight-semibold)",
-                cursor: "pointer",
-                transition: "all 0.3s ease",
-                boxShadow: "var(--shadow-md)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "var(--shadow-lg)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "var(--shadow-md)";
-              }}
+              className="px-8 py-4 bg-blue-600 text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-all duration-300 shadow-md hover:-translate-y-1 hover:shadow-lg"
             >
               Go to Dashboard
             </button>
           )}
         </div>
 
-        <p
-          style={{
-            fontSize: "var(--font-size-sm)",
-            color: "var(--color-text-secondary)",
-          }}
-        >
+        <p className="text-sm text-gray-600">
           No credit card required. Start exploring PharmEasy instantly.
         </p>
       </div>

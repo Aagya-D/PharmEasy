@@ -19,13 +19,14 @@ import {
   Plus,
   Minus,
 } from "lucide-react";
-import { Navbar } from "../../../shared/components/Navbar";
+import Layout from "../../../shared/layouts/Layout";
 
 /**
  * Emergency SOS Request Form
  * Urgent medicine request form with location and disclaimer
  */
-export default function EmergencySOS() {
+export default function EmergencySOS()
+{
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -192,18 +193,17 @@ export default function EmergencySOS() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
-      {/* Disclaimer Modal */}
-      <AnimatePresence>
-        {showDisclaimer && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-          >
+    <Layout>
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50">
+        {/* Disclaimer Modal */}
+        <AnimatePresence>
+          {showDisclaimer && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+            >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -311,7 +311,7 @@ export default function EmergencySOS() {
             </motion.div>
           </motion.div>
         )}
-      </AnimatePresence>
+        </AnimatePresence>
 
       {/* Main Form */}
       <div className="max-w-2xl mx-auto px-4 py-8">
@@ -651,7 +651,8 @@ export default function EmergencySOS() {
           </p>
         </motion.form>
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 }
 

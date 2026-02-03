@@ -6,16 +6,32 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { prisma } from "./database/prisma.js";
 import { errorHandler, asyncHandler } from "./middlewares/errorHandler.js";
 import loggingMiddleware from "./middlewares/logger.middleware.js";
 import logger from "./utils/logger.js";
+import validateEnvironment from "./utils/validateEnv.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import pharmacyRoutes from "./modules/pharmacy/pharmacy.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 
+// ES Module __dirname workaround
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Load environment variables
 dotenv.config();
+
+// Validate environment variables before starting
+try {
+  validateEnvironment();
+} catch (error) {
+  console.error('❌ Environment validation failed:');
+  console.error(error.message);
+  process.exit(1);
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -115,18 +131,45 @@ app.get("/api", (req, res) => {
 });
 
 // ============================================
-// 404 HANDLER
+// STATIC FILE SERVING (Production Only)
 // ============================================
 
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: {
-      status: 404,
-      message: `Cannot ${req.method} ${req.path}`,
-    },
+if (NODE_ENV === "production") {
+  // Serve static files from the Frontend build directory
+  const frontendBuildPath = path.join(__dirname, "../../Frontend/dist");
+  
+  app.use(express.static(frontendBuildPath, {
+    maxAge: "1y", // Cache static assets for 1 year
+    etag: true,
+    lastModified: true,
+  }));
+
+  // Catch-all route for SPA - must be AFTER API routes
+  // Only serve index.html for non-API routes
+  app.get("*", (req, res, next) => {
+    // Never serve index.html for API routes
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendBuildPath, "index.html"));
   });
-});
+}
+
+// ============================================
+// 404 HANDLER (Development Only - API routes)
+// ============================================
+
+if (NODE_ENV !== "production") {
+  app.use((req, res) => {
+    res.status(404).json({
+      success: false,
+      error: {
+        status: 404,
+        message: `Cannot ${req.method} ${req.path}`,
+      },
+    });
+  });
+}
 
 // ============================================
 // ERROR HANDLER (Must be last)

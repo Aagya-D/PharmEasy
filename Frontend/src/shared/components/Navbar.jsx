@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { ROLE_IDS } from "../../core/constants/roles";
 import { 
   Menu, 
   X, 
@@ -12,15 +13,51 @@ import {
   LogOut,
   ChevronDown,
   Settings,
-  LayoutDashboard
+  LayoutDashboard,
+  Package,
+  Users,
+  FileText,
+  Shield
 } from "lucide-react";
 
 /**
- * Enhanced Navigation Bar with Tailwind
- * Sticky header with responsive design and smooth interactions
+ * Role-Aware Navigation Configuration
+ * Each role gets specific navigation items
+ */
+const NAV_CONFIG = {
+  [ROLE_IDS.PATIENT]: [
+    { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+    { name: "Search", path: "/search", icon: Search },
+    { name: "SOS", path: "/sos", icon: AlertTriangle, highlight: true },
+    { name: "Notifications", path: "/notifications", icon: Bell },
+  ],
+  [ROLE_IDS.PHARMACY]: {
+    approved: [
+      { name: "Dashboard", path: "/pharmacy/dashboard", icon: LayoutDashboard },
+      { name: "Inventory", path: "/pharmacy/dashboard", icon: Package },
+      { name: "SOS Requests", path: "/pharmacy/sos", icon: AlertTriangle, highlight: true },
+      { name: "Notifications", path: "/notifications", icon: Bell },
+    ],
+    pending: [
+      { name: "Dashboard", path: "/pharmacy/pending", icon: LayoutDashboard },
+      { name: "Approval Status", path: "/pharmacy/pending", icon: Shield },
+    ],
+  },
+  [ROLE_IDS.ADMIN]: [
+    { name: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
+    { name: "Users", path: "/admin/users", icon: Users },
+    { name: "Pharmacies", path: "/admin/pharmacies", icon: Package },
+    { name: "System Logs", path: "/admin/logs", icon: FileText },
+    { name: "Settings", path: "/admin/settings", icon: Settings },
+  ],
+};
+
+/**
+ * Enhanced Navigation Bar with Role-Based Rendering
+ * Conditionally displays navigation based on auth state and user role
  */
 export function Navbar() {
-  const { isAuthenticated, logout, user } = useAuth();
+  const { isAuthenticated, logout, user, isSessionRestoring } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -37,15 +74,49 @@ export function Navbar() {
     await logout();
     navigate("/login");
     setIsMenuOpen(false);
+    setShowUserMenu(false);
   };
 
-  const navLinks = [
-    { name: "Search", path: "/search", icon: Search },
-    { name: "SOS", path: "/sos", icon: AlertTriangle, highlight: true },
-    { name: "Notifications", path: "/notifications", icon: Bell },
-  ];
-
   const isActive = (path) => location.pathname === path;
+
+  // Get navigation links based on user role
+  const getNavLinks = () => {
+    if (!isAuthenticated || !user) return [];
+
+    const roleId = user.roleId;
+
+    // Patient
+    if (roleId === ROLE_IDS.PATIENT) {
+      return NAV_CONFIG[ROLE_IDS.PATIENT];
+    }
+
+    // Pharmacy - check approval status
+    if (roleId === ROLE_IDS.PHARMACY) {
+      const isApproved = user.pharmacy?.verificationStatus === "VERIFIED";
+      return isApproved 
+        ? NAV_CONFIG[ROLE_IDS.PHARMACY].approved 
+        : NAV_CONFIG[ROLE_IDS.PHARMACY].pending;
+    }
+
+    // Admin
+    if (roleId === ROLE_IDS.ADMIN) {
+      return NAV_CONFIG[ROLE_IDS.ADMIN];
+    }
+
+    return [];
+  };
+
+  const navLinks = getNavLinks();
+
+  // Don't render navbar until session is restored
+  if (isSessionRestoring) {
+    return null;
+  }
+
+  // Don't render navbar until session is restored
+  if (isSessionRestoring) {
+    return null;
+  }
 
   return (
     <nav
@@ -68,26 +139,28 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-6">
-            {/* Nav Links */}
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                  link.highlight
-                    ? "bg-red-600 text-white hover:bg-red-700"
-                    : isActive(link.path)
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                <link.icon size={18} className={link.highlight && "animate-pulse"} />
-                {link.name}
-              </Link>
-            ))}
-
-            {/* Divider */}
-            <div className="h-6 w-px bg-gray-200" />
+            {/* Authenticated User Navigation */}
+            {isAuthenticated && navLinks.length > 0 && (
+              <>
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      link.highlight
+                        ? "bg-red-600 text-white hover:bg-red-700"
+                        : isActive(link.path)
+                        ? "bg-blue-50 text-blue-700"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    <link.icon size={18} className={link.highlight ? "animate-pulse" : ""} />
+                    {link.name}
+                  </Link>
+                ))}
+                <div className="h-6 w-px bg-gray-200" />
+              </>
+            )}
 
             {/* Auth Section */}
             {isAuthenticated ? (
@@ -98,11 +171,11 @@ export function Navbar() {
                 >
                   <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                     <span className="text-blue-600 font-semibold text-sm">
-                      {user?.firstName?.[0] || "U"}
+                      {user?.name?.[0] || user?.email?.[0] || "U"}
                     </span>
                   </div>
                   <span className="text-sm font-medium text-gray-700">
-                    {user?.firstName || "User"}
+                    {user?.name || user?.email || "User"}
                   </span>
                   <ChevronDown size={16} className="text-gray-400" />
                 </button>
@@ -110,22 +183,6 @@ export function Navbar() {
                 {/* User Dropdown */}
                 {showUserMenu && (
                   <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
-                    <Link
-                      to="/dashboard"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      <LayoutDashboard size={16} />
-                      Dashboard
-                    </Link>
-                    <Link
-                      to="/admin/dashboard"
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      <Settings size={16} />
-                      Admin Panel
-                    </Link>
                     <Link
                       to="/profile"
                       className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -137,7 +194,7 @@ export function Navbar() {
                     <hr className="my-2 border-gray-100" />
                     <button
                       onClick={handleLogout}
-                      className="flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full"
+                      className="flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left"
                     >
                       <LogOut size={16} />
                       Logout
@@ -180,47 +237,43 @@ export function Navbar() {
         {isMenuOpen && (
           <div className="md:hidden py-4 border-t border-gray-100">
             <div className="space-y-2">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  onClick={() => setIsMenuOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
-                    link.highlight
-                      ? "bg-red-600 text-white"
-                      : isActive(link.path)
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-gray-600 hover:bg-gray-50"
-                  }`}
-                >
-                  <link.icon size={20} />
-                  {link.name}
-                </Link>
-              ))}
-
-              <hr className="my-4 border-gray-100" />
+              {/* Authenticated User Navigation */}
+              {isAuthenticated && navLinks.length > 0 && (
+                <>
+                  {navLinks.map((link) => (
+                    <Link
+                      key={link.path}
+                      to={link.path}
+                      onClick={() => setIsMenuOpen(false)}
+                      className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                        link.highlight
+                          ? "bg-red-600 text-white"
+                          : isActive(link.path)
+                          ? "bg-blue-50 text-blue-700"
+                          : "text-gray-600 hover:bg-gray-50"
+                      }`}
+                    >
+                      <link.icon size={20} />
+                      {link.name}
+                    </Link>
+                  ))}
+                  <hr className="my-4 border-gray-100" />
+                </>
+              )}
 
               {isAuthenticated ? (
                 <>
                   <Link
-                    to="/dashboard"
+                    to="/profile"
                     onClick={() => setIsMenuOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
                   >
-                    <LayoutDashboard size={20} />
-                    Dashboard
-                  </Link>
-                  <Link
-                    to="/admin/dashboard"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
-                  >
-                    <Settings size={20} />
-                    Admin Panel
+                    <User size={20} />
+                    Profile
                   </Link>
                   <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 w-full"
+                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 w-full text-left"
                   >
                     <LogOut size={20} />
                     Logout

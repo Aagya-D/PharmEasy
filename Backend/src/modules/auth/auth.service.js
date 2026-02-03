@@ -124,6 +124,17 @@ export const register = async ({
     `[REGISTER] User created/updated with ID: ${user.id}, email: ${normalizedEmail}`
   );
 
+  // ✅ Invalidate old OTPs for this user (prevent confusion from multiple registration attempts)
+  await prisma.oTPToken.updateMany({
+    where: {
+      userId: user.id,
+      isUsed: false,
+    },
+    data: {
+      expiresAt: new Date(), // Expire them immediately
+    },
+  });
+
   // Store OTP with hash (not plaintext)
   await prisma.oTPToken.create({
     data: {

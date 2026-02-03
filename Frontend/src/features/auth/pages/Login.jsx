@@ -1,9 +1,12 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { AuthLayout } from "../components/AuthLayout";
-import { useAuth } from "../../context/AuthContext";
-import { Eye, EyeOff } from "lucide-react";
-import pharmacyImage from "../../assets/image.png";
+import { useAuth } from "../../../context/AuthContext";
+import { Input } from "../../../shared/components/ui";
+import { Button } from "../../../shared/components/ui";
+import { Alert } from "../../../shared/components/ui";
+import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import pharmacyImage from "../../../assets/image.png";
 
 export function Login() {
   const navigate = useNavigate();
@@ -32,8 +35,8 @@ export function Login() {
         // Role-based redirect after successful login
         const { user } = result;
         if (user?.roleId === 3) {
-          // PATIENT → Search page
-          navigate("/search");
+          // PATIENT → Patient dashboard
+          navigate("/patient");
         } else if (user?.roleId === 2) {
           // PHARMACY → Pharmacy dashboard
           navigate("/pharmacy/dashboard");
@@ -72,96 +75,82 @@ export function Login() {
       slogan="Your trusted pharmacy partner, available 24/7 to serve your healthcare needs with expertise and care."
       accentColor="#3B82F6"
     >
-      <form
-        onSubmit={handleSubmit}
-        className="flex flex-col gap-5"
-      >
+      <form onSubmit={handleSubmit} className="space-y-6">
         {/* Error Alert */}
         {error && (
-          <div
-            className="px-4 py-3 bg-red-50 text-red-600 rounded-lg text-sm font-medium border border-red-100"
-            role="alert"
-          >
-            {error}
-          </div>
+          <Alert 
+            type="error" 
+            message={error}
+            onDismiss={() => setError("")}
+          />
         )}
 
         {/* Email Field */}
-        <div>
-          <label
-            className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2 uppercase tracking-wide"
-          >
-            Email
-          </label>
-          <input
-            type="email"
-            placeholder="pharmacy@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={isLoading}
-            className="w-full px-3.5 py-3 text-sm border border-[var(--color-border)] rounded-lg bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)] transition-all duration-200 box-border font-normal focus:border-[var(--color-primary)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.08)] focus:bg-[var(--color-bg-primary)] focus:outline-none"
-          />
-        </div>
+        <Input
+          label="Email Address"
+          type="email"
+          placeholder="pharmacy@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={isLoading}
+          required
+          icon={<Mail size={18} />}
+        />
 
         {/* Password Field */}
-        <div>
-          <label
-            className="block text-sm font-semibold text-[var(--color-text-primary)] mb-2 uppercase tracking-wide"
+        <div className="relative">
+          <Input
+            label="Password"
+            type={showPassword ? "text" : "password"}
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={isLoading}
+            required
+            icon={<Lock size={18} />}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-[38px] text-slate-500 hover:text-slate-700 transition-colors"
+            tabIndex={-1}
           >
-            Password
-          </label>
-          <div
-            className="relative flex items-center"
-          >
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="••••••••••••••••••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
-              className="w-full py-3 pl-3.5 pr-10 text-sm border border-[var(--color-border)] rounded-lg bg-[var(--color-bg-secondary)] text-[var(--color-text-primary)] transition-all duration-200 box-border font-normal focus:border-[var(--color-primary)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.08)] focus:bg-[var(--color-bg-primary)] focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 bg-transparent border-none cursor-pointer text-[var(--color-text-secondary)] p-1.5 flex items-center justify-center transition-colors duration-200 hover:text-[var(--color-primary)]"
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
+            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
         </div>
 
         {/* Forgot Password Link */}
         <div className="text-right">
           <Link
             to="/forgot-password"
-            className="text-sm text-[var(--color-primary)] font-semibold no-underline transition-colors duration-200 hover:text-[var(--color-primary-dark)]"
+            className="text-sm text-cyan-600 font-medium hover:text-cyan-700 transition-colors"
           >
             Forgot password?
           </Link>
         </div>
 
         {/* Sign In Button */}
-        <button
+        <Button
           type="submit"
+          variant="primary"
+          size="lg"
+          loading={isLoading}
           disabled={isLoading}
-          className={`w-full px-4 py-3 bg-[var(--color-primary)] text-white border-none rounded-lg text-sm font-semibold transition-all duration-200 mt-2 ${isLoading ? "cursor-not-allowed opacity-75" : "cursor-pointer hover:bg-[var(--color-primary-dark)] hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(59,130,246,0.25)]"}`}
+          className="w-full"
         >
-          {isLoading ? "Signing in..." : "Sign In"}
-        </button>
+          Sign In
+        </Button>
 
         {/* Sign Up Link */}
-        <div
-          className="text-center text-sm text-[var(--color-text-secondary)] font-normal mt-2"
-        >
+        <p className="text-center text-sm text-slate-600 mt-6">
           Don't have an account?{" "}
           <Link
             to="/register"
-            className="text-[var(--color-primary)] font-semibold no-underline transition-colors duration-200 hover:text-[var(--color-primary-dark)]"
+            className="text-cyan-600 font-semibold hover:text-cyan-700 transition-colors"
           >
             Sign Up
           </Link>
-        </div>
+        </p>
       </form>
     </AuthLayout>
   );

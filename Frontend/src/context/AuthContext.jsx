@@ -66,7 +66,8 @@ function authReducer(state, action) {
       return {
         ...state,
         user: action.payload.user,
-        isAuthenticated: true, // ✅ Now authenticated
+        accessToken: action.payload.accessToken,
+        isAuthenticated: true,
         isOTPVerified: true,
         isLoading: false,
         error: null,
@@ -147,25 +148,58 @@ export function AuthProvider({ children }) {
     }
   }, [state.user]);
 
-  // ✅ DISABLED: No automatic session restoration
-  // Landing page always shows public version until user clicks login
+  // ✅ ENABLED: Auto-restore session from localStorage on page load
   useEffect(() => {
-    const disableAutoRestore = () => {
-      logger.info("Auto-restore disabled - landing page shows public view");
-      
-      // Always start with unauthenticated state
-      dispatch({
-        type: ACTIONS.RESTORE_SESSION,
-        payload: {
-          user: null,
-          accessToken: null,
-          isAuthenticated: false,
-          isOTPVerified: false,
-        },
-      });
+    const restoreSession = () => {
+      try {
+        const storedUser = localStorage.getItem("user");
+        const storedAccessToken = localStorage.getItem("accessToken");
+        
+        if (storedUser && storedAccessToken) {
+          const user = JSON.parse(storedUser);
+          
+          logger.info("Session restored from localStorage", { 
+            userId: user.id,
+            role: user.roleId
+          });
+          
+          dispatch({
+            type: ACTIONS.RESTORE_SESSION,
+            payload: {
+              user,
+              accessToken: storedAccessToken,
+              isAuthenticated: true,
+              isOTPVerified: true,
+            },
+          });
+        } else {
+          // No session - start unauthenticated
+          logger.info("No stored session found");
+          dispatch({
+            type: ACTIONS.RESTORE_SESSION,
+            payload: {
+              user: null,
+              accessToken: null,
+              isAuthenticated: false,
+              isOTPVerified: false,
+            },
+          });
+        }
+      } catch (error) {
+        logger.error("Session restore failed", error);
+        dispatch({
+          type: ACTIONS.RESTORE_SESSION,
+          payload: {
+            user: null,
+            accessToken: null,
+            isAuthenticated: false,
+            isOTPVerified: false,
+          },
+        });
+      }
     };
 
-    disableAutoRestore();
+    restoreSession();
   }, []);
 
   // Setup axios interceptors
@@ -234,7 +268,7 @@ export function AuthProvider({ children }) {
 
               // Retry original request with new token
               originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-              return api(originalRequest);
+              return httpClient(originalRequest);
             }
           } catch (refreshError) {
             // Refresh failed, logout user
@@ -265,25 +299,25 @@ export function AuthProvider({ children }) {
       const response = await authService.login({ email, password });
       timer.stop();
 
-      // Extract data from backend response
-      const { data } = response.data;
+      // Extract data from backend response (nested structure)
+      const userData = response.data?.data || response.data;
       const user = {
-        id: data.userId,
-        email: data.email,
-        name: data.name,
-        role: data.role,
-        roleId: data.roleId,
-        pharmacy: data.pharmacy,
-        isOnboarded: data.isOnboarded,
-        needsOnboarding: data.needsOnboarding,
+        id: userData.userId,
+        email: userData.email,
+        name: userData.name,
+        role: userData.role,
+        roleId: userData.roleId,
+        pharmacy: userData.pharmacy,
+        isOnboarded: userData.isOnboarded,
+        needsOnboarding: userData.needsOnboarding,
       };
 
       // Store tokens and user info
-      if (data.accessToken) {
-        localStorage.setItem("accessToken", data.accessToken);
+      if (userData.accessToken) {
+        localStorage.setItem("accessToken", userData.accessToken);
       }
-      if (data.refreshToken) {
-        localStorage.setItem("refreshToken", data.refreshToken);
+      if (userData.refreshToken) {
+        localStorage.setItem("refreshToken", userData.refreshToken);
       }
       localStorage.setItem("user", JSON.stringify(user));
 
@@ -293,7 +327,7 @@ export function AuthProvider({ children }) {
 
       dispatch({
         type: ACTIONS.LOGIN_SUCCESS,
-        payload: { user, accessToken: data.accessToken },
+        payload: { user, accessToken: userData.accessToken },
       });
 
       return { success: true, user };
@@ -303,12 +337,27 @@ export function AuthProvider({ children }) {
       const message =
         error.response?.data?.message ||
         error.response?.data?.error?.message ||
+        error.message ||
         "Login failed";
+      
+      // ✅ FIX: Dispatch structured error object, NOT a string
+      const errorPayload = {
+        message: message,
+        status: error.response?.status || null,
+        code: code || null,
+      };
 
       dispatch({
         type: ACTIONS.LOGIN_ERROR,
-        payload: message,
+        payload: errorPayload,
       });
+
+      // ✅ Also log error safely
+      try {
+        logger.error("Login failed", error);
+      } catch (logError) {
+        console.error("Failed to log error:", logError.message);
+      }
 
       // Return code so frontend can redirect to verify OTP page
       if (code === "EMAIL_NOT_VERIFIED") {
@@ -329,17 +378,33 @@ export function AuthProvider({ children }) {
     try {
       const response = await authService.register(userData);
 
-      // Registration returns: { success, message, data: { userId, email, role } }
+      // Backend response structure:
+      // Success: { success, message, data: { userId, email, role } }
+      // Axios wraps this as: response.data = { success, message, data: { userId, email, role } }
+      // So response.data.data contains the user info
       const apiResponse = response.data;
-      const payload = apiResponse.data;
+      
+      // Extract nested data - handle both cases
+      let payload = apiResponse.data || apiResponse;
+      
+      // If payload is still the wrapper object, try to get data
+      if (payload && !payload.userId && apiResponse.data && apiResponse.data.userId) {
+        payload = apiResponse.data;
+      }
 
-      console.log("[AUTH] Register response data:", apiResponse);
+      console.log("[AUTH] API Response:", apiResponse);
+      console.log("[AUTH] Extracted Payload:", payload);
       console.log(
         "[AUTH] userId type:",
-        typeof payload.userId,
+        typeof payload?.userId,
         "value:",
-        payload.userId
+        payload?.userId
       );
+
+      // Validate we have userId
+      if (!payload?.userId) {
+        throw new Error("No userId in registration response");
+      }
 
       // Store userId temporarily for OTP verification
       localStorage.setItem("pendingUserId", payload.userId);
@@ -359,12 +424,31 @@ export function AuthProvider({ children }) {
 
       return { success: true, userId: payload.userId };
     } catch (error) {
-      const message = error.response?.data?.message || "Registration failed";
+      // ✅ FIX: Extract error safely and dispatch structured error object
+      const errorMessage = error.response?.data?.message || error.message || "Registration failed";
+      const errorStatus = error.response?.status || null;
+      const errorCode = error.response?.data?.code || null;
+
+      // ✅ Dispatch structured error object, NOT a string
+      const errorPayload = {
+        message: errorMessage,
+        status: errorStatus,
+        code: errorCode,
+      };
+
       dispatch({
         type: ACTIONS.REGISTER_ERROR,
-        payload: message,
+        payload: errorPayload,
       });
-      return { success: false, error: message };
+
+      // ✅ Also log error safely
+      try {
+        logger.error("Registration failed", error);
+      } catch (logError) {
+        console.error("Failed to log error:", logError.message);
+      }
+
+      return { success: false, error: errorMessage };
     }
   };
 
@@ -377,24 +461,27 @@ export function AuthProvider({ children }) {
         otp: otp,
       });
 
-      const { data } = response.data;
+      // Handle both nested and direct response structures
+      const responseData = response.data;
+      const apiData = responseData.data || responseData;
+      
       const user = {
-        id: data.user.id,
-        email: data.user.email,
-        name: data.user.name,
-        roleId: data.user.roleId,
-        role: data.user.role,
-        pharmacy: data.pharmacy,
-        isOnboarded: data.isOnboarded,
-        needsOnboarding: data.needsOnboarding,
+        id: apiData.user?.id,
+        email: apiData.user?.email,
+        name: apiData.user?.name,
+        roleId: apiData.user?.roleId,
+        role: apiData.user?.role,
+        pharmacy: apiData.pharmacy,
+        isOnboarded: apiData.isOnboarded,
+        needsOnboarding: apiData.needsOnboarding,
       };
 
       // Store tokens and user info
-      if (data.accessToken) {
-        localStorage.setItem("accessToken", data.accessToken);
+      if (apiData.accessToken) {
+        localStorage.setItem("accessToken", apiData.accessToken);
       }
-      if (data.refreshToken) {
-        localStorage.setItem("refreshToken", data.refreshToken);
+      if (apiData.refreshToken) {
+        localStorage.setItem("refreshToken", apiData.refreshToken);
       }
       localStorage.setItem("user", JSON.stringify(user));
 
@@ -406,11 +493,11 @@ export function AuthProvider({ children }) {
         type: ACTIONS.OTP_VERIFY_SUCCESS,
         payload: {
           user,
-          accessToken: data.accessToken,
+          accessToken: apiData.accessToken,
         },
       });
 
-      return { success: true };
+      return { success: true, user, role: user.role, roleId: user.roleId };
     } catch (error) {
       const message =
         error.response?.data?.message || "OTP verification failed";

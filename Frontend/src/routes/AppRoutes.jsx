@@ -1,5 +1,5 @@
 import React from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import LoadingSpinner from "../shared/components/ui/LoadingSpinner";
 
@@ -8,8 +8,8 @@ import Landing from "../features/landing/pages/Landing";
 
 // Auth Pages
 import Login from "../features/auth/pages/Login";
-import Register from "../features/auth/pages/Register";
-import VerifyOtp from "../features/auth/pages/VerifyOtp";
+import { Register } from "../features/auth/pages/Register";
+import { VerifyOtp } from "../features/auth/pages/VerifyOtp";
 import ForgotPassword from "../features/auth/pages/ForgotPassword";
 import ResetPassword from "../features/auth/pages/ResetPassword";
 
@@ -18,6 +18,11 @@ import PatientPortal from "../features/patient/pages/PatientPortal";
 import SearchResults from "../features/patient/pages/SearchResults";
 import EmergencySOS from "../features/patient/pages/EmergencySOS";
 import NotificationCenter from "../features/patient/pages/NotificationCenter";
+import PatientDashboard from "../features/patient/pages/Dashboard/PatientDashboard";
+import OrdersPage from "../features/patient/pages/Orders/OrdersPage";
+import MedicationsPage from "../features/patient/pages/Medications/MedicationsPage";
+import ProfilePage from "../features/patient/pages/Profile/ProfilePage";
+import PrescriptionsPage from "../features/patient/pages/Prescriptions/PrescriptionsPage";
 
 // Pharmacy Pages
 import PharmacyDashboard from "../features/pharmacy/pages/PharmacyDashboard";
@@ -209,8 +214,46 @@ export const routes = [
 
   // --- PATIENT ZONE (Protected) ---
   {
+    path: "/patient",
+    element: (
+      <ProtectedRoute allowedRoles={['PATIENT']}>
+        <Outlet />
+      </ProtectedRoute>
+    ),
+    children: [
+      {
+        path: "",
+        element: <PatientDashboard />,
+      },
+      {
+        path: "orders",
+        element: <OrdersPage />,
+      },
+      {
+        path: "orders/:id",
+        element: <OrdersPage />,
+      },
+      {
+        path: "medications",
+        element: <MedicationsPage />,
+      },
+      {
+        path: "prescriptions",
+        element: <PrescriptionsPage />,
+      },
+      {
+        path: "profile",
+        element: <ProfilePage />,
+      },
+    ],
+  },
+  {
     path: "/",
-    element: <ProtectedRoute allowedRoles={['PATIENT']} />,
+    element: (
+      <ProtectedRoute allowedRoles={['PATIENT']}>
+        <Outlet />
+      </ProtectedRoute>
+    ),
     children: [
       {
         path: "search",
@@ -225,10 +268,6 @@ export const routes = [
         element: <EmergencySOS />,
       },
       {
-        path: "patient",
-        element: <PatientPortal />,
-      },
-      {
         path: "notifications",
         element: <NotificationCenter />,
       },
@@ -238,7 +277,11 @@ export const routes = [
   // --- PHARMACY ZONE (Protected) ---
   {
     path: "/pharmacy",
-    element: <ProtectedRoute allowedRoles={['PHARMACY']} />,
+    element: (
+      <ProtectedRoute allowedRoles={['PHARMACY']}>
+        <Outlet />
+      </ProtectedRoute>
+    ),
     children: [
       {
         path: "dashboard",
@@ -262,7 +305,11 @@ export const routes = [
   // --- ADMIN ZONE (Protected) ---
   {
     path: "/admin",
-    element: <ProtectedRoute allowedRoles={['ADMIN']} />,
+    element: (
+      <ProtectedRoute allowedRoles={['ADMIN']}>
+        <Outlet />
+      </ProtectedRoute>
+    ),
     children: [
       {
         path: "verify",
@@ -321,5 +368,3 @@ export const routes = [
     element: <NotFoundPage />,
   },
 ];
-
-export default routes;

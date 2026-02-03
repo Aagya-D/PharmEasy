@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { AuthLayout } from "../components/AuthLayout";
-import { Input } from "../../../shared/components/ui/Input";
-import { Button } from "../../../shared/components/ui/Button";
+import { Input, Button, Alert } from "../../../shared/components/ui";
 import authService from "../../../core/services/auth.service";
+import { Lock, Shield, Mail } from "lucide-react";
 import resetPasswordHeroImage from "../../../assets/reset-password-hero.svg";
 
 export function ResetPassword() {
@@ -151,70 +151,40 @@ export function ResetPassword() {
       slogan="Fortify your account with a strong new password. Your security, strengthened with every character."
       accentColor="#06B6D4"
     >
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Error Alert */}
         {error && (
-          <div
-            style={{
-              padding: "var(--spacing-md)",
-              backgroundColor: "var(--color-error-light)",
-              color: "var(--color-error)",
-              borderRadius: "var(--radius-md)",
-              marginBottom: "var(--spacing-lg)",
-              fontSize: "var(--font-size-sm)",
-            }}
-            role="alert"
-          >
-            {error}
-          </div>
+          <Alert 
+            type="error" 
+            message={error}
+            onDismiss={() => setError("")}
+          />
         )}
 
+        {/* Success Alert */}
         {success && (
-          <div
-            style={{
-              padding: "var(--spacing-md)",
-              backgroundColor: "var(--color-success-light)",
-              color: "var(--color-success)",
-              borderRadius: "var(--radius-md)",
-              marginBottom: "var(--spacing-lg)",
-              fontSize: "var(--font-size-sm)",
-            }}
-            role="status"
-          >
-            {success}
-          </div>
+          <Alert 
+            type="success" 
+            title="Password Reset Successful!"
+            message={success}
+          />
         )}
+
+        {/* Email Display */}
+        <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4 flex items-center gap-3">
+          <Mail className="w-5 h-5 text-cyan-600" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-cyan-900">Resetting password for:</p>
+            <p className="text-sm text-cyan-700">{email}</p>
+          </div>
+        </div>
 
         {/* OTP Input Section */}
-        <div style={{ marginBottom: "var(--spacing-lg)" }}>
-          <label
-            style={{
-              display: "block",
-              fontSize: "var(--font-size-sm)",
-              fontWeight: "var(--font-weight-medium)",
-              color: "var(--color-text-primary)",
-              marginBottom: "var(--spacing-md)",
-              textTransform: "uppercase",
-              letterSpacing: "0.3px",
-            }}
-          >
-            OTP Code
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-3">
+            Enter Reset Code
           </label>
-          <p
-            style={{
-              fontSize: "var(--font-size-xs)",
-              color: "var(--color-text-secondary)",
-              marginBottom: "var(--spacing-md)",
-            }}
-          >
-            Enter the 6-digit code sent to {email}
-          </p>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(6, 1fr)",
-              gap: "var(--spacing-sm)",
-            }}
-          >
+          <div className="grid grid-cols-6 gap-2 mb-2">
             {otp.map((digit, index) => (
               <input
                 key={index}
@@ -226,50 +196,52 @@ export function ResetPassword() {
                 onChange={(e) => handleOtpInput(index, e.target.value)}
                 onKeyDown={(e) => handleBackspace(index, e)}
                 disabled={isLoading}
-                style={{
-                  width: "100%",
-                  padding: "var(--spacing-md)",
-                  fontSize: "var(--font-size-lg)",
-                  fontWeight: "var(--font-weight-bold)",
-                  textAlign: "center",
-                  border: `2px solid ${
-                    digit ? "var(--color-primary)" : "var(--color-border)"
-                  }`,
-                  borderRadius: "var(--radius-md)",
-                  backgroundColor: "var(--color-bg-secondary)",
-                  color: "var(--color-text-primary)",
-                  cursor: isLoading ? "not-allowed" : "text",
-                  opacity: isLoading ? 0.6 : 1,
-                  transition: "border-color 0.2s ease",
-                }}
+                className={`
+                  w-full aspect-square text-2xl font-bold text-center rounded-lg border-2 transition-all
+                  ${digit ? "bg-cyan-50 border-cyan-500" : "bg-white border-slate-300"}
+                  ${isLoading ? "cursor-not-allowed opacity-50" : ""}
+                  focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200
+                `}
               />
             ))}
           </div>
+          <p className="text-xs text-slate-500">
+            Enter the 6-digit code sent to your email
+          </p>
         </div>
 
-        <div>
-          <Input
-            label="New Password"
-            type="password"
-            placeholder="Create a strong password"
-            value={password}
-            onChange={(e) => handlePasswordChange(e.target.value)}
-            disabled={isLoading}
-            error={
-              passwordErrors.length > 0
-                ? `Must include: ${passwordErrors.join(", ")}`
-                : ""
-            }
-          />
-        </div>
-
+        {/* New Password */}
         <Input
-          label="Confirm Password"
+          label="New Password"
+          type="password"
+          placeholder="Create a strong password"
+          value={password}
+          onChange={(e) => handlePasswordChange(e.target.value)}
+          disabled={isLoading}
+          required
+          icon={<Lock size={18} />}
+          error={
+            password && passwordErrors.length > 0
+              ? `Must include: ${passwordErrors.join(", ")}`
+              : ""
+          }
+          hint={
+            !password
+              ? "Minimum 8 characters with uppercase, lowercase, number and special character"
+              : ""
+          }
+        />
+
+        {/* Confirm Password */}
+        <Input
+          label="Confirm New Password"
           type="password"
           placeholder="Re-enter your password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           disabled={isLoading}
+          required
+          icon={<Shield size={18} />}
           error={
             confirmPassword && password !== confirmPassword
               ? "Passwords do not match"
@@ -277,33 +249,25 @@ export function ResetPassword() {
           }
         />
 
-        <Button type="submit" loading={isLoading}>
+        {/* Submit Button */}
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          loading={isLoading}
+          disabled={isLoading || Boolean(success)}
+          className="w-full"
+        >
           Reset Password
         </Button>
 
-        <div
-          style={{
-            marginTop: "var(--spacing-lg)",
-            textAlign: "center",
-          }}
-        >
+        {/* Back to Login */}
+        <div className="text-center">
           <Link
             to="/login"
-            style={{
-              fontSize: "var(--font-size-sm)",
-              color: "var(--color-primary)",
-              fontWeight: "var(--font-weight-medium)",
-              textDecoration: "none",
-              transition: "color var(--transition-fast)",
-            }}
-            onMouseEnter={(e) =>
-              (e.target.style.color = "var(--color-primary-dark)")
-            }
-            onMouseLeave={(e) =>
-              (e.target.style.color = "var(--color-primary)")
-            }
+            className="text-sm text-slate-600 hover:text-slate-900 transition-colors"
           >
-            Back to login
+            ← Back to login
           </Link>
         </div>
       </form>

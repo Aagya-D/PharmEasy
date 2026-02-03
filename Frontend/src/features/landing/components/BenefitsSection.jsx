@@ -40,79 +40,28 @@ export function BenefitsSection() {
   ];
 
   return (
-    <section
-      style={{
-        padding: "var(--spacing-3xl) var(--spacing-xl)",
-        backgroundColor: "var(--color-bg-primary)",
-      }}
-    >
-      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        <h2
-          style={{
-            fontSize: "var(--font-size-2xl)",
-            fontWeight: "var(--font-weight-bold)",
-            color: "var(--color-text-primary)",
-            marginBottom: "var(--spacing-2xl)",
-            textAlign: "center",
-          }}
-        >
+    <section className="px-6 py-20 bg-white">
+      <div className="max-w-7xl mx-auto">
+        <h2 className="text-4xl font-bold text-gray-900 mb-16 text-center">
           Why Choose PharmEasy?
         </h2>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "var(--spacing-lg)",
-          }}
-        >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {benefits.map((benefit, idx) => {
             const Icon = benefit.icon;
             return (
               <div
                 key={idx}
-                style={{
-                  padding: "var(--spacing-xl)",
-                  backgroundColor: "var(--color-bg-secondary)",
-                  borderRadius: "var(--radius-lg)",
-                  textAlign: "center",
-                  border: "1px solid var(--color-border)",
-                  transition: "all 0.3s ease",
-                  cursor: "pointer",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-8px)";
-                  e.currentTarget.style.boxShadow = "var(--shadow-lg)";
-                  e.currentTarget.style.borderColor = "var(--color-primary)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "var(--shadow-sm)";
-                  e.currentTarget.style.borderColor = "var(--color-border)";
-                }}
+                className="p-8 bg-gray-50 rounded-xl text-center border border-gray-200 transition-all duration-300 cursor-pointer hover:-translate-y-2 hover:shadow-lg hover:border-blue-600"
               >
                 <Icon
                   size={48}
-                  color="var(--color-primary)"
-                  style={{ margin: "0 auto var(--spacing-md)" }}
+                  className="text-blue-600 mx-auto mb-4"
                 />
-                <h3
-                  style={{
-                    fontSize: "var(--font-size-lg)",
-                    fontWeight: "var(--font-weight-semibold)",
-                    color: "var(--color-text-primary)",
-                    marginBottom: "var(--spacing-md)",
-                  }}
-                >
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   {benefit.title}
                 </h3>
-                <p
-                  style={{
-                    color: "var(--color-text-secondary)",
-                    fontSize: "var(--font-size-sm)",
-                    lineHeight: "1.6",
-                  }}
-                >
+                <p className="text-gray-600 text-sm leading-relaxed">
                   {benefit.description}
                 </p>
               </div>

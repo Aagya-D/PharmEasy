@@ -2,48 +2,20 @@ import { AlertCircle, Eye, TrendingUp, LogIn } from "lucide-react";
 
 export function ProblemSection() {
   return (
-    <section
-      style={{
-        padding: "var(--spacing-3xl) var(--spacing-xl)",
-        backgroundColor: "var(--color-bg-secondary)",
-      }}
-    >
-      <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-        <h2
-          style={{
-            fontSize: "var(--font-size-2xl)",
-            fontWeight: "var(--font-weight-bold)",
-            color: "var(--color-text-primary)",
-            marginBottom: "var(--spacing-md)",
-            textAlign: "center",
-          }}
-        >
+    <section className="px-6 py-20 bg-gray-50">
+      <div className="max-w-7xl mx-auto">
+        <h2 className="text-4xl font-bold text-gray-900 mb-4 text-center">
           The Healthcare Gap We're Solving
         </h2>
 
-        <p
-          style={{
-            fontSize: "var(--font-size-base)",
-            color: "var(--color-text-secondary)",
-            maxWidth: "800px",
-            margin: "0 auto var(--spacing-2xl)",
-            textAlign: "center",
-            lineHeight: "var(--line-height-relaxed)",
-          }}
-        >
+        <p className="text-base text-gray-600 max-w-4xl mx-auto mb-16 text-center leading-relaxed">
           Fragmented pharmaceutical supply chains create information asymmetry.
           Patients waste time and resources searching for medicines across
           multiple locations, while pharmacies lack visibility into demand and
           inventory optimization.
         </p>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-            gap: "var(--spacing-xl)",
-          }}
-        >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {[
             {
               icon: AlertCircle,
@@ -70,34 +42,13 @@ export function ProblemSection() {
             return (
               <div
                 key={idx}
-                style={{
-                  padding: "var(--spacing-xl)",
-                  backgroundColor: "var(--color-bg-primary)",
-                  borderRadius: "var(--radius-lg)",
-                  border: "1px solid var(--color-border)",
-                }}
+                className="p-8 bg-white rounded-xl border border-gray-200 hover:shadow-lg transition-shadow duration-300"
               >
-                <Icon
-                  size={40}
-                  color="var(--color-error)"
-                  style={{ marginBottom: "var(--spacing-md)" }}
-                />
-                <h3
-                  style={{
-                    fontSize: "var(--font-size-lg)",
-                    fontWeight: "var(--font-weight-semibold)",
-                    color: "var(--color-text-primary)",
-                    marginBottom: "var(--spacing-sm)",
-                  }}
-                >
+                <Icon size={40} className="text-red-500 mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">
                   {problem.title}
                 </h3>
-                <p
-                  style={{
-                    fontSize: "var(--font-size-sm)",
-                    color: "var(--color-text-secondary)",
-                  }}
-                >
+                <p className="text-sm text-gray-600">
                   {problem.desc}
                 </p>
               </div>

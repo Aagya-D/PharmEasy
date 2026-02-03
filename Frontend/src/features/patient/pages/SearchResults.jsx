@@ -20,7 +20,7 @@ import {
   AlertCircle,
   AlertTriangle,
 } from "lucide-react";
-import { Navbar } from "../../../shared/components/Navbar";
+import Layout from "../../../shared/layouts/Layout";
 
 /**
  * Medicine Search Results Page
@@ -204,8 +204,8 @@ export default function SearchResults() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
+    <Layout>
+      <div className="min-h-screen bg-gray-50">
 
       {/* Search Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
@@ -688,7 +688,8 @@ export default function SearchResults() {
           )}
         </button>
       </div>
-    </div>
+      </div>
+    </Layout>
   );
 }
 

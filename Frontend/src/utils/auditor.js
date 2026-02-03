@@ -67,6 +67,29 @@ class StateAuditor {
       return;
     }
 
+    // OTP_VERIFY is a special case - user is verified but may not have full profile yet
+    if (action === "OTP_VERIFY") {
+      const checks = {
+        hasUserId: !!user.id,
+        hasEmail: !!user.email,
+        hasRole: !!user.roleId,
+      };
+      
+      const passed = Object.values(checks).every(Boolean);
+      
+      if (!passed) {
+        this.recordViolation("INCOMPLETE_OTP_STATE", {
+          action,
+          checks,
+          user: this.sanitizeState(user),
+        });
+      }
+      
+      logger.debug("AUTH_AUDIT", { action, checks, passed });
+      return passed;
+    }
+
+    // For LOGIN, check full authentication state
     const checks = {
       hasUserId: !!user.id,
       hasEmail: !!user.email,

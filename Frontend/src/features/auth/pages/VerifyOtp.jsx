@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { AuthLayout } from "../components/AuthLayout";
-import { Button } from "../../../shared/components/ui/Button";
+import { Button, Alert } from "../../../shared/components/ui";
 import { useAuth } from "../../../context/AuthContext";
 import authService from "../../../core/services/auth.service";
+import { Clock, Mail, RefreshCw } from "lucide-react";
 import verifyOtpHeroImage from "../../../assets/verify-otp-hero.svg";
 
 export function VerifyOtp() {
@@ -101,11 +102,33 @@ export function VerifyOtp() {
 
       if (result.success) {
         // If coming from login page, redirect to dashboard (now verified and can login)
-        // If coming from register page, redirect to login (need to login)
-        const nextRoute = isFromLogin ? "/dashboard" : "/login";
-        const nextState = isFromLogin
-          ? { message: "Email verified! You can now access your dashboard." }
-          : { message: "OTP verified successfully. Please sign in." };
+        // If coming from register page, redirect to role-based dashboard (auto-login)
+        let nextRoute = "/login";
+        let nextState = { message: "OTP verified successfully. Please sign in." };
+
+        if (isFromLogin) {
+          // From login: redirect to dashboard
+          nextRoute = "/dashboard";
+          nextState = { message: "Email verified! You can now access your dashboard." };
+        } else if (result.roleId) {
+          // From registration: auto-login and go to role-based dashboard
+          if (result.roleId === 3) {
+            nextRoute = "/patient";
+            nextState = { message: "Account created! Welcome to your dashboard." };
+          } else if (result.roleId === 2) {
+            nextRoute = result.needsOnboarding
+              ? "/pharmacy/onboard"
+              : "/pharmacy/dashboard";
+            nextState = {
+              message: result.needsOnboarding
+                ? "Account created! Complete your pharmacy details."
+                : "Account created! Welcome to your pharmacy dashboard.",
+            };
+          } else if (result.roleId === 1) {
+            nextRoute = "/admin/dashboard";
+            nextState = { message: "Account created! Welcome to admin panel." };
+          }
+        }
 
         navigate(nextRoute, { state: nextState });
       } else {
@@ -148,64 +171,41 @@ export function VerifyOtp() {
       slogan="Verification in seconds, peace of mind for a lifetime. Your account security starts here."
       accentColor="#8B5CF6"
     >
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Success Message */}
         {successMessage && (
-          <div
-            style={{
-              padding: "var(--spacing-md)",
-              backgroundColor: "rgba(16, 185, 129, 0.08)",
-              color: "rgb(5, 150, 105)",
-              borderRadius: "var(--radius-md)",
-              marginBottom: "var(--spacing-lg)",
-              fontSize: "var(--font-size-sm)",
-              fontWeight: "500",
-              border: "1px solid rgba(16, 185, 129, 0.15)",
-            }}
-            role="alert"
-          >
-            {successMessage}
-          </div>
+          <Alert 
+            type="success" 
+            message={successMessage}
+            onDismiss={() => setSuccessMessage("")}
+          />
         )}
 
+        {/* Error Alert */}
         {error && (
-          <div
-            style={{
-              padding: "var(--spacing-md)",
-              backgroundColor: "var(--color-error-light)",
-              color: "var(--color-error)",
-              borderRadius: "var(--radius-md)",
-              marginBottom: "var(--spacing-lg)",
-              fontSize: "var(--font-size-sm)",
-            }}
-            role="alert"
-          >
-            {error}
-          </div>
+          <Alert 
+            type="error" 
+            message={error}
+            onDismiss={() => setError("")}
+          />
         )}
+
+        {/* Email Display */}
+        <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4 flex items-center gap-3">
+          <Mail className="w-5 h-5 text-cyan-600" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-cyan-900">Code sent to:</p>
+            <p className="text-sm text-cyan-700">{email}</p>
+          </div>
+        </div>
 
         {/* OTP Input Fields */}
-        <div style={{ marginBottom: "var(--spacing-lg)" }}>
-          <label
-            style={{
-              display: "block",
-              fontSize: "var(--font-size-sm)",
-              fontWeight: "var(--font-weight-medium)",
-              color: "var(--color-text-primary)",
-              marginBottom: "var(--spacing-md)",
-              textAlign: "center",
-            }}
-          >
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-3 text-center">
             Enter the 6-digit code
           </label>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(6, 1fr)",
-              gap: "var(--spacing-sm)",
-              marginBottom: "var(--spacing-lg)",
-            }}
-          >
+          <div className="grid grid-cols-6 gap-2">
             {otp.map((digit, index) => (
               <input
                 key={index}
@@ -218,142 +218,77 @@ export function VerifyOtp() {
                 onKeyDown={(e) => handleBackspace(index, e)}
                 disabled={isLoading}
                 autoComplete="one-time-code"
-                style={{
-                  width: "100%",
-                  aspectRatio: "1",
-                  fontSize: "var(--font-size-xl)",
-                  fontWeight: "var(--font-weight-bold)",
-                  textAlign: "center",
-                  border: error
-                    ? "2px solid var(--color-error)"
-                    : "2px solid var(--color-border)",
-                  borderRadius: "var(--radius-md)",
-                  backgroundColor: digit
-                    ? "var(--color-primary-bg)"
-                    : "var(--color-bg-primary)",
-                  color: "var(--color-text-primary)",
-                  transition: "all var(--transition-fast)",
-                  cursor: isLoading ? "not-allowed" : "text",
-                }}
-                onFocus={(e) => {
-                  if (!error && !isLoading) {
-                    e.target.style.borderColor = "var(--color-primary)";
+                className={`
+                  w-full aspect-square text-2xl font-bold text-center rounded-lg border-2 transition-all
+                  ${error 
+                    ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200" 
+                    : "border-slate-300 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200"
                   }
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = error
-                    ? "var(--color-error)"
-                    : "var(--color-border)";
-                }}
+                  ${digit ? "bg-cyan-50 border-cyan-500" : "bg-white"}
+                  ${isLoading ? "cursor-not-allowed opacity-50" : ""}
+                  focus:outline-none
+                `}
               />
             ))}
           </div>
         </div>
 
-        {/* Timer */}
-        <div
-          style={{
-            textAlign: "center",
-            marginBottom: "var(--spacing-lg)",
-            padding: "var(--spacing-md)",
-            backgroundColor: "var(--color-bg-secondary)",
-            borderRadius: "var(--radius-md)",
-          }}
-        >
-          <p
-            style={{
-              fontSize: "var(--font-size-sm)",
-              color: "var(--color-text-secondary)",
-              marginBottom: "var(--spacing-xs)",
-            }}
-          >
-            Code expires in
-          </p>
-          <p
-            style={{
-              fontSize: "var(--font-size-2xl)",
-              fontWeight: "var(--font-weight-bold)",
-              color:
-                timeLeft < 120 ? "var(--color-error)" : "var(--color-primary)",
-            }}
-          >
+        {/* Timer Display */}
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Clock className="w-5 h-5 text-slate-600" />
+            <p className="text-sm text-slate-600 font-medium">Code expires in</p>
+          </div>
+          <p className={`text-3xl font-bold text-center ${timeLeft < 120 ? "text-red-600" : "text-cyan-600"}`}>
             {formatTime(timeLeft)}
           </p>
+          {timeLeft < 120 && (
+            <p className="text-xs text-red-600 text-center mt-2">Code expiring soon!</p>
+          )}
         </div>
 
-        <Button type="submit" loading={isLoading}>
+        {/* Verify Button */}
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          loading={isLoading}
+          disabled={isLoading}
+          className="w-full"
+        >
           Verify Code
         </Button>
 
-        {/* Resend Button */}
-        <div style={{ marginTop: "var(--spacing-lg)", textAlign: "center" }}>
+        {/* Resend Section */}
+        <div className="text-center">
           {canResend ? (
             <button
               type="button"
               onClick={handleResend}
               disabled={isLoading}
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--color-primary)",
-                cursor: isLoading ? "not-allowed" : "pointer",
-                fontSize: "var(--font-size-sm)",
-                fontWeight: "var(--font-weight-medium)",
-                transition: "color var(--transition-fast)",
-                textDecoration: "underline",
-              }}
-              onMouseEnter={(e) => {
-                if (!isLoading) {
-                  e.target.style.color = "var(--color-primary-dark)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.color = "var(--color-primary)";
-              }}
+              className="inline-flex items-center gap-2 text-sm font-medium text-cyan-600 hover:text-cyan-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
+              <RefreshCw size={16} />
               Didn't receive the code? Resend
             </button>
           ) : (
-            <p
-              style={{
-                fontSize: "var(--font-size-sm)",
-                color: "var(--color-text-tertiary)",
-              }}
-            >
-              You can resend the code in {formatTime(timeLeft)}
+            <p className="text-sm text-slate-500">
+              Resend available in {formatTime(timeLeft)}
             </p>
           )}
         </div>
 
-        {/* Back to login link */}
-        <div
-          style={{
-            marginTop: "var(--spacing-lg)",
-            textAlign: "center",
-          }}
-        >
+        {/* Back to Login */}
+        <div className="text-center">
           <Link
             to="/login"
-            style={{
-              fontSize: "var(--font-size-sm)",
-              color: "var(--color-text-secondary)",
-              textDecoration: "none",
-              transition: "color var(--transition-fast)",
-            }}
-            onMouseEnter={(e) =>
-              (e.target.style.color = "var(--color-primary)")
-            }
-            onMouseLeave={(e) =>
-              (e.target.style.color = "var(--color-text-secondary)")
-            }
+            className="text-sm text-slate-600 hover:text-slate-900 transition-colors"
           >
-            Back to login
+            ← Back to login
           </Link>
         </div>
       </form>
     </AuthLayout>
   );
 }
-
-export default VerifyOtp;
 
