@@ -28,6 +28,13 @@ import PrescriptionsPage from "../features/patient/pages/Prescriptions/Prescript
 import PharmacyDashboard from "../features/pharmacy/pages/PharmacyDashboard";
 import PharmacyOnboarding from "../features/pharmacy/pages/PharmacyOnboarding";
 import PharmacyPendingApproval from "../features/pharmacy/pages/PharmacyPendingApproval";
+import PharmacyInventory from "../features/pharmacy/pages/PharmacyInventory";
+import PharmacyOrders from "../features/pharmacy/pages/PharmacyOrders";
+import PharmacySOSRequests from "../features/pharmacy/pages/PharmacySOSRequests";
+import PharmacyCustomers from "../features/pharmacy/pages/PharmacyCustomers";
+import PharmacyAnalytics from "../features/pharmacy/pages/PharmacyAnalytics";
+import PharmacyReports from "../features/pharmacy/pages/PharmacyReports";
+import PharmacySettings from "../features/pharmacy/pages/PharmacySettings";
 
 // Admin Pages
 import AdminDashboardHome from "../features/admin/pages/AdminDashboardHome";
@@ -280,7 +287,9 @@ export const routes = [
     path: "/pharmacy",
     element: (
       <ProtectedRoute allowedRoles={['PHARMACY']}>
-        <Outlet />
+        <Layout>
+          <Outlet />
+        </Layout>
       </ProtectedRoute>
     ),
     children: [
@@ -294,7 +303,31 @@ export const routes = [
       },
       {
         path: "inventory",
-        element: <PharmacyDashboard />, // Reusing dashboard for inventory
+        element: <PharmacyInventory />,
+      },
+      {
+        path: "orders",
+        element: <PharmacyOrders />,
+      },
+      {
+        path: "sos-requests",
+        element: <PharmacySOSRequests />,
+      },
+      {
+        path: "customers",
+        element: <PharmacyCustomers />,
+      },
+      {
+        path: "analytics",
+        element: <PharmacyAnalytics />,
+      },
+      {
+        path: "reports",
+        element: <PharmacyReports />,
+      },
+      {
+        path: "settings",
+        element: <PharmacySettings />,
       },
       {
         path: "onboard",

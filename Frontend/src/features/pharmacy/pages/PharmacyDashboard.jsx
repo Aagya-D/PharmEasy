@@ -18,15 +18,6 @@ import {
   Save,
   AlertCircle,
   Bell,
-  Settings,
-  LogOut,
-  Menu,
-  Home,
-  Pill,
-  ClipboardList,
-  Users,
-  BarChart3,
-  FileText,
   ChevronDown,
   Eye,
   XCircle,
@@ -38,7 +29,6 @@ import { Link } from "react-router-dom";
  * Professional dashboard with stats, CRUD table, and modals
  */
 export default function PharmacyDashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -312,122 +302,32 @@ export default function PharmacyDashboard() {
     setSelectedMedicine(null);
   };
 
-  const sidebarItems = [
-    { icon: Home, label: "Dashboard", active: true },
-    { icon: Pill, label: "Inventory", active: false },
-    { icon: ClipboardList, label: "Orders", active: false },
-    { icon: AlertTriangle, label: "SOS Requests", active: false, badge: 3 },
-    { icon: Users, label: "Customers", active: false },
-    { icon: BarChart3, label: "Analytics", active: false },
-    { icon: FileText, label: "Reports", active: false },
-    { icon: Settings, label: "Settings", active: false },
-  ];
-
   return (
-    <div className="min-h-screen bg-gray-100 flex">
-      {/* Sidebar */}
-      <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
-      >
-        <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-100">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-              <Pill className="text-white" size={22} />
-            </div>
-            <div>
-              <h1 className="font-bold text-gray-900">PharmEasy</h1>
-              <p className="text-xs text-gray-500">Admin Portal</p>
-            </div>
+    <div className="min-h-screen bg-gray-100">
+      <header className="bg-white border-b border-gray-200 px-6 py-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
+            <p className="text-sm text-gray-500">
+              Manage your pharmacy stock and medicines
+            </p>
           </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-            {sidebarItems.map((item, index) => (
-              <button
-                key={index}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-                  item.active
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <item.icon size={20} />
-                  <span>{item.label}</span>
-                </div>
-                {item.badge && (
-                  <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            ))}
-          </nav>
-
-          {/* User Profile */}
-          <div className="p-4 border-t border-gray-100">
-            <div className="flex items-center gap-3 px-4 py-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <span className="text-blue-600 font-semibold">AP</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  Apollo Pharmacy
-                </p>
-                <p className="text-xs text-gray-500 truncate">
-                  admin@apollo.com
-                </p>
-              </div>
-              <button className="text-gray-400 hover:text-gray-600">
-                <LogOut size={18} />
-              </button>
-            </div>
+          <div className="flex items-center gap-3">
+            <button className="relative p-2 hover:bg-gray-100 rounded-lg">
+              <Bell size={22} className="text-gray-600" />
+              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+            </button>
+            <Link
+              to="/notifications"
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              View Notifications
+            </Link>
           </div>
         </div>
-      </aside>
+      </header>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
-              >
-                <Menu size={24} />
-              </button>
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">
-                  Inventory Management
-                </h1>
-                <p className="text-sm text-gray-500">
-                  Manage your pharmacy stock and medicines
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button className="relative p-2 hover:bg-gray-100 rounded-lg">
-                <Bell size={22} className="text-gray-600" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-              </button>
-              <Link
-                to="/notifications"
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
-                View Notifications
-              </Link>
-            </div>
-          </div>
-        </header>
-
-        {/* Dashboard Content */}
-        <main className="flex-1 p-6 overflow-y-auto">
+      <main className="p-6 overflow-y-auto">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {stats.map((stat, index) => (
@@ -686,7 +586,6 @@ export default function PharmacyDashboard() {
             </div>
           </div>
         </main>
-      </div>
 
       {/* Add Medicine Modal */}
       <AnimatePresence>
