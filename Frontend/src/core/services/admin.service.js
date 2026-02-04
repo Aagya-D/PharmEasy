@@ -47,25 +47,28 @@ const adminService = {
 
   /**
    * Get pharmacy details (Admin)
+   * Endpoint: GET /api/admin/pharmacy/:id (note: singular "pharmacy")
    */
   getPharmacyById: async (pharmacyId) => {
-    const response = await httpClient.get(`/admin/pharmacies/${pharmacyId}`);
+    const response = await httpClient.get(`/admin/pharmacy/${pharmacyId}`);
     return response.data;
   },
 
   /**
-   * Approve pharmacy
+   * Verify pharmacy (Approve)
+   * Endpoint: PATCH /api/admin/pharmacy/:id/verify
    */
   approvePharmacy: async (pharmacyId) => {
-    const response = await httpClient.put(`/admin/pharmacies/${pharmacyId}/approve`);
+    const response = await httpClient.patch(`/admin/pharmacy/${pharmacyId}/verify`);
     return response.data;
   },
 
   /**
    * Reject pharmacy
+   * Endpoint: PATCH /api/admin/pharmacy/:id/reject
    */
   rejectPharmacy: async (pharmacyId, reason) => {
-    const response = await httpClient.put(`/admin/pharmacies/${pharmacyId}/reject`, { reason });
+    const response = await httpClient.patch(`/admin/pharmacy/${pharmacyId}/reject`, { reason });
     return response.data;
   },
 

@@ -109,12 +109,13 @@ app.get(
 // Authentication routes
 app.use("/api/auth", authRoutes);
 
-// Pharmacy routes (onboarding & admin verification)
-app.use("/api/pharmacy", pharmacyRoutes);
+// Pharmacy routes (onboarding, pharmacy management & admin verification)
+// Routes include: /pharmacy/onboard, /pharmacy/my-pharmacy, /admin/pharmacies, /admin/pharmacy/:id, etc.
 app.use("/api", pharmacyRoutes);
 
-// Admin routes (pharmacy approval/rejection)
-app.use("/api/admin", adminRoutes);
+// NOTE: Admin routes from admin.routes.js are now consolidated in pharmacy.routes.js
+// Keeping adminRoutes import for backward compatibility but no longer mounting it
+// TODO: Remove admin.routes.js file and admin controller in future refactor
 
 // Root API endpoint
 app.get("/api", (req, res) => {
