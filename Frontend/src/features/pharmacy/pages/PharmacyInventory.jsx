@@ -90,14 +90,31 @@ export default function PharmacyInventory() {
       
       const response = await inventoryService.getMyInventory(page, 50);
       
+      // Validate response structure
+      if (!response || !response.data || !Array.isArray(response.data)) {
+        throw new Error("Invalid response format from server");
+      }
+
       setInventory(response.data);
-      setPagination(response.pagination);
+      setPagination(response.pagination || {});
       logger.success("INVENTORY", "Inventory fetched successfully", { 
         itemsCount: response.data.length 
       });
     } catch (err) {
       logger.error("INVENTORY", "Failed to fetch inventory", err);
-      setError(err.response?.data?.error || "Failed to load inventory");
+      
+      // Extract error message safely
+      let errorMessage = "Failed to load inventory";
+      
+      if (err?.message) {
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
+      }
+      
+      setError(errorMessage);
+      setInventory([]);
+      setPagination({ currentPage: 1, totalPages: 0, totalItems: 0 });
     } finally {
       setLoading(false);
     }
@@ -140,7 +157,8 @@ export default function PharmacyInventory() {
       setEditValues({});
     } catch (err) {
       logger.error("INVENTORY", "Failed to update item", err);
-      alert(err.response?.data?.error || "Failed to update item");
+      const errorMessage = err?.message || "Failed to update item";
+      alert(errorMessage);
     }
   };
 
@@ -159,7 +177,8 @@ export default function PharmacyInventory() {
       await fetchInventory(pagination.currentPage);
     } catch (err) {
       logger.error("INVENTORY", "Failed to delete item", err);
-      alert(err.response?.data?.error || "Failed to delete item");
+      const errorMessage = err?.message || "Failed to delete item";
+      alert(errorMessage);
     }
   };
 
@@ -205,7 +224,7 @@ export default function PharmacyInventory() {
         </header>
         <div className="p-6">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-600">{error}</p>
+            <p className="text-red-600">{error?.message || error || 'An error occurred while loading inventory'}</p>
             <button
               onClick={() => fetchInventory()}
               className="mt-2 text-red-600 underline"
@@ -509,7 +528,7 @@ function AddMedicineModal({ isOpen, onClose, onSuccess }) {
       onSuccess();
     } catch (err) {
       logger.error("INVENTORY", "Failed to add medicine", err);
-      const errorMessage = err.response?.data?.error || "Failed to add medicine";
+      const errorMessage = err?.message || "Failed to add medicine";
       setErrors({ submit: errorMessage });
     } finally {
       setSubmitting(false);

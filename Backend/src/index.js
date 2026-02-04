@@ -75,17 +75,64 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.use(loggingMiddleware);
 
 // ============================================
-// HEALTH CHECK
+// HEALTH CHECK & STATUS
 // ============================================
 
+// Simple health check (no dependencies)
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     success: true,
     message: "API is running",
+    status: "healthy",
     timestamp: new Date().toISOString(),
     environment: NODE_ENV,
+    uptime: process.uptime(),
   });
 });
+
+// Comprehensive status check (includes DB)
+app.get("/api/status", asyncHandler(async (req, res) => {
+  const startTime = Date.now();
+  
+  // Check database connection
+  let dbStatus = "disconnected";
+  let dbLatency = null;
+  try {
+    const dbStart = Date.now();
+    await prisma.$queryRaw`SELECT 1`;
+    dbLatency = Date.now() - dbStart;
+    dbStatus = "connected";
+  } catch (error) {
+    dbStatus = "error";
+  }
+  
+  const responseTime = Date.now() - startTime;
+  
+  res.status(200).json({
+    success: true,
+    message: "Server status check",
+    status: {
+      api: "healthy",
+      database: dbStatus,
+    },
+    metrics: {
+      uptime: `${Math.floor(process.uptime())}s`,
+      responseTime: `${responseTime}ms`,
+      dbLatency: dbLatency ? `${dbLatency}ms` : "N/A",
+      memory: {
+        used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
+        total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB`,
+      },
+    },
+    environment: {
+      nodeVersion: process.version,
+      environment: NODE_ENV,
+      port: PORT,
+      host: HOST,
+    },
+    timestamp: new Date().toISOString(),
+  });
+}));
 
 // ============================================
 // DATABASE CHECK

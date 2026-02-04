@@ -62,8 +62,8 @@ export const addMedicine = async (req, res, next) => {
  * Query params: page (default: 1), limit (default: 20)
  */
 export const getMyInventory = async (req, res, next) => {
+  const startTime = Date.now();
   try {
-    const startTime = Date.now();
     const pharmacyId = req.user.pharmacyId;
     const page = req.query.page || 1;
     const limit = req.query.limit || 20;
