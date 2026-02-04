@@ -6,6 +6,7 @@ import { useAuth } from "../../../context/AuthContext";
 import authService from "../../../core/services/auth.service";
 import { Clock, Mail, RefreshCw } from "lucide-react";
 import verifyOtpHeroImage from "../../../assets/verify-otp-hero.svg";
+import { getDashboardPath } from "../../../utils/roleHelpers";
 
 export function VerifyOtp() {
   const navigate = useNavigate();
@@ -101,36 +102,19 @@ export function VerifyOtp() {
       const result = await verifyOTP(email, otpString);
 
       if (result.success) {
-        // If coming from login page, redirect to dashboard (now verified and can login)
-        // If coming from register page, redirect to role-based dashboard (auto-login)
-        let nextRoute = "/login";
-        let nextState = { message: "OTP verified successfully. Please sign in." };
+        // Use helper function for role-based navigation
+        const user = result.user || { roleId: result.roleId, pharmacy: result.pharmacy };
+        const dashboardPath = getDashboardPath(user);
+        
+        let nextState = { message: "OTP verified successfully!" };
 
         if (isFromLogin) {
-          // From login: redirect to dashboard
-          nextRoute = "/dashboard";
-          nextState = { message: "Email verified! You can now access your dashboard." };
-        } else if (result.roleId) {
-          // From registration: auto-login and go to role-based dashboard
-          if (result.roleId === 3) {
-            nextRoute = "/patient";
-            nextState = { message: "Account created! Welcome to your dashboard." };
-          } else if (result.roleId === 2) {
-            nextRoute = result.needsOnboarding
-              ? "/pharmacy/onboard"
-              : "/pharmacy/dashboard";
-            nextState = {
-              message: result.needsOnboarding
-                ? "Account created! Complete your pharmacy details."
-                : "Account created! Welcome to your pharmacy dashboard.",
-            };
-          } else if (result.roleId === 1) {
-            nextRoute = "/admin/dashboard";
-            nextState = { message: "Account created! Welcome to admin panel." };
-          }
+          nextState.message = "Email verified! You can now access your dashboard.";
+        } else {
+          nextState.message = "Account created! Welcome to PharmEasy.";
         }
 
-        navigate(nextRoute, { state: nextState });
+        navigate(dashboardPath, { state: nextState });
       } else {
         setError(result.error || "OTP verification failed. Please try again.");
       }

@@ -33,7 +33,7 @@ const router = express.Router();
  * Accepts: multipart/form-data with optional "licenseDocument" file (PDF/JPG/PNG, max 5MB)
  */
 router.post(
-  "/onboard",
+  "/pharmacy/onboard",
   authenticate(),
   requirePharmacyAdmin,
   uploadLicenseDocument, // Cloudinary upload middleware
@@ -47,7 +47,7 @@ router.post(
  * Requires: JWT token, roleId=2 (PHARMACY_ADMIN)
  */
 router.get(
-  "/my-pharmacy",
+  "/pharmacy/my-pharmacy",
   authenticate(),
   requirePharmacyAdmin,
   pharmacyController.getMyPharmacy

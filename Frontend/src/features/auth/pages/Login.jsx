@@ -7,6 +7,7 @@ import { Button } from "../../../shared/components/ui";
 import { Alert } from "../../../shared/components/ui";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import pharmacyImage from "../../../assets/image.png";
+import { getDashboardPath } from "../../../utils/roleHelpers";
 
 export function Login() {
   const navigate = useNavigate();
@@ -32,21 +33,9 @@ export function Login() {
     try {
       const result = await login(email, password);
       if (result.success) {
-        // Role-based redirect after successful login
-        const { user } = result;
-        if (user?.roleId === 3) {
-          // PATIENT → Patient dashboard
-          navigate("/patient");
-        } else if (user?.roleId === 2) {
-          // PHARMACY → Pharmacy dashboard
-          navigate("/pharmacy/dashboard");
-        } else if (user?.roleId === 1) {
-          // ADMIN → Admin verification page
-          navigate("/admin/verify");
-        } else {
-          // Fallback to smart dashboard router
-          navigate("/dashboard");
-        }
+        // Use helper function for role-based navigation
+        const dashboardPath = getDashboardPath(result.user);
+        navigate(dashboardPath);
       } else if (result.code === "EMAIL_NOT_VERIFIED") {
         // Redirect to verify OTP page with email pre-filled
         navigate("/verify-otp", {

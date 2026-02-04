@@ -40,6 +40,7 @@ import AdminSettings from "../features/admin/pages/AdminSettings";
 // Layouts & Components
 import ProtectedRoute from "./ProtectedRoute";
 import Layout from "../shared/layouts/Layout";
+import ErrorBoundary from "../shared/components/ErrorBoundary";
 
 // Unauthorized page component
 function UnauthorizedPage() {
@@ -285,7 +286,11 @@ export const routes = [
     children: [
       {
         path: "dashboard",
-        element: <PharmacyDashboard />,
+        element: (
+          <ErrorBoundary errorMessage="Failed to load pharmacy dashboard. Please refresh the page.">
+            <PharmacyDashboard />
+          </ErrorBoundary>
+        ),
       },
       {
         path: "inventory",
@@ -293,11 +298,19 @@ export const routes = [
       },
       {
         path: "onboard",
-        element: <PharmacyOnboarding />,
+        element: (
+          <ErrorBoundary errorMessage="Failed to load pharmacy onboarding. Please refresh the page or contact support.">
+            <PharmacyOnboarding />
+          </ErrorBoundary>
+        ),
       },
       {
         path: "pending-approval",
-        element: <PharmacyPendingApproval />,
+        element: (
+          <ErrorBoundary errorMessage="Failed to load approval status. Please refresh the page.">
+            <PharmacyPendingApproval />
+          </ErrorBoundary>
+        ),
       },
     ],
   },

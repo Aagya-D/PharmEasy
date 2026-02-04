@@ -26,7 +26,7 @@ import {
  */
 const NAV_CONFIG = {
   [ROLE_IDS.PATIENT]: [
-    { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+    { name: "Dashboard", path: "/patient", icon: LayoutDashboard },
     { name: "Search", path: "/search", icon: Search },
     { name: "SOS", path: "/sos", icon: AlertTriangle, highlight: true },
     { name: "Notifications", path: "/notifications", icon: Bell },
@@ -34,13 +34,15 @@ const NAV_CONFIG = {
   [ROLE_IDS.PHARMACY]: {
     approved: [
       { name: "Dashboard", path: "/pharmacy/dashboard", icon: LayoutDashboard },
-      { name: "Inventory", path: "/pharmacy/dashboard", icon: Package },
+      { name: "Inventory", path: "/pharmacy/inventory", icon: Package },
       { name: "SOS Requests", path: "/pharmacy/sos", icon: AlertTriangle, highlight: true },
       { name: "Notifications", path: "/notifications", icon: Bell },
     ],
     pending: [
-      { name: "Dashboard", path: "/pharmacy/pending", icon: LayoutDashboard },
-      { name: "Approval Status", path: "/pharmacy/pending", icon: Shield },
+      { name: "Onboarding Status", path: "/pharmacy/pending-approval", icon: Shield },
+    ],
+    onboarding: [
+      { name: "Complete Onboarding", path: "/pharmacy/onboard", icon: FileText },
     ],
   },
   [ROLE_IDS.ADMIN]: [
@@ -92,10 +94,30 @@ export function Navbar() {
 
     // Pharmacy - check approval status
     if (roleId === ROLE_IDS.PHARMACY) {
-      const isApproved = user.pharmacy?.verificationStatus === "VERIFIED";
-      return isApproved 
-        ? NAV_CONFIG[ROLE_IDS.PHARMACY].approved 
-        : NAV_CONFIG[ROLE_IDS.PHARMACY].pending;
+      // Not onboarded yet
+      if (!user.pharmacy) {
+        return NAV_CONFIG[ROLE_IDS.PHARMACY].onboarding;
+      }
+      
+      const status = user.pharmacy.verificationStatus;
+      
+      // Pending or Rejected - show onboarding/status link
+      if (status === "PENDING_VERIFICATION") {
+        return NAV_CONFIG[ROLE_IDS.PHARMACY].pending;
+      }
+      
+      // Rejected - show onboarding link
+      if (status === "REJECTED") {
+        return NAV_CONFIG[ROLE_IDS.PHARMACY].onboarding;
+      }
+      
+      // Verified - show full dashboard
+      if (status === "VERIFIED") {
+        return NAV_CONFIG[ROLE_IDS.PHARMACY].approved;
+      }
+      
+      // Default fallback
+      return NAV_CONFIG[ROLE_IDS.PHARMACY].onboarding;
     }
 
     // Admin
