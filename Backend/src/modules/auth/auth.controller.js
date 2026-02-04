@@ -66,6 +66,8 @@ export const register = async (req, res, next) => {
       },
     });
   } catch (err) {
+    const duration = Date.now() - startTime;
+    logger.timing('AUTH', 'register', duration, 'ERROR');
     logger.error('AUTH', `[REGISTER] Failed: ${err.message}`, err);
     logger.operation('AUTH', 'register', 'ERROR', { error: err.message });
     next(err);
@@ -154,6 +156,8 @@ export const verifyEmailOTP = async (req, res, next) => {
       },
     });
   } catch (err) {
+    const duration = Date.now() - startTime;
+    logger.timing('AUTH', 'verifyEmailOTP', duration, 'ERROR');
     logger.error('AUTH', `[VERIFY_OTP] Failed: ${err.message}`, err);
     logger.operation('AUTH', 'verifyEmailOTP', 'ERROR', { error: err.message });
     next(err);
@@ -243,6 +247,8 @@ export const login = async (req, res, next) => {
       }
     }
 
+    const duration = Date.now() - startTime;
+    logger.timing('AUTH', 'login', duration, 'ERROR');
     logger.error('AUTH', `[LOGIN] Failed: ${err.message}`, err);
     logger.operation('AUTH', 'login', 'ERROR', { error: err.message });
     next(err);

@@ -65,8 +65,8 @@ export const getMyInventory = async (req, res, next) => {
   const startTime = Date.now();
   try {
     const pharmacyId = req.user.pharmacyId;
-    const page = req.query.page || 1;
-    const limit = req.query.limit || 20;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
 
     logger.operation('INVENTORY', 'getMyInventory', 'START', { 
       pharmacyId, 

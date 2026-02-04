@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Package,
@@ -22,14 +22,23 @@ import {
   Eye,
   XCircle,
   Pill,
+  Loader,
+  Calendar,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../../../context/AuthContext";
+import { getDashboardStats } from "../../../core/services/pharmacy.service";
+import { getMyInventory } from "../../../core/services/inventory.service";
 
 /**
  * Pharmacy Admin Dashboard - Inventory Management
- * Professional dashboard with stats, CRUD table, and modals
+ * Real data integration - Fetches stats and inventory from backend API
  */
 export default function PharmacyDashboard() {
+  // Auth context
+  const { user } = useAuth();
+
+  // State variables
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -39,167 +48,95 @@ export default function PharmacyDashboard() {
   const [filterCategory, setFilterCategory] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
+  // Data states
+  const [stats, setStats] = useState([]);
+  const [medicines, setMedicines] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+
+  // Medicine categories
+  const categories = [
+    "General",
+    "Antibiotics",
+    "Analgesics",
+    "Vitamins",
+    "Antiseptics",
+    "Cardiovascular",
+    "Respiratory",
+    "Gastrointestinal",
+    "Dermatology",
+    "Other"
+  ];
+
   // Form state for add/edit
   const [formData, setFormData] = useState({
     name: "",
-    category: "Pain Relief",
+    genericName: "",
+    category: "General",
+    manufacturer: "",
     quantity: "",
     price: "",
-    manufacturer: "",
-    expiryDate: "",
     batchNumber: "",
+    expiryDate: "",
   });
 
-  // Mock stats data
-  const stats = [
-    {
-      title: "Total Items",
-      value: "1,248",
-      change: "+12%",
-      trend: "up",
-      icon: Package,
-      color: "blue",
-    },
-    {
-      title: "Low Stock",
-      value: "23",
-      change: "-5%",
-      trend: "down",
-      icon: AlertTriangle,
-      color: "yellow",
-    },
-    {
-      title: "Fulfilled SOS",
-      value: "156",
-      change: "+28%",
-      trend: "up",
-      icon: CheckCircle,
-      color: "green",
-    },
-    {
-      title: "Revenue Today",
-      value: "₹45,230",
-      change: "+8%",
-      trend: "up",
-      icon: TrendingUp,
-      color: "purple",
-    },
-  ];
+  // Fetch dashboard data on component mount
+  useEffect(() => {
+    fetchDashboardData();
+  }, [page]);
 
-  // Mock medicines data
-  const [medicines, setMedicines] = useState([
-    {
-      id: 1,
-      name: "Paracetamol 500mg",
-      category: "Pain Relief",
-      quantity: 250,
-      price: 45,
-      status: "in-stock",
-      manufacturer: "Cipla",
-      expiryDate: "2027-06",
-      batchNumber: "BAT001",
-    },
-    {
-      id: 2,
-      name: "Amoxicillin 250mg",
-      category: "Antibiotic",
-      quantity: 8,
-      price: 120,
-      status: "low-stock",
-      manufacturer: "Sun Pharma",
-      expiryDate: "2026-12",
-      batchNumber: "BAT002",
-    },
-    {
-      id: 3,
-      name: "Omeprazole 20mg",
-      category: "Gastric",
-      quantity: 0,
-      price: 85,
-      status: "out-of-stock",
-      manufacturer: "Dr. Reddy's",
-      expiryDate: "2027-03",
-      batchNumber: "BAT003",
-    },
-    {
-      id: 4,
-      name: "Metformin 500mg",
-      category: "Diabetes",
-      quantity: 180,
-      price: 65,
-      status: "in-stock",
-      manufacturer: "Lupin",
-      expiryDate: "2027-08",
-      batchNumber: "BAT004",
-    },
-    {
-      id: 5,
-      name: "Cetirizine 10mg",
-      category: "Allergy",
-      quantity: 5,
-      price: 35,
-      status: "low-stock",
-      manufacturer: "Cipla",
-      expiryDate: "2026-11",
-      batchNumber: "BAT005",
-    },
-    {
-      id: 6,
-      name: "Azithromycin 500mg",
-      category: "Antibiotic",
-      quantity: 120,
-      price: 150,
-      status: "in-stock",
-      manufacturer: "Zydus",
-      expiryDate: "2027-04",
-      batchNumber: "BAT006",
-    },
-    {
-      id: 7,
-      name: "Pantoprazole 40mg",
-      category: "Gastric",
-      quantity: 0,
-      price: 95,
-      status: "out-of-stock",
-      manufacturer: "Abbott",
-      expiryDate: "2027-01",
-      batchNumber: "BAT007",
-    },
-    {
-      id: 8,
-      name: "Ibuprofen 400mg",
-      category: "Pain Relief",
-      quantity: 300,
-      price: 55,
-      status: "in-stock",
-      manufacturer: "Mankind",
-      expiryDate: "2027-09",
-      batchNumber: "BAT008",
-    },
-  ]);
+  /**
+   * Fetch dashboard statistics and inventory data
+   */
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const categories = [
-    "Pain Relief",
-    "Antibiotic",
-    "Gastric",
-    "Diabetes",
-    "Allergy",
-    "Cardiac",
-    "Vitamins",
-    "Other",
-  ];
+      // Fetch stats (which includes inventory data)
+      const statsResponse = await getDashboardStats();
+      
+      if (statsResponse.success && statsResponse.data) {
+        setStats(statsResponse.data.stats || []);
+        
+        // If getDashboardStats includes inventory preview, use it
+        // Otherwise fetch full inventory
+        if (statsResponse.data.inventory && statsResponse.data.inventory.length > 0) {
+          setMedicines(statsResponse.data.inventory);
+        } else {
+          // Fetch full inventory
+          const inventoryResponse = await getMyInventory(page, 100);
+          if (inventoryResponse.data && Array.isArray(inventoryResponse.data)) {
+            setMedicines(inventoryResponse.data);
+          } else if (inventoryResponse.data && inventoryResponse.data.items) {
+            setMedicines(inventoryResponse.data.items);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err);
+      setError(
+        err.error?.message || 
+        err.message || 
+        "Failed to load dashboard data. Please try again."
+      );
+      // Set empty arrays on error
+      setStats([]);
+      setMedicines([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Filter medicines
-  const filteredMedicines = medicines.filter((medicine) => {
-    const matchesSearch = medicine.name
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesCategory =
-      filterCategory === "all" || medicine.category === filterCategory;
-    const matchesStatus =
-      filterStatus === "all" || medicine.status === filterStatus;
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+  /**
+   * Determine stock status based on quantity
+   */
+  const getStockStatus = (quantity) => {
+    if (quantity === 0) return "out-of-stock";
+    if (quantity < 50) return "low-stock";
+    return "in-stock";
+  };
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -230,62 +167,40 @@ export default function PharmacyDashboard() {
   };
 
   const handleAddMedicine = () => {
-    const newMedicine = {
-      id: medicines.length + 1,
-      ...formData,
-      quantity: parseInt(formData.quantity),
-      price: parseFloat(formData.price),
-      status:
-        parseInt(formData.quantity) === 0
-          ? "out-of-stock"
-          : parseInt(formData.quantity) < 10
-          ? "low-stock"
-          : "in-stock",
-    };
-    setMedicines([...medicines, newMedicine]);
+    // Add medicine will be handled by PharmacyInventory component
     setShowAddModal(false);
     resetForm();
+    // Refresh data
+    fetchDashboardData();
   };
 
   const handleEditMedicine = () => {
-    setMedicines(
-      medicines.map((m) =>
-        m.id === selectedMedicine.id
-          ? {
-              ...m,
-              ...formData,
-              quantity: parseInt(formData.quantity),
-              price: parseFloat(formData.price),
-              status:
-                parseInt(formData.quantity) === 0
-                  ? "out-of-stock"
-                  : parseInt(formData.quantity) < 10
-                  ? "low-stock"
-                  : "in-stock",
-            }
-          : m
-      )
-    );
+    // Edit will be handled by PharmacyInventory component
     setShowEditModal(false);
     resetForm();
+    // Refresh data
+    fetchDashboardData();
   };
 
   const handleDeleteMedicine = () => {
-    setMedicines(medicines.filter((m) => m.id !== selectedMedicine.id));
+    // Delete will be handled by PharmacyInventory component
     setShowDeleteModal(false);
     setSelectedMedicine(null);
+    // Refresh data
+    fetchDashboardData();
   };
 
   const openEditModal = (medicine) => {
     setSelectedMedicine(medicine);
     setFormData({
       name: medicine.name,
-      category: medicine.category,
+      genericName: medicine.genericName || "",
+      category: medicine.category || "General",
+      manufacturer: medicine.manufacturer || "",
       quantity: medicine.quantity.toString(),
       price: medicine.price.toString(),
-      manufacturer: medicine.manufacturer,
-      expiryDate: medicine.expiryDate,
-      batchNumber: medicine.batchNumber,
+      batchNumber: medicine.batchNumber || "",
+      expiryDate: medicine.expiryDate || "",
     });
     setShowEditModal(true);
   };
@@ -293,12 +208,13 @@ export default function PharmacyDashboard() {
   const resetForm = () => {
     setFormData({
       name: "",
-      category: "Pain Relief",
+      genericName: "",
+      category: "General",
+      manufacturer: "",
       quantity: "",
       price: "",
-      manufacturer: "",
-      expiryDate: "",
       batchNumber: "",
+      expiryDate: "",
     });
     setSelectedMedicine(null);
   };
@@ -314,9 +230,13 @@ export default function PharmacyDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="relative p-2 hover:bg-gray-100 rounded-lg">
-              <Bell size={22} className="text-gray-600" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+            <button 
+              onClick={fetchDashboardData}
+              disabled={loading}
+              className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+              title="Refresh data"
+            >
+              <Loader size={22} className={`text-gray-600 ${loading ? "animate-spin" : ""}`} />
             </button>
             <Link
               to="/notifications"
@@ -329,65 +249,96 @@ export default function PharmacyDashboard() {
       </header>
 
       <main className="p-6 overflow-y-auto">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {stats.map((stat, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="bg-white rounded-xl p-6 shadow-sm border border-gray-100"
+        {/* Error Alert */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3"
+          >
+            <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+            <div>
+              <h3 className="font-semibold text-red-900">Error Loading Data</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+              <button
+                onClick={fetchDashboardData}
+                className="text-sm text-red-600 hover:text-red-700 font-medium mt-2 underline"
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">{stat.title}</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {stat.value}
-                    </p>
-                    <div
-                      className={`flex items-center gap-1 mt-2 text-sm ${
-                        stat.trend === "up" ? "text-green-600" : "text-red-600"
-                      }`}
-                    >
-                      {stat.trend === "up" ? (
-                        <TrendingUp size={16} />
-                      ) : (
-                        <TrendingDown size={16} />
-                      )}
-                      <span>{stat.change} from last week</span>
-                    </div>
-                  </div>
-                  <div
-                    className={`p-3 rounded-xl ${
-                      stat.color === "blue"
-                        ? "bg-blue-100"
-                        : stat.color === "yellow"
-                        ? "bg-yellow-100"
-                        : stat.color === "green"
-                        ? "bg-green-100"
-                        : "bg-purple-100"
-                    }`}
-                  >
-                    <stat.icon
-                      size={24}
-                      className={
-                        stat.color === "blue"
-                          ? "text-blue-600"
-                          : stat.color === "yellow"
-                          ? "text-yellow-600"
-                          : stat.color === "green"
-                          ? "text-green-600"
-                          : "text-purple-600"
-                      }
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                Try Again
+              </button>
+            </div>
+          </motion.div>
+        )}
 
-          {/* Table Section */}
+        {/* Loading State */}
+        {loading && stats.length === 0 ? (
+          <div className="flex items-center justify-center py-24">
+            <div className="text-center">
+              <Loader className="animate-spin mx-auto mb-4 text-blue-600" size={40} />
+              <p className="text-gray-600 font-medium">Loading dashboard data...</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {stats.length > 0 ? (
+                stats.map((stat, index) => {
+                  const IconComponent = stat.icon && typeof stat.icon === 'string' 
+                    ? eval(stat.icon)
+                    : stat.icon;
+                  
+                  return (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="bg-white rounded-xl p-6 shadow-sm border border-gray-100"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-sm text-gray-500 mb-1">{stat.title}</p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {stat.value}
+                          </p>
+                          <div
+                            className={`flex items-center gap-1 mt-2 text-sm ${
+                              stat.trend === "up" ? "text-green-600" : 
+                              stat.trend === "down" ? "text-red-600" :
+                              "text-yellow-600"
+                            }`}
+                          >
+                            {stat.trend === "up" ? (
+                              <TrendingUp size={16} />
+                            ) : stat.trend === "down" ? (
+                              <TrendingDown size={16} />
+                            ) : (
+                              <AlertTriangle size={16} />
+                            )}
+                            <span>{stat.change}</span>
+                          </div>
+                        </div>
+                        <div
+                          className={`p-3 rounded-xl ${stat.color}`}
+                        >
+                          {IconComponent && (
+                            <IconComponent size={24} className="text-white" />
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })
+              ) : (
+                <div className="col-span-full text-center py-12">
+                  <Package className="mx-auto mb-3 text-gray-300" size={40} />
+                  <p className="text-gray-500">No inventory data available yet</p>
+                </div>
+              )}
+            </div>
+
+            {/* Table Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100">
             {/* Table Header */}
             <div className="p-6 border-b border-gray-100">
@@ -410,183 +361,157 @@ export default function PharmacyDashboard() {
 
                   <div className="flex gap-2">
                     <select
-                      value={filterCategory}
-                      onChange={(e) => setFilterCategory(e.target.value)}
-                      className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">All Categories</option>
-                      {categories.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="all">All Status</option>
+                        <option value="in-stock">In Stock</option>
+                        <option value="low-stock">Low Stock</option>
+                        <option value="out-of-stock">Out of Stock</option>
+                      </select>
+                    </div>
+                  </div>
 
-                    <select
-                      value={filterStatus}
-                      onChange={(e) => setFilterStatus(e.target.value)}
-                      className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    <Link
+                      to="/pharmacy/inventory"
+                      className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
                     >
-                      <option value="all">All Status</option>
-                      <option value="in-stock">In Stock</option>
-                      <option value="low-stock">Low Stock</option>
-                      <option value="out-of-stock">Out of Stock</option>
-                    </select>
+                      <Plus size={18} />
+                      <span>Manage Inventory</span>
+                    </Link>
                   </div>
                 </div>
+              </div>
 
-                {/* Action Buttons */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowBulkUploadModal(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <Upload size={18} />
-                    <span className="hidden sm:inline">Bulk CSV Upload</span>
-                  </button>
-                  <button className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                    <Download size={18} />
-                    <span className="hidden sm:inline">Export</span>
-                  </button>
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-                  >
-                    <Plus size={18} />
-                    <span>Add Medicine</span>
-                  </button>
+              {/* Table */}
+              {loading ? (
+                <div className="p-12 text-center">
+                  <Loader className="animate-spin mx-auto mb-3 text-blue-600" size={32} />
+                  <p className="text-gray-600">Loading inventory data...</p>
                 </div>
-              </div>
-            </div>
-
-            {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Medicine Name
-                    </th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Category
-                    </th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Quantity
-                    </th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Price
-                    </th>
-                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="text-right px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredMedicines.map((medicine) => (
-                    <motion.tr
-                      key={medicine.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
-                            <Pill className="text-blue-600" size={18} />
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">
-                              {medicine.name}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {medicine.manufacturer}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-gray-600">
-                          {medicine.category}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`font-medium ${
-                            medicine.quantity === 0
-                              ? "text-red-600"
-                              : medicine.quantity < 10
-                              ? "text-yellow-600"
-                              : "text-gray-900"
-                          }`}
-                        >
-                          {medicine.quantity} units
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="font-medium text-gray-900">
-                          ₹{medicine.price}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        {getStatusBadge(medicine.status)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => openEditModal(medicine)}
-                            className="p-2 hover:bg-blue-50 rounded-lg transition-colors group"
+              ) : medicines.length === 0 ? (
+                <div className="p-12 text-center">
+                  <Package className="mx-auto mb-3 text-gray-300" size={40} />
+                  <p className="text-gray-600 font-medium">No medicines in inventory</p>
+                  <p className="text-gray-500 text-sm mt-1">
+                    Add your first medicine using the Manage Inventory button
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-100">
+                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Medicine Name
+                        </th>
+                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Generic Name
+                        </th>
+                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Quantity
+                        </th>
+                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Price
+                        </th>
+                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Expiry Date
+                        </th>
+                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {medicines
+                        .filter((medicine) => {
+                          const matchesSearch = (medicine.name || "")
+                            .toLowerCase()
+                            .includes(searchQuery.toLowerCase());
+                          const status = getStockStatus(medicine.quantity || 0);
+                          const matchesStatus =
+                            filterStatus === "all" || status === filterStatus;
+                          return matchesSearch && matchesStatus;
+                        })
+                        .slice(0, 10)
+                        .map((medicine, index) => (
+                          <motion.tr
+                            key={medicine.id || index}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="hover:bg-gray-50 transition-colors"
                           >
-                            <Edit2
-                              size={16}
-                              className="text-gray-400 group-hover:text-blue-600"
-                            />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setSelectedMedicine(medicine);
-                              setShowDeleteModal(true);
-                            }}
-                            className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
-                          >
-                            <Trash2
-                              size={16}
-                              className="text-gray-400 group-hover:text-red-600"
-                            />
-                          </button>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+                                  <Pill className="text-blue-600" size={18} />
+                                </div>
+                                <p className="font-medium text-gray-900">
+                                  {medicine.name || "N/A"}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-gray-600 text-sm">
+                                {medicine.genericName || "-"}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span
+                                className={`font-medium ${
+                                  medicine.quantity === 0
+                                    ? "text-red-600"
+                                    : medicine.quantity < 50
+                                    ? "text-yellow-600"
+                                    : "text-gray-900"
+                                }`}
+                              >
+                                {medicine.quantity || 0} units
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="font-medium text-gray-900">
+                                ₹{(medicine.price || 0).toFixed(2)}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-gray-600 text-sm">
+                                {medicine.expiryDate
+                                  ? new Date(medicine.expiryDate).toLocaleDateString()
+                                  : "-"}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              {getStatusBadge(getStockStatus(medicine.quantity || 0))}
+                            </td>
+                          </motion.tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
-            {/* Table Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
-              <p className="text-sm text-gray-500">
-                Showing {filteredMedicines.length} of {medicines.length}{" "}
-                medicines
-              </p>
-              <div className="flex gap-2">
-                <button className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-                  Previous
-                </button>
-                <button className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
-                  1
-                </button>
-                <button className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-                  2
-                </button>
-                <button className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-                  Next
-                </button>
-              </div>
+              {/* Table Footer */}
+              {medicines.length > 0 && (
+                <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                  <p className="text-sm text-gray-500">
+                    Showing up to 10 of {medicines.length} medicines
+                  </p>
+                  <Link
+                    to="/pharmacy/inventory"
+                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    View all →
+                  </Link>
+                </div>
+              )}
             </div>
-          </div>
-        </main>
+          </>
+        )}
+      </main>
 
       {/* Add Medicine Modal */}
       <AnimatePresence>

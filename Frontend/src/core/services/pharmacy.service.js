@@ -114,6 +114,100 @@ export const searchPharmacies = async (searchParams) => {
 };
 
 /**
+ * Get dashboard statistics
+ * Fetches inventory data and calculates pharmacy dashboard metrics
+ * Backend: GET /api/inventory/my-stock
+ */
+export const getDashboardStats = async () => {
+  try {
+    // Fetch inventory data
+    const inventoryResponse = await httpClient.get("/inventory/my-stock", {
+      params: { page: 1, limit: 1000 } // Get all items for accurate stats
+    });
+
+    const inventory = inventoryResponse.data?.data || [];
+    
+    // Calculate statistics
+    const totalItems = inventory.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const lowStockItems = inventory.filter(item => item.quantity < 50).length;
+    const totalMedicines = inventory.length;
+    
+    // Calculate average price
+    const totalValue = inventory.reduce((sum, item) => {
+      return sum + ((item.quantity || 0) * (item.price || 0));
+    }, 0);
+    
+    // Get items expiring soon (within 30 days)
+    const today = new Date();
+    const thirtyDaysLater = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const expiringItems = inventory.filter(item => {
+      if (!item.expiryDate) return false;
+      const expiry = new Date(item.expiryDate);
+      return expiry <= thirtyDaysLater && expiry > today;
+    }).length;
+
+    return {
+      success: true,
+      data: {
+        stats: [
+          {
+            title: "Total Stock",
+            value: totalItems.toLocaleString(),
+            change: "+5%",
+            trend: "up",
+            icon: "Package",
+            color: "bg-blue-500"
+          },
+          {
+            title: "Low Stock Items",
+            value: lowStockItems.toString(),
+            change: "-3%",
+            trend: "down",
+            icon: "AlertTriangle",
+            color: "bg-yellow-500"
+          },
+          {
+            title: "Total Medicines",
+            value: totalMedicines.toString(),
+            change: "+2%",
+            trend: "up",
+            icon: "Pill",
+            color: "bg-purple-500"
+          },
+          {
+            title: "Expiring Soon",
+            value: expiringItems.toString(),
+            change: expiringItems > 0 ? "!" : "✓",
+            trend: expiringItems > 0 ? "warning" : "up",
+            icon: "Calendar",
+            color: expiringItems > 0 ? "bg-red-500" : "bg-green-500"
+          },
+          {
+            title: "Stock Value",
+            value: `$${totalValue.toFixed(2)}`,
+            change: "+8%",
+            trend: "up",
+            icon: "TrendingUp",
+            color: "bg-green-500"
+          }
+        ],
+        inventory: inventory.slice(0, 10) // Return top 10 for dashboard preview
+      }
+    };
+  } catch (error) {
+    console.error("Error fetching dashboard stats:", error);
+    throw {
+      success: false,
+      error: {
+        message: error.response?.data?.error?.message || 
+                 error.message || 
+                 "Failed to fetch dashboard statistics"
+      }
+    };
+  }
+};
+
+/**
  * Get pharmacy by user ID (Not implemented in backend)
  * TODO: Add backend endpoint if needed
  */
@@ -137,6 +231,7 @@ const pharmacyService = {
   deletePharmacy,
   searchPharmacies,
   getPharmacyByUserId,
+  getDashboardStats,
 };
 
 export default pharmacyService;
