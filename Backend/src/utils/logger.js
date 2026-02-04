@@ -191,6 +191,38 @@ class BackendLogger {
   api(service, method, url, data = null) {
     this.debug('API', `${service} ${method} ${url}`, data);
   }
+
+  /**
+   * Business logic operation logging
+   */
+  operation(feature, operation, status = 'START', data = null) {
+    const level = status === 'ERROR' ? 'ERROR' : 'INFO';
+    this.log(level, feature, `[${operation}] ${status}`, data);
+  }
+
+  /**
+   * Performance/Timing logging
+   */
+  timing(feature, operation, duration, status = 'OK') {
+    const data = {
+      operation,
+      duration: `${duration}ms`,
+      status,
+    };
+    this.debug(feature, `⏱️  TIMING`, data);
+  }
+
+  /**
+   * Validation result logging
+   */
+  validation(feature, field, isValid, reason = null) {
+    const data = {
+      field,
+      valid: isValid,
+      ...(reason && { reason }),
+    };
+    this.debug(feature, `✓ VALIDATION`, data);
+  }
 }
 
 // Create singleton instance

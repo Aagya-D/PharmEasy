@@ -2,6 +2,7 @@ import userService from "./auth.service.js";
 import { generateAccessToken, generateRefreshToken } from "../../lib/auth.js";
 import { AuthenticationError, ValidationError } from "../../utils/errors.js";
 import jwt from "jsonwebtoken";
+import logger from "../../utils/logger.js";
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -13,6 +14,9 @@ const COOKIE_OPTIONS = {
 // ---------------- REGISTER ----------------
 export const register = async (req, res, next) => {
   try {
+    const startTime = Date.now();
+    logger.operation('AUTH', 'register', 'START', { email: req.body.email });
+
     // Accept various field names for flexibility
     const {
       email,
@@ -23,7 +27,10 @@ export const register = async (req, res, next) => {
       phone,
       roleTypeId,
       roleId,
+      pharmacyDetails, // NEW: Pharmacy-specific data
     } = req.body;
+
+    logger.debug('AUTH', '[REGISTER] Request body received', { email, roleId, hasPharmacyDetails: !!pharmacyDetails });
 
     // Combine firstName and lastName if needed
     const fullName =
@@ -31,6 +38,8 @@ export const register = async (req, res, next) => {
       (firstName && lastName
         ? `${firstName} ${lastName}`
         : firstName || lastName);
+
+    logger.debug('AUTH', '[REGISTER] Full name resolved', { name: fullName });
 
     // Call the correct service method
     const result = await userService.registerUser({
@@ -40,7 +49,12 @@ export const register = async (req, res, next) => {
       phone,
       roleTypeId,
       roleId,
+      pharmacyDetails, // Pass pharmacy details to service
     });
+
+    const duration = Date.now() - startTime;
+    logger.timing('AUTH', 'register', duration, 'SUCCESS');
+    logger.operation('AUTH', 'register', 'SUCCESS', { userId: result.userId, email: result.email });
 
     res.status(200).json({
       success: true,
@@ -52,6 +66,8 @@ export const register = async (req, res, next) => {
       },
     });
   } catch (err) {
+    logger.error('AUTH', `[REGISTER] Failed: ${err.message}`, err);
+    logger.operation('AUTH', 'register', 'ERROR', { error: err.message });
     next(err);
   }
 };
@@ -59,11 +75,17 @@ export const register = async (req, res, next) => {
 // ---------------- VERIFY EMAIL ----------------
 export const verifyEmailOTP = async (req, res, next) => {
   try {
+    const startTime = Date.now();
+    logger.operation('AUTH', 'verifyEmailOTP', 'START', { email: req.body.email || req.body.userId });
+
     // Accept both 'email' and 'userId' (they contain the same value - the email address)
     const { email, userId, otp } = req.body;
     const emailAddress = email || userId;
 
+    logger.debug('AUTH', '[VERIFY_OTP] Input validation', { emailProvided: !!email, userIdProvided: !!userId, otpProvided: !!otp });
+
     if (!emailAddress || !otp) {
+      logger.warn('AUTH', '[VERIFY_OTP] Missing required fields', { emailAddress: !!emailAddress, otp: !!otp });
       return res.status(400).json({
         success: false,
         message: `Missing required fields. email/userId: ${
@@ -76,6 +98,8 @@ export const verifyEmailOTP = async (req, res, next) => {
       email: emailAddress,
       otp,
     });
+
+    logger.debug('AUTH', '[VERIFY_OTP] User verified successfully', { userId: user.id, email: user.email });
 
     // Get pharmacy status if user is pharmacy admin
     const pharmacyStatus = user.pharmacy?.verificationStatus || null;
@@ -90,6 +114,8 @@ export const verifyEmailOTP = async (req, res, next) => {
 
     await userService.saveRefreshToken(user.id, refreshToken);
 
+    logger.debug('AUTH', '[VERIFY_OTP] Tokens generated', { userId: user.id, hasPharmacy: !!user.pharmacy });
+
     res.cookie("access_token", accessToken, {
       ...COOKIE_OPTIONS,
       maxAge: 1000 * 60 * 15,
@@ -98,6 +124,10 @@ export const verifyEmailOTP = async (req, res, next) => {
       ...COOKIE_OPTIONS,
       maxAge: 1000 * 60 * 60 * 24 * 30,
     });
+
+    const duration = Date.now() - startTime;
+    logger.timing('AUTH', 'verifyEmailOTP', duration, 'SUCCESS');
+    logger.operation('AUTH', 'verifyEmailOTP', 'SUCCESS', { userId: user.id });
 
     res.status(201).json({
       success: true,
@@ -124,6 +154,8 @@ export const verifyEmailOTP = async (req, res, next) => {
       },
     });
   } catch (err) {
+    logger.error('AUTH', `[VERIFY_OTP] Failed: ${err.message}`, err);
+    logger.operation('AUTH', 'verifyEmailOTP', 'ERROR', { error: err.message });
     next(err);
   }
 };
@@ -131,15 +163,23 @@ export const verifyEmailOTP = async (req, res, next) => {
 // ---------------- LOGIN ----------------
 export const login = async (req, res, next) => {
   try {
+    const startTime = Date.now();
+    logger.operation('AUTH', 'login', 'START', { email: req.body.email });
+
     const { email, password } = req.body;
 
     // 1. VALIDATE INPUT
     if (!email || !password) {
+      logger.warn('AUTH', '[LOGIN] Missing email or password', { emailProvided: !!email, passwordProvided: !!password });
       throw new ValidationError("Email and password are required.");
     }
 
+    logger.debug('AUTH', '[LOGIN] Input validation passed', { email });
+
     // 2. AUTHENTICATE USER AND GET TOKENS
     const result = await userService.authenticateUser(email, password);
+
+    logger.debug('AUTH', '[LOGIN] Authentication successful', { userId: result.userId, email: result.email, roleId: result.roleId });
 
     // 3. SET SECURE COOKIES
     res.cookie("access_token", result.accessToken, {
@@ -150,6 +190,12 @@ export const login = async (req, res, next) => {
       ...COOKIE_OPTIONS,
       maxAge: 1000 * 60 * 60 * 24 * 30,
     });
+
+    logger.debug('AUTH', '[LOGIN] Cookies set', { userId: result.userId });
+
+    const duration = Date.now() - startTime;
+    logger.timing('AUTH', 'login', duration, 'SUCCESS');
+    logger.operation('AUTH', 'login', 'SUCCESS', { userId: result.userId, roleId: result.roleId });
 
     // 4. RETURN USER DATA
     res.status(200).json({
@@ -171,10 +217,12 @@ export const login = async (req, res, next) => {
   } catch (err) {
     // Check if error is due to unverified email
     if (err.message && err.message.includes("Email not verified")) {
+      logger.warn('AUTH', '[LOGIN] Email not verified', { email: req.body.email });
       const { email } = req.body;
       try {
         // Send OTP to unverified email
         await userService.resendOTP(email);
+        logger.debug('AUTH', '[LOGIN] OTP resent to unverified email', { email });
 
         // Return specific error so frontend knows to redirect to verify OTP
         return res.status(403).json({
@@ -184,6 +232,7 @@ export const login = async (req, res, next) => {
           email: email,
         });
       } catch (otpErr) {
+        logger.error('AUTH', `[LOGIN] Failed to resend OTP: ${otpErr.message}`, otpErr);
         // If OTP sending fails, return generic error
         return res.status(403).json({
           success: false,
@@ -194,6 +243,8 @@ export const login = async (req, res, next) => {
       }
     }
 
+    logger.error('AUTH', `[LOGIN] Failed: ${err.message}`, err);
+    logger.operation('AUTH', 'login', 'ERROR', { error: err.message });
     next(err);
   }
 };

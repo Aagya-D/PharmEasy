@@ -4,6 +4,7 @@
  */
 
 import pharmacyService from "./pharmacy.service.js";
+import logger from "../../utils/logger.js";
 
 /**
  * POST /api/pharmacy/onboard
@@ -13,11 +14,16 @@ import pharmacyService from "./pharmacy.service.js";
  */
 export const onboardPharmacy = async (req, res, next) => {
   try {
+    const startTime = Date.now();
     const userId = req.user.userId;
+    logger.operation('PHARMACY', 'onboardPharmacy', 'START', { userId, hasFile: !!req.file });
+
     const pharmacyData = req.body;
+    logger.debug('PHARMACY', '[ONBOARD] Pharmacy data received', { pharmacyName: pharmacyData.pharmacyName, licenseNumber: pharmacyData.licenseNumber });
 
     // If file was uploaded via Cloudinary, attach the URL
     if (req.file && req.file.path) {
+      logger.debug('PHARMACY', '[ONBOARD] File uploaded successfully', { fileName: req.file.originalname, cloudinaryUrl: req.file.path });
       pharmacyData.licenseDocument = req.file.path; // Cloudinary URL
       pharmacyData.licenseDocumentPublicId = req.file.filename; // Cloudinary public_id
     }
@@ -26,6 +32,10 @@ export const onboardPharmacy = async (req, res, next) => {
       userId,
       pharmacyData
     );
+
+    const duration = Date.now() - startTime;
+    logger.timing('PHARMACY', 'onboardPharmacy', duration, 'SUCCESS');
+    logger.operation('PHARMACY', 'onboardPharmacy', 'SUCCESS', { pharmacyId: pharmacy.id, userId });
 
     res.status(201).json({
       success: true,
@@ -38,6 +48,8 @@ export const onboardPharmacy = async (req, res, next) => {
       },
     });
   } catch (error) {
+    logger.error('PHARMACY', `[ONBOARD] Failed: ${error.message}`, error);
+    logger.operation('PHARMACY', 'onboardPharmacy', 'ERROR', { error: error.message });
     next(error);
   }
 };

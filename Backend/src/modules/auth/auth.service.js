@@ -31,6 +31,7 @@ import {
 import { generateOTP, generateSecureToken } from "../../utils/otp.js";
 import { sendOTPEmail, sendPasswordResetEmail } from "../../utils/email.js";
 import { AppError } from "../../middlewares/errorHandler.js";
+import logger from "../../utils/logger.js";
 
 // Constants
 const VALID_REGISTRATION_ROLES = [2, 3]; // Pharmacy Admin, Patient
@@ -42,6 +43,7 @@ const OTP_EXPIRE_SECONDS = Number(process.env.OTP_EXPIRY_MINUTES || 10) * 60;
  * ============================================
  * Create pending user record with hashed OTP
  * User is not yet in User table
+ * If pharmacyDetails provided (roleId=2), store temporarily for post-verification
  */
 export const register = async ({
   email,
@@ -50,86 +52,134 @@ export const register = async ({
   phone,
   roleTypeId,
   roleId,
+  pharmacyDetails, // NEW: Optional pharmacy data for Pharmacy Admin registration
 }) => {
-  // Accept either roleTypeId or roleId for backward compatibility
-  const role = roleTypeId || roleId;
+  try {
+    logger.operation('AUTH_SERVICE', 'register', 'START', { email, roleId, hasPharmacyDetails: !!pharmacyDetails });
 
-  // Validate and normalize all inputs
-  const emailResult = validateEmail(email);
-  if (!emailResult.valid) throw new AppError(emailResult.error, 400);
-  const normalizedEmail = emailResult.data;
+    // Accept either roleTypeId or roleId for backward compatibility
+    const role = roleTypeId || roleId;
 
-  const nameResult = validateName(name);
-  if (!nameResult.valid) throw new AppError(nameResult.error, 400);
-  const normalizedName = nameResult.data;
+    // Validate and normalize all inputs
+    logger.debug('AUTH_SERVICE', '[REGISTER] Validating email', { email });
+    const emailResult = validateEmail(email);
+    if (!emailResult.valid) {
+      logger.validation('AUTH_SERVICE', 'email', false, emailResult.error);
+      throw new AppError(emailResult.error, 400);
+    }
+    logger.validation('AUTH_SERVICE', 'email', true);
+    const normalizedEmail = emailResult.data;
 
-  const passwordResult = validatePassword(password);
-  if (!passwordResult.valid) throw new AppError(passwordResult.error, 400);
+    logger.debug('AUTH_SERVICE', '[REGISTER] Validating name', { name });
+    const nameResult = validateName(name);
+    if (!nameResult.valid) {
+      logger.validation('AUTH_SERVICE', 'name', false, nameResult.error);
+      throw new AppError(nameResult.error, 400);
+    }
+    logger.validation('AUTH_SERVICE', 'name', true);
+    const normalizedName = nameResult.data;
 
-  let normalizedPhone = phone;
-  if (phone) {
-    const phoneResult = validatePhone(phone);
-    if (!phoneResult.valid) throw new AppError(phoneResult.error, 400);
-    normalizedPhone = phoneResult.data;
-  }
+    logger.debug('AUTH_SERVICE', '[REGISTER] Validating password');
+    const passwordResult = validatePassword(password);
+    if (!passwordResult.valid) {
+      logger.validation('AUTH_SERVICE', 'password', false, passwordResult.error);
+      throw new AppError(passwordResult.error, 400);
+    }
+    logger.validation('AUTH_SERVICE', 'password', true);
 
-  // Validate role
-  if (!role || !VALID_REGISTRATION_ROLES.includes(role)) {
-    throw new AppError(
-      "Invalid role. Allowed roles: 2 (Pharmacy Admin), 3 (Patient)",
-      400
-    );
-  }
+    let normalizedPhone = phone;
+    if (phone) {
+      logger.debug('AUTH_SERVICE', '[REGISTER] Validating phone', { phone });
+      const phoneResult = validatePhone(phone);
+      if (!phoneResult.valid) {
+        logger.validation('AUTH_SERVICE', 'phone', false, phoneResult.error);
+        throw new AppError(phoneResult.error, 400);
+      }
+      logger.validation('AUTH_SERVICE', 'phone', true);
+      normalizedPhone = phoneResult.data;
+    }
 
-  // Check if email already registered and verified
-  const existingUser = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
-  });
-  if (existingUser && existingUser.isVerified) {
-    throw new AppError("Email already registered", 409);
-  }
+    // Validate role
+    logger.debug('AUTH_SERVICE', '[REGISTER] Validating role', { roleId: role, validRoles: [2, 3] });
+    if (!role || !VALID_REGISTRATION_ROLES.includes(role)) {
+      logger.validation('AUTH_SERVICE', 'roleId', false, 'Invalid role');
+      throw new AppError(
+        "Invalid role. Allowed roles: 2 (Pharmacy Admin), 3 (Patient)",
+        400
+      );
+    }
+    logger.validation('AUTH_SERVICE', 'roleId', true);
+    
+    // Validate pharmacy details if role is Pharmacy Admin
+    if (role === 2 && pharmacyDetails) {
+      logger.debug('AUTH_SERVICE', '[REGISTER] Validating pharmacy details', { pharmacyName: pharmacyDetails.pharmacyName, licenseNumber: pharmacyDetails.licenseNumber });
+      if (!pharmacyDetails.pharmacyName || !pharmacyDetails.licenseNumber || !pharmacyDetails.address || !pharmacyDetails.contactNumber) {
+        logger.validation('AUTH_SERVICE', 'pharmacyDetails', false, 'Missing required fields');
+        throw new AppError("Missing required pharmacy details (name, license, address, contact)", 400);
+      }
+      
+      // Check if license number already exists
+      logger.debug('AUTH_SERVICE', '[REGISTER] Checking license number uniqueness', { licenseNumber: pharmacyDetails.licenseNumber });
+      const existingLicense = await prisma.pharmacy.findUnique({
+        where: { licenseNumber: pharmacyDetails.licenseNumber.trim() },
+      });
+      if (existingLicense) {
+        logger.warn('AUTH_SERVICE', '[REGISTER] License number already registered', { licenseNumber: pharmacyDetails.licenseNumber });
+        throw new AppError("License number already registered", 409);
+      }
+      logger.validation('AUTH_SERVICE', 'license_uniqueness', true);
+    }
 
-  // Hash password and OTP
-  const hashedPassword = await hashPassword(password);
-  const otp = generateOTP();
-  const otpHash = hashToken(otp);
+    // Check if email already registered and verified
+    logger.debug('AUTH_SERVICE', '[REGISTER] Checking if email exists', { email: normalizedEmail });
+    const existingUser = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+    if (existingUser && existingUser.isVerified) {
+      logger.warn('AUTH_SERVICE', '[REGISTER] Email already registered and verified', { email: normalizedEmail });
+      throw new AppError("Email already registered", 409);
+    }
 
-  console.log(
-    `[REGISTER] Creating pending user for email: ${normalizedEmail}, roleId: ${role}`
-  );
+    // Hash password and OTP
+    logger.debug('AUTH_SERVICE', '[REGISTER] Hashing password and generating OTP');
+    const hashedPassword = await hashPassword(password);
+    const otp = generateOTP();
+    const otpHash = hashToken(otp);
+    logger.debug('AUTH_SERVICE', '[REGISTER] Password hashed, OTP generated', { otpLength: otp.length });
 
-  // If user exists but unverified, update; otherwise create
-  const user = await prisma.user.upsert({
-    where: { email: normalizedEmail },
-    create: {
-      email: normalizedEmail,
-      name: normalizedName,
-      password: hashedPassword,
-      phone: normalizedPhone,
-      roleId: role,
-      isVerified: false,
-      isActive: true,
-    },
-    update: {
-      name: normalizedName,
-      password: hashedPassword,
-      phone: normalizedPhone,
-      roleId: role,
-      isVerified: false,
-    },
-    include: { role: true },
-  });
+    logger.info('AUTH_SERVICE', `[REGISTER] Creating pending user for email: ${normalizedEmail}, roleId: ${role}`);
 
-  console.log(
-    `[REGISTER] User created/updated with ID: ${user.id}, email: ${normalizedEmail}`
-  );
+    // If user exists but unverified, update; otherwise create
+    const user = await prisma.user.upsert({
+      where: { email: normalizedEmail },
+      create: {
+        email: normalizedEmail,
+        name: normalizedName,
+        password: hashedPassword,
+        phone: normalizedPhone,
+        roleId: role,
+        isVerified: false,
+        isActive: true,
+      },
+      update: {
+        name: normalizedName,
+        password: hashedPassword,
+        phone: normalizedPhone,
+        roleId: role,
+        isVerified: false,
+      },
+      include: { role: true },
+    });
 
-  // ✅ Invalidate old OTPs for this user (prevent confusion from multiple registration attempts)
-  await prisma.oTPToken.updateMany({
-    where: {
-      userId: user.id,
-      isUsed: false,
-    },
+    logger.info('AUTH_SERVICE', `[REGISTER] User created/updated with ID: ${user.id}, email: ${normalizedEmail}`);
+
+    // ✅ Invalidate old OTPs for this user (prevent confusion from multiple registration attempts)
+    logger.debug('AUTH_SERVICE', '[REGISTER] Invalidating old OTP tokens', { userId: user.id });
+    await prisma.oTPToken.updateMany({
+      where: {
+        userId: user.id,
+        isUsed: false,
+      },
     data: {
       expiresAt: new Date(), // Expire them immediately
     },
@@ -148,11 +198,36 @@ export const register = async ({
   console.log(
     `[REGISTER] OTP token created for userId: ${user.id}, OTP expires in ${OTP_EXPIRE_SECONDS} seconds`
   );
+  
+  // Create pharmacy record if pharmacy details provided (roleId=2)
+  if (role === 2 && pharmacyDetails) {
+    try {
+      const pharmacy = await prisma.pharmacy.create({
+        data: {
+          userId: user.id,
+          pharmacyName: pharmacyDetails.pharmacyName.trim(),
+          address: pharmacyDetails.address.trim(),
+          latitude: pharmacyDetails.latitude || 0.0,
+          longitude: pharmacyDetails.longitude || 0.0,
+          licenseNumber: pharmacyDetails.licenseNumber.trim(),
+          contactNumber: pharmacyDetails.contactNumber.trim(),
+          verificationStatus: "PENDING_VERIFICATION",
+        },
+      });
+      console.log(`[REGISTER] Pharmacy created for userId: ${user.id}, pharmacyId: ${pharmacy.id}`);
+    } catch (err) {
+      console.error(`[REGISTER] Failed to create pharmacy: ${err.message}`);
+      // Don't fail registration if pharmacy creation fails
+      // User can still complete onboarding manually
+    }
+  }
 
   // Send OTP email (non-blocking)
   sendOTPEmail(normalizedEmail, otp, normalizedName).catch((err) =>
     console.error("Email send failed:", err)
   );
+
+  logger.operation('AUTH_SERVICE', 'register', 'SUCCESS', { userId: user.id, email: user.email });
 
   return {
     userId: user.id,
@@ -160,6 +235,11 @@ export const register = async ({
     role: user.role.name,
     message: "User registered. Check email for OTP.",
   };
+  } catch (err) {
+    logger.error('AUTH_SERVICE', `[REGISTER] Failed: ${err.message}`, err);
+    logger.operation('AUTH_SERVICE', 'register', 'ERROR', { error: err.message });
+    throw err;
+  }
 };
 
 /**
