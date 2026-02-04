@@ -26,6 +26,7 @@ export function Input({
   placeholder,
   value,
   onChange,
+  inputRef,
   error,
   disabled = false,
   required = false,
@@ -62,6 +63,7 @@ export function Input({
           placeholder={placeholder}
           value={value}
           onChange={onChange}
+          ref={inputRef}
           disabled={disabled}
           required={required}
           aria-invalid={hasError}
@@ -122,6 +124,7 @@ export function TextArea({
   placeholder,
   value,
   onChange,
+  inputRef,
   error,
   disabled = false,
   required = false,
@@ -150,6 +153,7 @@ export function TextArea({
         placeholder={placeholder}
         value={value}
         onChange={onChange}
+        ref={inputRef}
         disabled={disabled}
         required={required}
         rows={rows}

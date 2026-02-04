@@ -115,6 +115,8 @@ export const getAllPharmacies = async (req, res, next) => {
       filters.status = status;
     }
 
+    logger.debug("PHARMACY", "[ADMIN] Fetch pharmacies", { status, filters });
+
     const pharmacies = await pharmacyService.getAllPharmacies(filters);
 
     res.status(200).json({
