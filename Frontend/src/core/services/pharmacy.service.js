@@ -7,38 +7,43 @@ import httpClient from "./httpClient";
 
 /**
  * Create pharmacy onboarding
+ * Backend: POST /api/pharmacy/onboard
  */
 export const createPharmacy = async (pharmacyData) => {
-  const response = await httpClient.post("/pharmacy/register", pharmacyData);
+  const response = await httpClient.post("/pharmacy/onboard", pharmacyData);
   return response.data;
 };
 
 /**
  * Submit pharmacy onboarding (alias)
+ * Backend: POST /api/pharmacy/onboard
  */
 export const submitPharmacyOnboarding = async (pharmacyData) => {
-  const response = await httpClient.post("/pharmacy/register", pharmacyData);
+  const response = await httpClient.post("/pharmacy/onboard", pharmacyData);
   return response.data;
 };
 
 /**
- * Get pharmacy details
+ * Get pharmacy details (Admin endpoint)
+ * Backend: GET /api/admin/pharmacy/:id
  */
 export const getPharmacy = async (pharmacyId) => {
-  const response = await httpClient.get(`/pharmacy/${pharmacyId}`);
+  const response = await httpClient.get(`/admin/pharmacy/${pharmacyId}`);
   return response.data;
 };
 
 /**
- * Get pharmacy by ID (alias)
+ * Get pharmacy by ID (alias for getPharmacy)
+ * Backend: GET /api/admin/pharmacy/:id
  */
 export const getPharmacyById = async (pharmacyId) => {
-  const response = await httpClient.get(`/pharmacy/${pharmacyId}`);
+  const response = await httpClient.get(`/admin/pharmacy/${pharmacyId}`);
   return response.data;
 };
 
 /**
- * Get my pharmacy (current user)
+ * Get my pharmacy (current pharmacy user)
+ * Backend: GET /api/pharmacy/my-pharmacy
  */
 export const getMyPharmacy = async () => {
   const response = await httpClient.get("/pharmacy/my-pharmacy");
@@ -46,68 +51,74 @@ export const getMyPharmacy = async () => {
 };
 
 /**
- * Get all pharmacies
+ * Get all pharmacies (Admin endpoint)
+ * Backend: GET /api/admin/pharmacies
  */
 export const getAllPharmacies = async (filters) => {
-  const response = await httpClient.get("/pharmacy", { params: filters });
+  const response = await httpClient.get("/admin/pharmacies", { params: filters });
   return response.data;
 };
 
 /**
- * Get pending pharmacies
+ * Get pending pharmacies (Admin endpoint)
+ * Backend: GET /api/admin/pharmacies/pending
  */
 export const getPendingPharmacies = async () => {
-  const response = await httpClient.get("/pharmacy", { 
-    params: { status: "PENDING_VERIFICATION" } 
-  });
+  const response = await httpClient.get("/admin/pharmacies/pending");
   return response.data;
 };
 
 /**
- * Approve pharmacy
+ * Approve pharmacy (Admin endpoint)
+ * Backend: PATCH /api/admin/pharmacy/:id/verify
  */
 export const approvePharmacy = async (pharmacyId) => {
-  const response = await httpClient.post(`/pharmacy/${pharmacyId}/approve`);
+  const response = await httpClient.patch(`/admin/pharmacy/${pharmacyId}/verify`);
   return response.data;
 };
 
 /**
- * Reject pharmacy
+ * Reject pharmacy (Admin endpoint)
+ * Backend: PATCH /api/admin/pharmacy/:id/reject
  */
 export const rejectPharmacy = async (pharmacyId, reason) => {
-  const response = await httpClient.post(`/pharmacy/${pharmacyId}/reject`, { reason });
+  const response = await httpClient.patch(`/admin/pharmacy/${pharmacyId}/reject`, { reason });
   return response.data;
 };
 
 /**
- * Update pharmacy
+ * Update pharmacy status (Admin endpoint)
+ * Backend: PATCH /api/admin/pharmacy/:id/status
  */
 export const updatePharmacy = async (pharmacyId, pharmacyData) => {
-  const response = await httpClient.put(`/pharmacy/${pharmacyId}`, pharmacyData);
+  const response = await httpClient.patch(`/admin/pharmacy/${pharmacyId}/status`, pharmacyData);
   return response.data;
 };
 
 /**
- * Delete pharmacy
+ * Delete pharmacy (Not implemented in backend)
+ * TODO: Add backend endpoint if needed
  */
 export const deletePharmacy = async (pharmacyId) => {
-  const response = await httpClient.delete(`/pharmacy/${pharmacyId}`);
+  const response = await httpClient.delete(`/admin/pharmacy/${pharmacyId}`);
   return response.data;
 };
 
 /**
- * Search pharmacies
+ * Search pharmacies (Not implemented in backend)
+ * TODO: Add backend endpoint if needed
  */
 export const searchPharmacies = async (searchParams) => {
-  const response = await httpClient.get("/pharmacy/search", { params: searchParams });
+  const response = await httpClient.get("/admin/pharmacies", { params: searchParams });
   return response.data;
 };
 
 /**
- * Get pharmacy by user ID
+ * Get pharmacy by user ID (Not implemented in backend)
+ * TODO: Add backend endpoint if needed
  */
 export const getPharmacyByUserId = async (userId) => {
-  const response = await httpClient.get(`/pharmacy/user/${userId}`);
+  const response = await httpClient.get(`/admin/pharmacy/user/${userId}`);
   return response.data;
 };
 

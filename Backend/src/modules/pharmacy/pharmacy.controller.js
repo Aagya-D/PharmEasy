@@ -108,10 +108,10 @@ export const getPendingPharmacies = async (req, res, next) => {
  */
 export const getAllPharmacies = async (req, res, next) => {
   try {
-    const { status } = req.query;
+    const status = typeof req.query?.status === "string" ? req.query.status : undefined;
 
     const filters = {};
-    if (status) {
+    if (status && status !== "ALL") {
       filters.status = status;
     }
 
@@ -195,6 +195,7 @@ export const rejectPharmacy = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+
 };
 
 /**
