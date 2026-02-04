@@ -176,6 +176,7 @@ export const requireVerifiedPharmacy = async (req, res, next) => {
 
     // Attach pharmacy info to request for controller use
     req.pharmacy = user.pharmacy;
+    req.user.pharmacyId = user.pharmacy.id; // Add pharmacyId to user object for easy access
 
     next();
   } catch (error) {

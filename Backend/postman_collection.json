@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "PharmEasy Authentication API",
-    "description": "Complete authentication flow testing collection",
+    "name": "PharmEasy API Collection",
+    "description": "Complete API testing collection for PharmEasy - Authentication, Pharmacy Management, and Inventory CRUD",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -232,6 +232,122 @@
           "path": ["auth", "logout"]
         },
         "description": "Logout user and revoke all refresh tokens"
+      },
+      "response": []
+    },
+    {
+      "name": "11. Add Medicine to Inventory",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Cetamol 500mg\",\n  \"genericName\": \"Paracetamol\",\n  \"quantity\": 100,\n  \"price\": 5.99,\n  \"expiryDate\": \"2025-12-31\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/inventory",
+          "host": ["{{base_url}}"],
+          "path": ["inventory"]
+        },
+        "description": "Add new medicine to pharmacy inventory. Requires verified pharmacy. Includes duplicate checking."
+      },
+      "response": []
+    },
+    {
+      "name": "12. Get My Inventory",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/inventory/my-stock?page=1&limit=20",
+          "host": ["{{base_url}}"],
+          "path": ["inventory", "my-stock"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1",
+              "description": "Page number (default: 1)"
+            },
+            {
+              "key": "limit",
+              "value": "20",
+              "description": "Items per page (default: 20, max: 100)"
+            }
+          ]
+        },
+        "description": "Get authenticated pharmacy's inventory with pagination. Items ordered by expiry date."
+      },
+      "response": []
+    },
+    {
+      "name": "13. Update Inventory Item",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"quantity\": 150,\n  \"price\": 6.99\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/inventory/:id",
+          "host": ["{{base_url}}"],
+          "path": ["inventory", ":id"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "inventory_item_id"
+            }
+          ]
+        },
+        "description": "Update inventory item. Can update: name, genericName, quantity, price, expiryDate. Validates ownership."
+      },
+      "response": []
+    },
+    {
+      "name": "14. Delete Inventory Item",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/inventory/:id",
+          "host": ["{{base_url}}"],
+          "path": ["inventory", ":id"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "inventory_item_id"
+            }
+          ]
+        },
+        "description": "Permanently delete inventory item from pharmacy. Validates ownership."
       },
       "response": []
     }

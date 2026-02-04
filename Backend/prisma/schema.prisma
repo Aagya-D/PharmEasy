@@ -175,10 +175,41 @@ model Pharmacy {
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
   user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inventory          Inventory[]
 
   @@index([userId])
   @@index([verificationStatus])
   @@index([licenseNumber])
+}
+
+/// *
+/// * Inventory Model - Medicine/Drug inventory management
+/// * 
+/// * Represents individual medicine items in a pharmacy's stock
+/// * Each pharmacy maintains its own inventory of medicines
+/// * 
+/// * Fields:
+/// * - name: Brand/product name (e.g., "Cetamol 500mg")
+/// * - genericName: Generic drug name (e.g., "Paracetamol")
+/// * - quantity: Real-time stock count
+/// * - price: Unit price per medicine
+/// * - expiryDate: Expiration date for batch tracking
+/// * - pharmacyId: Links medicine to specific pharmacy
+model Inventory {
+  id          String   @id @default(uuid())
+  name        String
+  genericName String
+  quantity    Int
+  price       Float
+  expiryDate  DateTime
+  pharmacyId  String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  pharmacy    Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId])
+  @@index([genericName])
+  @@index([expiryDate])
 }
 
 enum RoleType {

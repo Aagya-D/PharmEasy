@@ -15,6 +15,7 @@ import logger from "./utils/logger.js";
 import validateEnvironment from "./utils/validateEnv.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import pharmacyRoutes from "./modules/pharmacy/pharmacy.routes.js";
+import inventoryRoutes from "./modules/inventory/inventory.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 
 // ES Module __dirname workaround
@@ -112,6 +113,10 @@ app.use("/api/auth", authRoutes);
 // Pharmacy routes (onboarding, pharmacy management & admin verification)
 // Routes include: /pharmacy/onboard, /pharmacy/my-pharmacy, /admin/pharmacies, /admin/pharmacy/:id, etc.
 app.use("/api", pharmacyRoutes);
+
+// Inventory routes (medicine CRUD for verified pharmacies)
+// Routes include: /inventory, /inventory/my-stock, /inventory/:id
+app.use("/api", inventoryRoutes);
 
 // NOTE: Admin routes from admin.routes.js are now consolidated in pharmacy.routes.js
 // Keeping adminRoutes import for backward compatibility but no longer mounting it

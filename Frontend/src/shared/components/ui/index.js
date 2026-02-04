@@ -6,6 +6,7 @@
 // Core Interactive Components
 export { Button } from "./Button";
 export { Input, TextArea } from "./Input";
+export { default as Modal } from "./Modal";
 
 // Feedback Components
 export { Alert } from "./Alert";
