@@ -47,6 +47,7 @@ import AdminSettings from "../features/admin/pages/AdminSettings";
 // Layouts & Components
 import ProtectedRoute from "./ProtectedRoute";
 import Layout from "../shared/layouts/Layout";
+import DashboardLayout from "../shared/layouts/DashboardLayout";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
 
 // Unauthorized page component
@@ -287,9 +288,9 @@ export const routes = [
     path: "/pharmacy",
     element: (
       <ProtectedRoute allowedRoles={['PHARMACY']}>
-        <Layout>
+        <DashboardLayout>
           <Outlet />
-        </Layout>
+        </DashboardLayout>
       </ProtectedRoute>
     ),
     children: [

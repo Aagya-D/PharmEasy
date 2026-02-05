@@ -1,41 +1,24 @@
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../../context/AuthContext";
-import { ArrowRight, LogIn } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 /**
  * Hero Section - Primary Landing Page Entry Point
  * 
  * Architecture Rules:
- * 1. PRIMARY ACTION: Large "Get Started" button
- *    - Guest users → Redirect to /register
- *    - Logged-in users → Redirect to /dashboard (role-specific home)
+ * 1. ALWAYS PUBLIC: This page shows the same for everyone
+ *    - No login detection
+ *    - No auth-specific UI
+ *    - Clean, professional landing page
  * 
- * 2. SECONDARY ACTION (Guests Only): "Sign In" button
- *    - Only visible when user is NOT logged in
+ * 2. PRIMARY ACTION: "Get Started" button
  *    - Redirects to /login
+ *    - Login page handles auth logic and role-based routing
  * 
- * 3. LOGGED-IN STATE:
- *    - "Get Started" button changes to "Go to Dashboard"
- *    - No "Sign In" button shown
+ * 3. SECONDARY ACTION: "Learn More" button
+ *    - Scrolls to features section
  */
 export function HeroSection() {
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
-
-  // PRIMARY ACTION: Get Started / Go to Dashboard
-  const handlePrimaryAction = () => {
-    if (isAuthenticated) {
-      // Logged-in user: Redirect to their role-specific dashboard
-      navigate("/dashboard");
-    } else {
-      // Guest: Redirect to Sign Up page
-      navigate("/register");
-    }
-  };
-
-  // Get button text based on authentication state
-  const primaryButtonText = isAuthenticated ? "Go to Dashboard" : "Get Started";
-  const primaryButtonIcon = isAuthenticated ? null : <ArrowRight size={20} />;
 
   return (
     <section className="px-6 py-20 min-h-[90vh] flex items-center bg-gradient-to-br from-blue-50 to-white">
@@ -66,32 +49,28 @@ export function HeroSection() {
 
           {/* Action Buttons */}
           <div className="flex gap-4 flex-wrap items-center">
-            {/* PRIMARY ACTION: Get Started / Go to Dashboard */}
+            {/* PRIMARY ACTION: Get Started */}
             <button
-              onClick={handlePrimaryAction}
+              onClick={() => navigate("/login")}
               className="flex items-center gap-2 px-8 py-4 bg-blue-600 text-white rounded-lg text-lg font-semibold shadow-lg hover:bg-blue-700 hover:-translate-y-1 hover:shadow-xl transition-all duration-300"
             >
-              <span>{primaryButtonText}</span>
-              {primaryButtonIcon}
+              <span>Get Started</span>
+              <ArrowRight size={20} />
             </button>
 
-            {/* SECONDARY ACTION: Sign In (Guests Only) */}
-            {!isAuthenticated && (
-              <button
-                onClick={() => navigate("/login")}
-                className="flex items-center gap-2 px-8 py-4 bg-transparent text-blue-600 border-2 border-blue-600 rounded-lg text-lg font-semibold hover:bg-blue-50 hover:-translate-y-0.5 transition-all duration-300"
-              >
-                <LogIn size={20} />
-                <span>Sign In</span>
-              </button>
-            )}
-
-            {/* Logged-in User Info */}
-            {isAuthenticated && (
-              <div className="px-5 py-3 bg-green-50 text-green-700 rounded-lg text-sm font-medium border border-green-200">
-                ✓ Logged in as {user?.name || "User"}
-              </div>
-            )}
+            {/* SECONDARY ACTION: Learn More */}
+            <button
+              onClick={() => {
+                // Scroll to features section or navigate to docs
+                const featuresSection = document.getElementById('features');
+                if (featuresSection) {
+                  featuresSection.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
+              className="flex items-center gap-2 px-8 py-4 bg-transparent text-blue-600 border-2 border-blue-600 rounded-lg text-lg font-semibold hover:bg-blue-50 hover:-translate-y-0.5 transition-all duration-300"
+            >
+              <span>Learn More</span>
+            </button>
           </div>
         </div>
 
