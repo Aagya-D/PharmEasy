@@ -24,30 +24,25 @@ export const getDashboardPath = (user) => {
 
   // Pharmacy Admin
   if (roleId === ROLE_IDS.PHARMACY) {
-    // Not onboarded yet
-    if (!user.pharmacy) {
-      return "/pharmacy/onboard";
+    const status = user.status;
+
+    if (status === "ONBOARDING_REQUIRED") {
+      return "/pharmacy/onboarding";
     }
 
-    const status = user.pharmacy.verificationStatus;
-
-    // Pending verification
-    if (status === "PENDING_VERIFICATION") {
-      return "/pharmacy/pending-approval";
+    if (status === "PENDING") {
+      return "/pharmacy/waiting-approval";
     }
 
-    // Rejected - back to onboarding
     if (status === "REJECTED") {
-      return "/pharmacy/onboard";
+      return "/pharmacy/application-rejected";
     }
 
-    // Verified - show dashboard
-    if (status === "VERIFIED") {
+    if (status === "APPROVED") {
       return "/pharmacy/dashboard";
     }
 
-    // Default fallback
-    return "/pharmacy/onboard";
+    return "/pharmacy/onboarding";
   }
 
   // Patient

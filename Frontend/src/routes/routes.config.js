@@ -98,15 +98,21 @@ export const patientRoutes = [
 // Protected Routes - Pharmacy (roleId: 2)
 export const pharmacyRoutes = [
   {
-    path: "/pharmacy/onboard",
+    path: "/pharmacy/onboarding",
     name: "Pharmacy Onboarding",
     component: "features/pharmacy/pages/PharmacyOnboarding",
     roleId: 2,
   },
   {
-    path: "/pharmacy/pending-approval",
-    name: "Pending Approval",
-    component: "features/pharmacy/pages/PharmacyPendingApproval",
+    path: "/pharmacy/waiting-approval",
+    name: "Waiting Approval",
+    component: "features/pharmacy/pages/WaitingApproval",
+    roleId: 2,
+  },
+  {
+    path: "/pharmacy/application-rejected",
+    name: "Application Rejected",
+    component: "features/pharmacy/pages/ApplicationRejected",
     roleId: 2,
   },
   {

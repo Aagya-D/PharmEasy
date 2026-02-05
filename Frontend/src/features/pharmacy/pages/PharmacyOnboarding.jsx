@@ -13,7 +13,7 @@ const PHONE_REGEX = /^[+]?\d{7,15}$/;
 
 const PharmacyOnboarding = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
 
   const [licensePreview, setLicensePreview] = useState(null);
   const [licenseFile, setLicenseFile] = useState(null);
@@ -193,7 +193,10 @@ const PharmacyOnboarding = () => {
       const response = await submitPharmacyOnboarding(formData);
 
       if (response?.success) {
-        navigate("/pharmacy/pending-approval", { state: { pharmacy: response.data } });
+        if (user) {
+          updateUser({ ...user, status: "PENDING" });
+        }
+        navigate("/pharmacy/waiting-approval", { state: { pharmacy: response.data } });
         return;
       }
 

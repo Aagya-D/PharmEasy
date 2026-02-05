@@ -169,7 +169,9 @@ class StateAuditor {
   auditNavigation(from, to, user) {
     const protectedRoutes = {
       "/admin": { requiresRole: 1 },
-      "/pharmacy/onboard": { requiresRole: 2 },
+      "/pharmacy/onboarding": { requiresRole: 2 },
+      "/pharmacy/waiting-approval": { requiresRole: 2 },
+      "/pharmacy/application-rejected": { requiresRole: 2 },
       "/pharmacy/dashboard": { requiresRole: 2, requiresVerified: true },
       "/patient/portal": { requiresRole: 3 },
     };
@@ -199,11 +201,11 @@ class StateAuditor {
       return false;
     }
 
-    if (routeConfig.requiresVerified && !user.pharmacy?.verificationStatus) {
+    if (routeConfig.requiresVerified && user.status !== "APPROVED") {
       this.recordViolation("NAVIGATION_VERIFICATION_REQUIRED", {
         from,
         to,
-        pharmacyStatus: user.pharmacy?.verificationStatus,
+        pharmacyStatus: user.status,
       });
       return false;
     }

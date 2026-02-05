@@ -41,14 +41,6 @@ export function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [passwordErrors, setPasswordErrors] = useState([]);
-  
-  // Pharmacy-specific fields (shown when roleId === 2)
-  const [pharmacyName, setPharmacyName] = useState("");
-  const [licenseNumber, setLicenseNumber] = useState("");
-  const [address, setAddress] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
-  const [contactNumber, setContactNumber] = useState("");
 
   // Validate password
   const validatePassword = (pwd) => {
@@ -92,25 +84,6 @@ export function Register() {
       return;
     }
 
-    // Pharmacy-specific validation
-    if (selectedRole === 2) {
-      if (!pharmacyName.trim() || !licenseNumber.trim() || !address.trim() || !contactNumber.trim()) {
-        setError("Please fill in all pharmacy details (Name, License, Address, Contact)");
-        return;
-      }
-      
-      // Validate latitude/longitude if provided
-      if (latitude && (isNaN(parseFloat(latitude)) || parseFloat(latitude) < -90 || parseFloat(latitude) > 90)) {
-        setError("Latitude must be a number between -90 and 90");
-        return;
-      }
-      
-      if (longitude && (isNaN(parseFloat(longitude)) || parseFloat(longitude) < -180 || parseFloat(longitude) > 180)) {
-        setError("Longitude must be a number between -180 and 180");
-        return;
-      }
-    }
-
     if (passwordErrors.length > 0) {
       setError("Password does not meet requirements");
       return;
@@ -136,18 +109,6 @@ export function Register() {
         password,
         roleId: selectedRole,
       };
-      
-      // Add pharmacy details if registering as pharmacy admin
-      if (selectedRole === 2) {
-        registrationData.pharmacyDetails = {
-          pharmacyName: pharmacyName.trim(),
-          licenseNumber: licenseNumber.trim(),
-          address: address.trim(),
-          contactNumber: contactNumber.trim(),
-          latitude: latitude ? parseFloat(latitude) : null,
-          longitude: longitude ? parseFloat(longitude) : null,
-        };
-      }
 
       const result = await register(registrationData);
 
@@ -277,74 +238,6 @@ export function Register() {
             ))}
           </div>
         </div>
-
-        {/* Pharmacy-Specific Fields (Only shown when Pharmacy Admin is selected) */}
-        {selectedRole === 2 && (
-          <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h3 className="text-sm font-semibold text-blue-900 mb-2">
-              📋 Pharmacy Details
-            </h3>
-            
-            <Input
-              label="Pharmacy Name"
-              placeholder="e.g., City Health Pharmacy"
-              value={pharmacyName}
-              onChange={(e) => setPharmacyName(e.target.value)}
-              disabled={isLoading}
-              required
-            />
-            
-            <Input
-              label="License Number"
-              placeholder="e.g., PH-2024-12345"
-              value={licenseNumber}
-              onChange={(e) => setLicenseNumber(e.target.value)}
-              disabled={isLoading}
-              required
-            />
-            
-            <Input
-              label="Address"
-              placeholder="Full pharmacy address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              disabled={isLoading}
-              required
-            />
-            
-            <Input
-              label="Contact Number"
-              placeholder="+1234567890"
-              value={contactNumber}
-              onChange={(e) => setContactNumber(e.target.value)}
-              disabled={isLoading}
-              required
-            />
-            
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Latitude (Optional)"
-                placeholder="e.g., 40.7128"
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                disabled={isLoading}
-                hint="Enter latitude coordinate (-90 to 90)"
-              />
-              <Input
-                label="Longitude (Optional)"
-                placeholder="e.g., -74.0060"
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                disabled={isLoading}
-                hint="Enter longitude coordinate (-180 to 180)"
-              />
-            </div>
-            
-            <p className="text-xs text-slate-600 mt-2">
-              ℹ️ Your pharmacy will be submitted for admin verification after registration.
-            </p>
-          </div>
-        )}
 
         {/* Submit Button */}
         <Button

@@ -87,7 +87,7 @@ export const register = async ({
     }
     logger.validation('AUTH_SERVICE', 'password', true);
 
-    let normalizedPhone = phone;
+    let normalizedPhone = phone || null;
     if (phone) {
       logger.debug('AUTH_SERVICE', '[REGISTER] Validating phone', { phone });
       const phoneResult = validatePhone(phone);
@@ -156,16 +156,18 @@ export const register = async ({
         email: normalizedEmail,
         name: normalizedName,
         password: hashedPassword,
-        phone: normalizedPhone,
+        ...(normalizedPhone && { phone: normalizedPhone }),
         roleId: role,
+        status: role === 2 ? "ONBOARDING_REQUIRED" : "APPROVED", // ✅ Pharmacy users need onboarding
         isVerified: false,
         isActive: true,
       },
       update: {
         name: normalizedName,
         password: hashedPassword,
-        phone: normalizedPhone,
+        ...(normalizedPhone && { phone: normalizedPhone }),
         roleId: role,
+        status: role === 2 ? "ONBOARDING_REQUIRED" : "APPROVED", // ✅ Update status on re-register
         isVerified: false,
       },
       include: { role: true },
@@ -502,6 +504,7 @@ export const login = async (
     name: user.name,
     role: user.role.name,
     roleId: user.roleId,
+    status: user.status, // ✅ Include user status for approval workflow
     pharmacy: user.pharmacy ? {
       id: user.pharmacy.id,
       pharmacyName: user.pharmacy.pharmacyName,

@@ -1,5 +1,5 @@
 import React from "react";
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import LoadingSpinner from "../shared/components/ui/LoadingSpinner";
 
@@ -27,7 +27,8 @@ import PrescriptionsPage from "../features/patient/pages/Prescriptions/Prescript
 // Pharmacy Pages
 import PharmacyDashboard from "../features/pharmacy/pages/PharmacyDashboard";
 import PharmacyOnboarding from "../features/pharmacy/pages/PharmacyOnboarding";
-import PharmacyPendingApproval from "../features/pharmacy/pages/PharmacyPendingApproval";
+import WaitingApproval from "../features/pharmacy/pages/WaitingApproval";
+import ApplicationRejected from "../features/pharmacy/pages/ApplicationRejected";
 import PharmacyInventory from "../features/pharmacy/pages/PharmacyInventory";
 import PharmacyOrders from "../features/pharmacy/pages/PharmacyOrders";
 import PharmacySOSRequests from "../features/pharmacy/pages/PharmacySOSRequests";
@@ -47,7 +48,7 @@ import AdminSettings from "../features/admin/pages/AdminSettings";
 // Layouts & Components
 import ProtectedRoute from "./ProtectedRoute";
 import Layout from "../shared/layouts/Layout";
-import DashboardLayout from "../shared/layouts/DashboardLayout";
+import ProtectedPharmacyLayout from "../shared/layouts/ProtectedPharmacyLayout";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
 
 // Unauthorized page component
@@ -101,20 +102,25 @@ function Dashboard() {
     // System Admin -> Admin Dashboard
     return <Navigate to="/admin/dashboard" replace />;
   } else if (user?.roleId === 2) {
-    // Pharmacy Admin -> Check onboarding status
-    if (!user.pharmacy) {
-      // Not onboarded yet
-      return <Navigate to="/pharmacy/onboard" replace />;
-    } else if (user.pharmacy.verificationStatus === "PENDING_VERIFICATION") {
-      // Pending approval
-      return <Navigate to="/pharmacy/pending-approval" replace />;
-    } else if (user.pharmacy.verificationStatus === "VERIFIED") {
-      // Verified -> Pharmacy Dashboard
+    // Pharmacy Admin -> Status-based routing
+    const status = user?.status;
+
+    // Check user status first (new workflow)
+    if (status === "ONBOARDING_REQUIRED") {
+      // New user needs to complete onboarding form
+      return <Navigate to="/pharmacy/onboarding" replace />;
+    } else if (status === "PENDING") {
+      // Onboarding submitted, awaiting admin approval
+      return <Navigate to="/pharmacy/waiting-approval" replace />;
+    } else if (status === "REJECTED") {
+      // Admin rejected the application
+      return <Navigate to="/pharmacy/application-rejected" replace />;
+    } else if (status === "APPROVED") {
+      // Approved -> Can access pharmacy dashboard
       return <Navigate to="/pharmacy/dashboard" replace />;
-    } else if (user.pharmacy.verificationStatus === "REJECTED") {
-      // Rejected -> Show onboarding page with rejection message
-      return <Navigate to="/pharmacy/onboard" replace />;
     }
+
+    return <Navigate to="/pharmacy/onboarding" replace />;
   } else if (user?.roleId === 3) {
     // Patient -> Patient Portal
     return <Navigate to="/patient" replace />;
@@ -160,6 +166,53 @@ function PublicRoute({ children }) {
   }
 
   return children;
+}
+
+// Pharmacy status gatekeeper (routes enforced by user.status)
+function PharmacyStatusGate() {
+  const { user } = useAuth();
+  const location = useLocation();
+
+  if (!user || user?.roleId !== 2) {
+    return <Outlet />;
+  }
+
+  const status = user?.status;
+  const currentPath = location.pathname;
+
+  const statusRoutes = {
+    ONBOARDING_REQUIRED: ["/pharmacy/onboarding"],
+    PENDING: ["/pharmacy/waiting-approval"],
+    REJECTED: ["/pharmacy/application-rejected"],
+    APPROVED: [
+      "/pharmacy/dashboard",
+      "/pharmacy/inventory",
+      "/pharmacy/orders",
+      "/pharmacy/sos-requests",
+      "/pharmacy/customers",
+      "/pharmacy/analytics",
+      "/pharmacy/reports",
+      "/pharmacy/settings",
+    ],
+  };
+
+  const allowedPaths = statusRoutes[status] || [];
+  const isAllowed = allowedPaths.some((path) => currentPath.startsWith(path));
+
+  if (!status || !isAllowed) {
+    if (status === "PENDING") {
+      return <Navigate to="/pharmacy/waiting-approval" replace />;
+    }
+    if (status === "REJECTED") {
+      return <Navigate to="/pharmacy/application-rejected" replace />;
+    }
+    if (status === "APPROVED") {
+      return <Navigate to="/pharmacy/dashboard" replace />;
+    }
+    return <Navigate to="/pharmacy/onboarding" replace />;
+  }
+
+  return <Outlet />;
 }
 
 /**
@@ -288,50 +341,12 @@ export const routes = [
     path: "/pharmacy",
     element: (
       <ProtectedRoute allowedRoles={['PHARMACY']}>
-        <DashboardLayout>
-          <Outlet />
-        </DashboardLayout>
+        <PharmacyStatusGate />
       </ProtectedRoute>
     ),
     children: [
       {
-        path: "dashboard",
-        element: (
-          <ErrorBoundary errorMessage="Failed to load pharmacy dashboard. Please refresh the page.">
-            <PharmacyDashboard />
-          </ErrorBoundary>
-        ),
-      },
-      {
-        path: "inventory",
-        element: <PharmacyInventory />,
-      },
-      {
-        path: "orders",
-        element: <PharmacyOrders />,
-      },
-      {
-        path: "sos-requests",
-        element: <PharmacySOSRequests />,
-      },
-      {
-        path: "customers",
-        element: <PharmacyCustomers />,
-      },
-      {
-        path: "analytics",
-        element: <PharmacyAnalytics />,
-      },
-      {
-        path: "reports",
-        element: <PharmacyReports />,
-      },
-      {
-        path: "settings",
-        element: <PharmacySettings />,
-      },
-      {
-        path: "onboard",
+        path: "onboarding",
         element: (
           <ErrorBoundary errorMessage="Failed to load pharmacy onboarding. Please refresh the page or contact support.">
             <PharmacyOnboarding />
@@ -339,12 +354,65 @@ export const routes = [
         ),
       },
       {
-        path: "pending-approval",
+        path: "waiting-approval",
         element: (
           <ErrorBoundary errorMessage="Failed to load approval status. Please refresh the page.">
-            <PharmacyPendingApproval />
+            <WaitingApproval />
           </ErrorBoundary>
         ),
+      },
+      {
+        path: "application-rejected",
+        element: (
+          <ErrorBoundary errorMessage="Failed to load rejection notice. Please refresh the page.">
+            <ApplicationRejected />
+          </ErrorBoundary>
+        ),
+      },
+      {
+        element: (
+          <ProtectedPharmacyLayout>
+            <Outlet />
+          </ProtectedPharmacyLayout>
+        ),
+        children: [
+          {
+            path: "dashboard",
+            element: (
+              <ErrorBoundary errorMessage="Failed to load pharmacy dashboard. Please refresh the page.">
+                <PharmacyDashboard />
+              </ErrorBoundary>
+            ),
+          },
+          {
+            path: "inventory",
+            element: <PharmacyInventory />,
+          },
+          {
+            path: "orders",
+            element: <PharmacyOrders />,
+          },
+          {
+            path: "sos-requests",
+            element: <PharmacySOSRequests />,
+          },
+          {
+            path: "customers",
+            element: <PharmacyCustomers />,
+          },
+          {
+            path: "analytics",
+            element: <PharmacyAnalytics />,
+          },
+          {
+            path: "reports",
+            element: <PharmacyReports />,
+          },
+          {
+            path: "settings",
+            element: <PharmacySettings />,
+          },
+        ],
       },
     ],
   },

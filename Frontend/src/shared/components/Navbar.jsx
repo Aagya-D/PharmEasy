@@ -39,10 +39,13 @@ const NAV_CONFIG = {
       { name: "Notifications", path: "/notifications", icon: Bell },
     ],
     pending: [
-      { name: "Onboarding Status", path: "/pharmacy/pending-approval", icon: Shield },
+      { name: "Application Status", path: "/pharmacy/waiting-approval", icon: Shield },
     ],
     onboarding: [
-      { name: "Complete Onboarding", path: "/pharmacy/onboard", icon: FileText },
+      { name: "Complete Onboarding", path: "/pharmacy/onboarding", icon: FileText },
+    ],
+    rejected: [
+      { name: "Application Rejected", path: "/pharmacy/application-rejected", icon: Shield },
     ],
   },
   [ROLE_IDS.ADMIN]: [
@@ -94,29 +97,20 @@ export function Navbar() {
 
     // Pharmacy - check approval status
     if (roleId === ROLE_IDS.PHARMACY) {
-      // Not onboarded yet
-      if (!user.pharmacy) {
-        return NAV_CONFIG[ROLE_IDS.PHARMACY].onboarding;
-      }
-      
-      const status = user.pharmacy.verificationStatus;
-      
-      // Pending or Rejected - show onboarding/status link
-      if (status === "PENDING_VERIFICATION") {
-        return NAV_CONFIG[ROLE_IDS.PHARMACY].pending;
-      }
-      
-      // Rejected - show onboarding link
-      if (status === "REJECTED") {
-        return NAV_CONFIG[ROLE_IDS.PHARMACY].onboarding;
-      }
-      
-      // Verified - show full dashboard
-      if (status === "VERIFIED") {
+      const status = user.status;
+
+      if (status === "APPROVED") {
         return NAV_CONFIG[ROLE_IDS.PHARMACY].approved;
       }
-      
-      // Default fallback
+
+      if (status === "PENDING") {
+        return NAV_CONFIG[ROLE_IDS.PHARMACY].pending;
+      }
+
+      if (status === "REJECTED") {
+        return NAV_CONFIG[ROLE_IDS.PHARMACY].rejected;
+      }
+
       return NAV_CONFIG[ROLE_IDS.PHARMACY].onboarding;
     }
 
@@ -135,9 +129,18 @@ export function Navbar() {
     return null;
   }
 
-  // Don't render navbar until session is restored
-  if (isSessionRestoring) {
-    return null;
+  // Hide Navbar on pharmacy dashboard routes (Sidebar handles navigation there)
+  const isDashboardRoute = location.pathname.startsWith('/pharmacy/dashboard') ||
+    location.pathname.startsWith('/pharmacy/inventory') ||
+    location.pathname.startsWith('/pharmacy/orders') ||
+    location.pathname.startsWith('/pharmacy/sos-requests') ||
+    location.pathname.startsWith('/pharmacy/customers') ||
+    location.pathname.startsWith('/pharmacy/analytics') ||
+    location.pathname.startsWith('/pharmacy/reports') ||
+    location.pathname.startsWith('/pharmacy/settings');
+
+  if (isDashboardRoute && user?.roleId === 2 && user?.status === 'APPROVED') {
+    return null; // Sidebar handles navigation for approved pharmacy users
   }
 
   return (

@@ -30,7 +30,8 @@ export const PAGE_STRUCTURE = {
   pharmacy: {
     PharmacyDashboard: "/pages/pharmacy/PharmacyDashboard.jsx",
     PharmacyOnboarding: "/pages/pharmacy/PharmacyOnboarding.jsx",
-    PharmacyPendingApproval: "/pages/pharmacy/PharmacyPendingApproval.jsx",
+    WaitingApproval: "/pages/pharmacy/WaitingApproval.jsx",
+    ApplicationRejected: "/pages/pharmacy/ApplicationRejected.jsx",
   },
 
   // Admin Pages (roleId = 1)
@@ -47,7 +48,9 @@ export const ROLE_PAGES = {
 
 export const ACCESS_RULES = {
   "/admin/*": { requiresRole: 1, requiresAuth: true },
-  "/pharmacy/onboard": { requiresRole: 2, requiresAuth: true },
+  "/pharmacy/onboarding": { requiresRole: 2, requiresAuth: true },
+  "/pharmacy/waiting-approval": { requiresRole: 2, requiresAuth: true },
+  "/pharmacy/application-rejected": { requiresRole: 2, requiresAuth: true },
   "/pharmacy/dashboard": {
     requiresRole: 2,
     requiresAuth: true,

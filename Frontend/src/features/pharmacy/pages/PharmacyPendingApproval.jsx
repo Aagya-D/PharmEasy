@@ -13,7 +13,7 @@ const PharmacyPendingApproval = () => {
         <div className="max-w-[800px] mx-auto p-6 text-center">
           <p>No pharmacy data found.</p>
           <button
-            onClick={() => navigate("/pharmacy/onboard")}
+            onClick={() => navigate("/pharmacy/onboarding")}
             className="mt-4 px-6 py-2 bg-[var(--color-primary)] text-white border-none rounded-lg cursor-pointer"
           >
             Go to Onboarding

@@ -109,31 +109,44 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
   }
 
   // Create pharmacy record with PENDING_VERIFICATION status
-  const pharmacy = await prisma.pharmacy.create({
-    data: {
-      userId,
-      pharmacyName: pharmacyName.trim(),
-      address: address.trim(),
-      latitude: latitude !== null ? latitude : 0.0,
-      longitude: longitude !== null ? longitude : 0.0,
-      licenseNumber: licenseNumber.trim(),
-      licenseDocument: licenseDocument || null,
-      contactNumber: contactNumber.trim(),
-      verificationStatus: "PENDING_VERIFICATION",
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          email: true,
-          name: true,
+  // Also update user status from ONBOARDING_REQUIRED to PENDING
+  const pharmacy = await prisma.$transaction(async (tx) => {
+    // Update user status to PENDING (awaiting admin approval)
+    await tx.user.update({
+      where: { id: userId },
+      data: { status: "PENDING" },
+    });
+
+    // Create pharmacy record
+    const newPharmacy = await tx.pharmacy.create({
+      data: {
+        userId,
+        pharmacyName: pharmacyName.trim(),
+        address: address.trim(),
+        latitude: latitude !== null ? latitude : 0.0,
+        longitude: longitude !== null ? longitude : 0.0,
+        licenseNumber: licenseNumber.trim(),
+        licenseDocument: licenseDocument || null,
+        contactNumber: contactNumber.trim(),
+        verificationStatus: "PENDING_VERIFICATION",
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            status: true,
+          },
         },
       },
-    },
+    });
+
+    return newPharmacy;
   });
 
   console.log(
-    `[PHARMACY] Onboarding submitted for userId: ${userId}, pharmacyId: ${pharmacy.id}`
+    `[PHARMACY] Onboarding submitted for userId: ${userId}, pharmacyId: ${pharmacy.id}, user status updated to PENDING`
   );
 
   return pharmacy;
@@ -265,29 +278,41 @@ export const verifyPharmacy = async (pharmacyId, adminUserId) => {
     );
   }
 
-  // Update pharmacy status to VERIFIED
-  const updatedPharmacy = await prisma.pharmacy.update({
-    where: { id: pharmacyId },
-    data: {
-      verificationStatus: "VERIFIED",
-      verifiedAt: new Date(),
-      verifiedBy: adminUserId,
-      rejectionReason: null,
-      rejectedAt: null,
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          email: true,
-          name: true,
+  // Update pharmacy status to VERIFIED and user status to APPROVED
+  const updatedPharmacy = await prisma.$transaction(async (tx) => {
+    // Update user status to APPROVED
+    await tx.user.update({
+      where: { id: pharmacy.userId },
+      data: { status: "APPROVED" },
+    });
+
+    // Update pharmacy verification status
+    const updated = await tx.pharmacy.update({
+      where: { id: pharmacyId },
+      data: {
+        verificationStatus: "VERIFIED",
+        verifiedAt: new Date(),
+        verifiedBy: adminUserId,
+        rejectionReason: null,
+        rejectedAt: null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            status: true,
+          },
         },
       },
-    },
+    });
+
+    return updated;
   });
 
   console.log(
-    `[PHARMACY] Verified pharmacyId: ${pharmacyId} by adminId: ${adminUserId}`
+    `[PHARMACY] Verified pharmacyId: ${pharmacyId} by adminId: ${adminUserId}, user status set to APPROVED`
   );
 
   return updatedPharmacy;
@@ -314,25 +339,37 @@ export const rejectPharmacy = async (pharmacyId, adminUserId, reason) => {
     throw new AppError("Pharmacy is already rejected", 400);
   }
 
-  // Update pharmacy status to REJECTED
-  const updatedPharmacy = await prisma.pharmacy.update({
-    where: { id: pharmacyId },
-    data: {
-      verificationStatus: "REJECTED",
-      rejectedAt: new Date(),
-      rejectionReason: reason.trim(),
-      verifiedAt: null,
-      verifiedBy: null,
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          email: true,
-          name: true,
+  // Update pharmacy status to REJECTED and user status to REJECTED
+  const updatedPharmacy = await prisma.$transaction(async (tx) => {
+    // Update user status to REJECTED
+    await tx.user.update({
+      where: { id: pharmacy.userId },
+      data: { status: "REJECTED" },
+    });
+
+    // Update pharmacy verification status
+    const updated = await tx.pharmacy.update({
+      where: { id: pharmacyId },
+      data: {
+        verificationStatus: "REJECTED",
+        rejectedAt: new Date(),
+        rejectionReason: reason.trim(),
+        verifiedAt: null,
+        verifiedBy: null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            status: true,
+          },
         },
       },
-    },
+    });
+
+    return updated;
   });
 
   console.log(

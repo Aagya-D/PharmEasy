@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "UserStatus" ADD VALUE 'ONBOARDING_REQUIRED';

@@ -219,6 +219,7 @@ enum RoleType {
 }
 
 enum UserStatus {
+  ONBOARDING_REQUIRED
   PENDING
   APPROVED
   REJECTED

@@ -13,8 +13,8 @@ const COOKIE_OPTIONS = {
 
 // ---------------- REGISTER ----------------
 export const register = async (req, res, next) => {
+  const startTime = Date.now();
   try {
-    const startTime = Date.now();
     logger.operation('AUTH', 'register', 'START', { email: req.body.email });
 
     // Accept various field names for flexibility
@@ -56,7 +56,7 @@ export const register = async (req, res, next) => {
     logger.timing('AUTH', 'register', duration, 'SUCCESS');
     logger.operation('AUTH', 'register', 'SUCCESS', { userId: result.userId, email: result.email });
 
-    res.status(200).json({
+    res.status(201).json({
       success: true,
       message: "OTP sent to your email for verification.",
       data: {
@@ -142,6 +142,7 @@ export const verifyEmailOTP = async (req, res, next) => {
           roleId: user.roleId,
           role: user.role.name,
           isVerified: user.isVerified,
+          status: user.status,
         },
         pharmacy: user.pharmacy ? {
           id: user.pharmacy.id,
@@ -211,6 +212,7 @@ export const login = async (req, res, next) => {
         name: result.name,
         role: result.role,
         roleId: result.roleId,
+        status: result.status,
         pharmacy: result.pharmacy,
         isOnboarded: result.isOnboarded,
         needsOnboarding: result.roleId === 2 && !result.pharmacy,
