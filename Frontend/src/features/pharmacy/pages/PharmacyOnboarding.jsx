@@ -75,7 +75,9 @@ const PharmacyOnboarding = () => {
           setExistingPharmacy(response.data);
         }
       } catch (err) {
-        // No existing pharmacy found
+        if (err?.response?.status !== 404) {
+          console.error("Failed to fetch pharmacy details", err);
+        }
       } finally {
         if (isMounted) {
           setCheckingStatus(false);

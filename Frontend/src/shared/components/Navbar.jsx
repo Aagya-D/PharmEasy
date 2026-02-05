@@ -129,6 +129,10 @@ export function Navbar() {
     return null;
   }
 
+  if (user?.roleId === ROLE_IDS.PHARMACY) {
+    return null;
+  }
+
   // Hide Navbar on pharmacy dashboard routes (Sidebar handles navigation there)
   const isDashboardRoute = location.pathname.startsWith('/pharmacy/dashboard') ||
     location.pathname.startsWith('/pharmacy/inventory') ||

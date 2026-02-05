@@ -111,6 +111,11 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
   // Create pharmacy record with PENDING_VERIFICATION status
   // Also update user status from ONBOARDING_REQUIRED to PENDING
   const pharmacy = await prisma.$transaction(async (tx) => {
+    const normalizedLicenseDocument =
+      typeof licenseDocument === "string" && licenseDocument.trim().length > 0
+        ? licenseDocument.trim()
+        : null;
+
     // Update user status to PENDING (awaiting admin approval)
     await tx.user.update({
       where: { id: userId },
@@ -126,7 +131,7 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
         latitude: latitude !== null ? latitude : 0.0,
         longitude: longitude !== null ? longitude : 0.0,
         licenseNumber: licenseNumber.trim(),
-        licenseDocument: licenseDocument || null,
+        licenseDocument: normalizedLicenseDocument,
         contactNumber: contactNumber.trim(),
         verificationStatus: "PENDING_VERIFICATION",
       },
