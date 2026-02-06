@@ -229,6 +229,30 @@ export const updatePharmacyStatus = async (req, res, next) => {
   }
 };
 
+/**
+ * POST /api/pharmacy/reset-onboarding
+ * Reset user status to ONBOARDING_REQUIRED after rejection
+ * Allows rejected pharmacies to resubmit their application
+ * Requires: Authentication, roleId=2 (PHARMACY_ADMIN), current status=REJECTED
+ */
+export const resetOnboarding = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    logger.operation('PHARMACY', 'resetOnboarding', 'START', { userId });
+
+    const result = await pharmacyService.resetPharmacyOnboarding(userId);
+
+    res.status(200).json({
+      success: true,
+      message: "Your application has been reset. You can now resubmit your details.",
+      data: result,
+    });
+  } catch (error) {
+    logger.error('PHARMACY', `[RESET_ONBOARDING] Failed: ${error.message}`, error);
+    next(error);
+  }
+};
+
 export default {
   onboardPharmacy,
   getMyPharmacy,
@@ -238,4 +262,5 @@ export default {
   verifyPharmacy,
   rejectPharmacy,
   updatePharmacyStatus,
+  resetOnboarding,
 };

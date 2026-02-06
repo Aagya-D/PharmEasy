@@ -44,6 +44,16 @@ export const authenticate = (allowedRoles = null) => {
       // Attach decoded user to request object
       req.user = decoded;
 
+      // Validate that userId exists in token (guard against malformed tokens)
+      if (!req.user.userId) {
+        return next(
+          new AppError(
+            "Invalid authentication token: missing userId",
+            401
+          )
+        );
+      }
+
       // Check role-based authorization if specified
       if (allowedRoles && Array.isArray(allowedRoles)) {
         if (!allowedRoles.includes(req.user.role)) {

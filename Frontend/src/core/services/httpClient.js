@@ -117,11 +117,21 @@ httpClient.interceptors.response.use(
       console.error('[HTTP] Logger error:', logError.message);
     }
 
-    // Handle 401 Unauthorized - Auto logout
+    // ✅ FIX: Handle 401 Unauthorized - Auto logout ONLY for authenticated routes
+    // DO NOT auto-logout for auth endpoints (login, register, verify-otp)
+    // These endpoints can legitimately return 401 for failed credentials
     if (status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.href = "/login";
+      const authEndpoints = ['/auth/login', '/auth/register', '/auth/verify-otp', '/auth/forgot-password'];
+      const isAuthEndpoint = authEndpoints.some(endpoint => error.config?.url?.includes(endpoint));
+      
+      // Only auto-logout for non-auth endpoints (user session expired, token invalid)
+      if (!isAuthEndpoint) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+      }
     }
 
     return Promise.reject(error);

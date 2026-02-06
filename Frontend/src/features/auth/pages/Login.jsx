@@ -32,6 +32,7 @@ export function Login() {
 
     try {
       const result = await login(email, password);
+      
       if (result.success) {
         // Use helper function for role-based navigation
         const dashboardPath = getDashboardPath(result.user);
@@ -47,10 +48,17 @@ export function Login() {
           },
         });
       } else {
-        setError(result.error || "Login failed");
+        // ✅ FIX: Display the specific error message from backend
+        // This will be "Invalid email or password" for failed login
+        const errorMessage = result.error || "Login failed";
+        setError(errorMessage);
+        console.error("[LOGIN] Failed:", errorMessage);
       }
     } catch (err) {
-      setError("An unexpected error occurred");
+      // ✅ FIX: Catch unexpected errors, not from API response
+      const errorMessage = err.response?.data?.message || err.message || "An unexpected error occurred";
+      setError(errorMessage);
+      console.error("[LOGIN] Unexpected error:", err);
     } finally {
       setIsLoading(false);
     }

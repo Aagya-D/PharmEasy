@@ -245,8 +245,14 @@ export function AuthProvider({ children }) {
           error
         );
 
+        // ✅ SKIP token refresh for auth endpoints (login, register, verify-otp, etc.)
+        // These endpoints fail legitimately and should NOT trigger token refresh
+        const authEndpoints = ['/auth/login', '/auth/register', '/auth/verify-otp', '/auth/forgot-password'];
+        const isAuthEndpoint = authEndpoints.some(endpoint => originalRequest?.url?.includes(endpoint));
+
         // If 401 and not already retried, try to refresh token
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        // BUT: Skip refresh if this is an auth endpoint (login/register fail legitimately)
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
           originalRequest._retry = true;
 
           try {
@@ -333,18 +339,33 @@ export function AuthProvider({ children }) {
 
       return { success: true, user };
     } catch (error) {
-      // Check for EMAIL_NOT_VERIFIED error code from backend
-      const code = error.response?.data?.code;
-      const message =
-        error.response?.data?.message ||
-        error.response?.data?.error?.message ||
-        error.message ||
-        "Login failed";
+      // ✅ FIX: Extract error message from API response
+      // Handle different response structures
+      let message = "Login failed";
+      let code = null;
       
-      // ✅ FIX: Dispatch structured error object, NOT a string
+      if (error.response?.data?.message) {
+        // Standard API error response: { success: false, message: "..." }
+        message = error.response.data.message;
+      } else if (error.response?.data?.error?.message) {
+        // Alternative error structure
+        message = error.response.data.error.message;
+      } else if (error.message) {
+        // Fallback to error message
+        message = error.message;
+      }
+      
+      // Extract error code if present
+      code = error.response?.data?.code;
+      
+      // ✅ Log error with proper status
+      const status = error.response?.status;
+      logger.warn("AUTH", `[LOGIN] Authentication failed: ${message}`, { status, email });
+      
+      // Dispatch structured error object
       const errorPayload = {
         message: message,
-        status: error.response?.status || null,
+        status: status || null,
         code: code || null,
       };
 
@@ -369,6 +390,7 @@ export function AuthProvider({ children }) {
         };
       }
 
+      // Return error for all other cases (including 401 Invalid credentials)
       return { success: false, error: message };
     }
   };
@@ -539,6 +561,45 @@ export function AuthProvider({ children }) {
     });
   };
 
+  // ✅ NEW: Refresh user profile from backend (fetches latest status, pharmacy data, etc.)
+  const refreshUser = async () => {
+    try {
+      const response = await httpClient.get("/auth/me");
+      const userData = response.data?.data;
+
+      if (userData?.user) {
+        const updatedUser = {
+          id: userData.user.id,
+          email: userData.user.email,
+          name: userData.user.name,
+          roleId: userData.user.roleId,
+          role: userData.user.role,
+          status: userData.user.status,
+          isVerified: userData.user.isVerified,
+          pharmacy: userData.pharmacy || null,
+        };
+
+        // Update state and localStorage
+        updateUser(updatedUser);
+
+        logger.info("User profile refreshed", {
+          userId: updatedUser.id,
+          status: updatedUser.status,
+        });
+
+        return { success: true, user: updatedUser };
+      }
+
+      return { success: false, error: "Invalid response from server" };
+    } catch (error) {
+      logger.error("Failed to refresh user profile", error);
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || "Failed to check status",
+      };
+    }
+  };
+
   const value = {
     ...state,
     login,
@@ -546,6 +607,7 @@ export function AuthProvider({ children }) {
     verifyOTP,
     logout,
     updateUser,
+    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

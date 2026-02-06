@@ -706,8 +706,36 @@ const userService = {
   },
   authenticateUser: login,
   resendOTP: resendOTP,
-  getUserById: async (userId) =>
-    await prisma.user.findUnique({ where: { id: userId } }),
+  getUserById: async (userId) => {
+    // Guard: validate userId is provided
+    if (!userId) {
+      console.error('[AUTH_SERVICE] getUserById called with empty userId');
+      return null;
+    }
+    
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          role: true,
+          pharmacy: {
+            select: {
+              id: true,
+              pharmacyName: true,
+              verificationStatus: true,
+              rejectionReason: true,
+              address: true,
+              contactNumber: true,
+            },
+          },
+        },
+      });
+      return user;
+    } catch (err) {
+      console.error(`[AUTH_SERVICE] getUserById error for userId: ${userId}`, err);
+      return null;
+    }
+  },
   getUserByEmail: async (email) =>
     await prisma.user.findUnique({ where: { email } }),
   sendPasswordResetOTP: async (email) => {

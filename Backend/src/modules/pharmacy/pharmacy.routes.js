@@ -53,6 +53,19 @@ router.get(
   pharmacyController.getMyPharmacy
 );
 
+/**
+ * POST /api/pharmacy/reset-onboarding
+ * Reset pharmacy onboarding status after rejection
+ * Allows rejected pharmacies to resubmit their application
+ * Requires: JWT token, roleId=2 (PHARMACY_ADMIN), current status=REJECTED
+ */
+router.post(
+  "/pharmacy/reset-onboarding",
+  authenticate(),
+  requirePharmacyAdmin,
+  pharmacyController.resetOnboarding
+);
+
 // ============================================
 // SYSTEM ADMIN ROUTES
 // ============================================

@@ -167,8 +167,8 @@ export const verifyEmailOTP = async (req, res, next) => {
 
 // ---------------- LOGIN ----------------
 export const login = async (req, res, next) => {
+  const startTime = Date.now();
   try {
-    const startTime = Date.now();
     logger.operation('AUTH', 'login', 'START', { email: req.body.email });
 
     const { email, password } = req.body;
@@ -221,7 +221,12 @@ export const login = async (req, res, next) => {
       },
     });
   } catch (err) {
-    // Check if error is due to unverified email
+    const duration = Date.now() - startTime;
+    logger.timing('AUTH', 'login', duration, 'ERROR');
+    logger.error('AUTH', `[LOGIN] Failed: ${err.message}`, err);
+    logger.operation('AUTH', 'login', 'ERROR', { error: err.message });
+    
+    // Handle Email not verified error
     if (err.message && err.message.includes("Email not verified")) {
       logger.warn('AUTH', '[LOGIN] Email not verified', { email: req.body.email });
       const { email } = req.body;
@@ -249,10 +254,16 @@ export const login = async (req, res, next) => {
       }
     }
 
-    const duration = Date.now() - startTime;
-    logger.timing('AUTH', 'login', duration, 'ERROR');
-    logger.error('AUTH', `[LOGIN] Failed: ${err.message}`, err);
-    logger.operation('AUTH', 'login', 'ERROR', { error: err.message });
+    // Handle invalid credentials (401 Unauthorized)
+    if (err.status === 401 || err.statusCode === 401) {
+      logger.warn('AUTH', '[LOGIN] Invalid credentials', { email: req.body.email });
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    // For all other errors, pass to error handling middleware
     next(err);
   }
 };
@@ -419,6 +430,59 @@ export const resendOTP = async (req, res, next) => {
       }
     });
   } catch (err) {
+    next(err);
+  }
+};
+
+// ---------------- GET CURRENT USER ----------------
+export const getCurrentUser = async (req, res, next) => {
+  try {
+    // Extract userId from JWT (JWT payload has 'userId', not 'id')
+    const userId = req.user?.userId;
+    
+    // Validate userId exists
+    if (!userId) {
+      logger.warn('AUTH', '[GET_CURRENT_USER] Missing userId in JWT token', { decoded: req.user });
+      return res.status(401).json({
+        success: false,
+        message: "Invalid authentication token"
+      });
+    }
+    
+    const user = await userService.getUserById(userId);
+    if (!user) {
+      logger.warn('AUTH', '[GET_CURRENT_USER] User not found', { userId });
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    logger.debug('AUTH', '[GET_CURRENT_USER] User retrieved', { userId, email: user.email, status: user.status });
+
+    res.status(200).json({
+      success: true,
+      message: "User data retrieved",
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          roleId: user.roleId,
+          role: user.role.name,
+          status: user.status,
+          isVerified: user.isVerified,
+        },
+        pharmacy: user.pharmacy ? {
+          id: user.pharmacy.id,
+          pharmacyName: user.pharmacy.pharmacyName,
+          verificationStatus: user.pharmacy.verificationStatus,
+          rejectionReason: user.pharmacy.rejectionReason,
+        } : null,
+      }
+    });
+  } catch (err) {
+    logger.error('AUTH', `[GET_CURRENT_USER] Failed: ${err.message}`, err);
     next(err);
   }
 };

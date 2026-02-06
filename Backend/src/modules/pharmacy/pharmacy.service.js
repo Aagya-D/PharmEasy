@@ -449,6 +449,72 @@ export const updatePharmacyStatus = async (pharmacyId, adminUserId, newStatus, r
   return updatedPharmacy;
 };
 
+/**
+ * Reset pharmacy onboarding status
+ * Allows rejected pharmacies to resubmit their application
+ * Sets user status back to ONBOARDING_REQUIRED and deletes pharmacy record
+ */
+export const resetPharmacyOnboarding = async (userId) => {
+  // Verify user exists and has roleId=2 (pharmacy admin)
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { pharmacy: true },
+  });
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  if (user.roleId !== 2) {
+    throw new AppError("Only pharmacy admins can reset their onboarding", 403);
+  }
+
+  // Verify user has a rejected pharmacy
+  if (!user.pharmacy) {
+    throw new AppError("No pharmacy found for this user", 404);
+  }
+
+  if (user.pharmacy.verificationStatus !== "REJECTED") {
+    throw new AppError(
+      "Only rejected pharmacies can reset their onboarding",
+      400
+    );
+  }
+
+  // Transaction: Delete pharmacy record and reset user status
+  const result = await prisma.$transaction(async (tx) => {
+    // Delete the pharmacy record
+    await tx.pharmacy.delete({
+      where: { id: user.pharmacy.id },
+    });
+
+    // Update user status back to ONBOARDING_REQUIRED
+    const updatedUser = await tx.user.update({
+      where: { id: userId },
+      data: { status: "ONBOARDING_REQUIRED" },
+      include: {
+        role: true,
+      },
+    });
+
+    return {
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        status: updatedUser.status,
+        roleId: updatedUser.roleId,
+      },
+    };
+  });
+
+  console.log(
+    `[PHARMACY] Onboarding reset for userId: ${userId}, user status set to ONBOARDING_REQUIRED`
+  );
+
+  return result;
+};
+
 export default {
   submitPharmacyOnboarding,
   getPharmacyByUserId,
@@ -458,4 +524,5 @@ export default {
   verifyPharmacy,
   rejectPharmacy,
   updatePharmacyStatus,
+  resetPharmacyOnboarding,
 };

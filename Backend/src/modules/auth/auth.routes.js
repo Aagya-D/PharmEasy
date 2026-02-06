@@ -62,6 +62,10 @@ router.post("/reset-password", authController.resetPassword);
  * Protected Routes (authentication required)
  */
 
+// GET /auth/me
+// Get current authenticated user's profile
+router.get("/me", authenticate(), authController.getCurrentUser);
+
 // POST /auth/logout
 // Logout and revoke refresh token
 router.post("/logout", authenticate(), authController.logout);
