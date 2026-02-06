@@ -10,7 +10,10 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronRight
+  ChevronRight,
+  MapPin,
+  TrendingUp,
+  Heart,
 } from "lucide-react";
 
 const AdminLayout = ({ children }) => {
@@ -26,6 +29,9 @@ const AdminLayout = ({ children }) => {
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard" },
+    { icon: MapPin, label: "Emergency Map", path: "/admin/map" },
+    { icon: TrendingUp, label: "Inventory Insights", path: "/admin/inventory-insights" },
+    { icon: Heart, label: "Content CMS", path: "/admin/cms" },
     { icon: Package, label: "Pharmacies", path: "/admin/pharmacies" },
     { icon: Users, label: "Users", path: "/admin/users" },
     { icon: FileText, label: "Activity Logs", path: "/admin/logs" },

@@ -19,6 +19,7 @@ import inventoryRoutes from "./modules/inventory/inventory.routes.js";
 import patientRoutes from "./modules/patient/patient.routes.js";
 import searchRoutes from "./modules/search/search.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
+// Note: adminExtendedRoutes uses CommonJS, will need conversion or dynamic import
 
 // ES Module __dirname workaround
 const __filename = fileURLToPath(import.meta.url);
@@ -198,6 +199,17 @@ app.use("/api", inventoryRoutes);
 // Admin routes (profile settings, password change, pharmacy management)
 // Routes include: /admin/profile, /admin/change-password, /admin/pharmacies, etc.
 app.use("/api/admin", adminRoutes);
+
+// Admin extended routes will be loaded dynamically
+// Dynamic import for CommonJS module compatibility
+import("./modules/admin/admin-extended.routes.js")
+  .then((module) => {
+    app.use("/api/admin", module.default || module);
+    logger.info("✓ Admin extended routes loaded");
+  })
+  .catch((err) => {
+    logger.error("✗ Failed to load admin extended routes:", err);
+  });
 
 // Root API endpoint
 app.get("/api", (req, res) => {

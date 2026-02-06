@@ -361,3 +361,71 @@ enum LogCategory {
   INVENTORY
   ORDER
 }
+
+/// *
+/// * HealthTip Model - Health tips and advice for patients
+/// * 
+/// * Admin-managed health tips displayed on patient dashboard
+/// * Can be scheduled or published immediately
+model HealthTip {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   @db.Text
+  category    String?
+  isActive    Boolean  @default(true)
+  publishDate DateTime @default(now())
+  expiryDate  DateTime?
+  imageUrl    String?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([publishDate])
+  @@index([category])
+}
+
+/// *
+/// * Announcement Model - Global system announcements
+/// * 
+/// * Broadcast messages to all users (e.g., system maintenance, guidelines)
+/// * Can target specific user roles or all users
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  message     String   @db.Text
+  type        String   @default("info")
+  priority    String   @default("normal")
+  targetRole  String?
+  isActive    Boolean  @default(true)
+  publishDate DateTime @default(now())
+  expiryDate  DateTime?
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([publishDate])
+  @@index([priority])
+  @@index([targetRole])
+}
+
+/// *
+/// * TwoFactorAuth Model - Two-factor authentication for enhanced security
+/// * 
+/// * Stores 2FA settings and backup codes for users (especially admins)
+/// * Uses TOTP (Time-based One-Time Password) algorithm
+model TwoFactorAuth {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  secret       String
+  isEnabled    Boolean   @default(false)
+  backupCodes  String[]
+  enabledAt    DateTime?
+  lastUsedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([isEnabled])
+}

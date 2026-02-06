@@ -150,6 +150,24 @@ export const adminRoutes = [
     roleId: 1,
   },
   {
+    path: "/admin/map",
+    name: "Emergency SOS Map",
+    component: "features/admin/pages/AdminMap",
+    roleId: 1,
+  },
+  {
+    path: "/admin/inventory-insights",
+    name: "Inventory Insights",
+    component: "features/admin/pages/AdminInventoryInsight",
+    roleId: 1,
+  },
+  {
+    path: "/admin/cms",
+    name: "Content Management",
+    component: "features/admin/pages/AdminCMS",
+    roleId: 1,
+  },
+  {
     path: "/admin/logs",
     name: "Audit Logs",
     component: "features/admin/pages/AdminLogs",

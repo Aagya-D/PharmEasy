@@ -13,10 +13,17 @@ import {
   EyeOff,
   Shield,
   Clock,
+  Moon,
+  Sun,
+  Smartphone,
+  Key,
+  Copy,
+  RefreshCw,
 } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import adminService from "../../../core/services/admin.service";
 import AdminLayout from "../components/AdminLayout";
+import { useDarkMode } from "../../../context/DarkModeContext";
 
 /**
  * Password Strength Meter Component
@@ -139,11 +146,18 @@ const Toast = ({ type, message, onClose }) => {
  */
 const AdminSettings = () => {
   const { user, updateUser } = useAuth();
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
   const [toast, setToast] = useState(null);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [newPasswordValue, setNewPasswordValue] = useState("");
+  const [twoFAEnabled, setTwoFAEnabled] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [secret, setSecret] = useState("");
+  const [backupCodes, setBackupCodes] = useState([]);
+  const [verificationCode, setVerificationCode] = useState("");
 
   // Profile form
   const {
@@ -178,8 +192,98 @@ const AdminSettings = () => {
         email: user.email || "",
         phone: user.phone || "",
       });
+      // Fetch 2FA status
+      fetch2FAStatus();
     }
   }, [user, resetProfile]);
+
+  const fetch2FAStatus = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/admin/2fa/status', {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setTwoFAEnabled(data.data.enabled);
+      }
+    } catch (error) {
+      console.error('Error fetching 2FA status:', error);
+    }
+  };
+
+  const enable2FA = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/admin/2fa/enable', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setQrCodeUrl(data.data.qrCode);
+        setSecret(data.data.secret);
+        setBackupCodes(data.data.backupCodes);
+        setShowQRCode(true);
+      }
+    } catch (error) {
+      console.error('Error enabling 2FA:', error);
+      setToast({ type: 'error', message: 'Failed to enable 2FA' });
+    }
+  };
+
+  const verify2FA = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/admin/2fa/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({ code: verificationCode }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setTwoFAEnabled(true);
+        setShowQRCode(false);
+        setVerificationCode('');
+        setToast({ type: 'success', message: '2FA enabled successfully!' });
+      } else {
+        setToast({ type: 'error', message: 'Invalid verification code' });
+      }
+    } catch (error) {
+      console.error('Error verifying 2FA:', error);
+      setToast({ type: 'error', message: 'Failed to verify 2FA' });
+    }
+  };
+
+  const disable2FA = async () => {
+    if (!confirm('Are you sure you want to disable 2FA? This will reduce your account security.')) return;
+    
+    try {
+      const response = await fetch('http://localhost:3000/api/admin/2fa/disable', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setTwoFAEnabled(false);
+        setToast({ type: 'success', message: '2FA disabled successfully' });
+      }
+    } catch (error) {
+      console.error('Error disabling 2FA:', error);
+      setToast({ type: 'error', message: 'Failed to disable 2FA' });
+    }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setToast({ type: 'success', message: 'Copied to clipboard!' });
+  };
 
   // Handle profile update
   const onProfileSubmit = async (data) => {
@@ -513,7 +617,7 @@ const AdminSettings = () => {
                   <input
                     type={showConfirmPassword ? "text" : "password"}
                     {...registerPassword("confirmPassword", {
-                      required: "Please confirm your new password",
+                      required: "Please confirm your password",
                       validate: (value) =>
                         value === watchNewPassword || "Passwords do not match",
                     })}
@@ -571,6 +675,228 @@ const AdminSettings = () => {
                 )}
               </button>
             </form>
+          </motion.div>
+
+          {/* Dark Mode Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
+          >
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 flex items-center gap-3">
+              {isDarkMode ? <Moon className="text-white" size={24} /> : <Sun className="text-white" size={24} />}
+              <div>
+                <h2 className="text-xl font-semibold text-white">
+                  Appearance Settings
+                </h2>
+                <p className="text-indigo-100 text-sm">
+                  Customize your interface theme
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center">
+                    {isDarkMode ? <Moon className="text-indigo-600" size={24} /> : <Sun className="text-indigo-600" size={24} />}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Dark Mode</h3>
+                    <p className="text-sm text-gray-600">
+                      {isDarkMode ? 'Switch to light theme' : 'Switch to dark theme for reduced eye strain'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={toggleDarkMode}
+                  className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                    isDarkMode ? 'bg-indigo-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                      isDarkMode ? 'translate-x-7' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              
+              <div className="mt-4 bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                <p className="text-sm text-indigo-900">
+                  <strong>Note:</strong> Dark mode helps reduce eye strain during extended use and saves battery on OLED displays.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Two-Factor Authentication Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
+          >
+            <div className="bg-gradient-to-r from-green-600 to-green-700 px-6 py-4 flex items-center gap-3">
+              <Smartphone className="text-white" size={24} />
+              <div>
+                <h2 className="text-xl font-semibold text-white">
+                  Two-Factor Authentication (2FA)
+                </h2>
+                <p className="text-green-100 text-sm">
+                  Add an extra layer of security to your account
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* 2FA Status */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                    twoFAEnabled ? 'bg-green-100' : 'bg-gray-100'
+                  }`}>
+                    <Key className={twoFAEnabled ? 'text-green-600' : 'text-gray-600'} size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Status: {twoFAEnabled ? 'Enabled' : 'Disabled'}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      {twoFAEnabled 
+                        ? 'Your account is protected with 2FA' 
+                        : 'Enable 2FA for enhanced security'}
+                    </p>
+                  </div>
+                </div>
+                {!showQRCode && (
+                  <button
+                    onClick={twoFAEnabled ? disable2FA : enable2FA}
+                    className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                      twoFAEnabled
+                        ? 'bg-red-600 text-white hover:bg-red-700'
+                        : 'bg-green-600 text-white hover:bg-green-700'
+                    }`}
+                  >
+                    {twoFAEnabled ? 'Disable 2FA' : 'Enable 2FA'}
+                  </button>
+                )}
+              </div>
+
+              {/* QR Code Setup */}
+              {showQRCode && !twoFAEnabled && (
+                <div className="border border-gray-200 rounded-lg p-6 space-y-6">
+                  <div className="text-center">
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">
+                      Scan QR Code with Your Authenticator App
+                    </h4>
+                    {qrCodeUrl && (
+                      <div className="inline-block bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                        <img src={qrCodeUrl} alt="2FA QR Code" className="w-48 h-48" />
+                      </div>
+                    )}
+                    <p className="text-sm text-gray-600 mt-4">
+                      Use apps like Google Authenticator, Authy, or Microsoft Authenticator
+                    </p>
+                  </div>
+
+                  {/* Manual Secret */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Or enter this secret manually:
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={secret}
+                        readOnly
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 font-mono text-sm"
+                      />
+                      <button
+                        onClick={() => copyToClipboard(secret)}
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                      >
+                        <Copy size={20} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Verification Code */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Enter 6-digit verification code:
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={verificationCode}
+                        onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="000000"
+                        className="flex-1 px-4 py-3 border border-gray-300 rounded-lg text-center text-2xl font-mono tracking-widest"
+                      />
+                      <button
+                        onClick={verify2FA}
+                        disabled={verificationCode.length !== 6}
+                        className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                      >
+                        Verify
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Backup Codes */}
+                  {backupCodes.length > 0 && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <h5 className="font-semibold text-yellow-900 mb-2 flex items-center gap-2">
+                        <AlertCircle size={18} />
+                        Save Your Backup Codes
+                      </h5>
+                      <p className="text-sm text-yellow-800 mb-3">
+                        Store these codes in a safe place. Each code can be used once if you lose access to your authenticator.
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {backupCodes.map((code, index) => (
+                          <div key={index} className="font-mono text-sm bg-white px-3 py-2 rounded border border-yellow-300">
+                            {code}
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => copyToClipboard(backupCodes.join('\n'))}
+                        className="mt-3 flex items-center gap-2 text-sm text-yellow-700 hover:text-yellow-900 font-medium"
+                      >
+                        <Copy size={16} />
+                        Copy All Codes
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setShowQRCode(false);
+                      setVerificationCode('');
+                    }}
+                    className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
+              {/* 2FA Info */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <p className="text-sm font-medium text-green-900 mb-2">
+                  Why Enable 2FA?
+                </p>
+                <ul className="text-sm text-green-700 space-y-1 list-disc list-inside">
+                  <li>Protects against unauthorized access even if your password is compromised</li>
+                  <li>Required for admins managing sensitive data</li>
+                  <li>Provides backup codes for emergency access</li>
+                  <li>Works with popular authenticator apps</li>
+                </ul>
+              </div>
+            </div>
           </motion.div>
         </div>
       </div>

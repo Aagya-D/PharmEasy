@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { getAllPharmacies } from "../../../core/services/pharmacy.service";
-import { Package, CheckCircle, Clock, XCircle, Users, TrendingUp } from "lucide-react";
+import { Package, CheckCircle, Clock, XCircle, Users, TrendingUp, Download, FileText, Table } from "lucide-react";
 import AdminLayout from "../components/AdminLayout";
 
 const AdminDashboardHome = () => {
@@ -17,6 +17,8 @@ const AdminDashboardHome = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [recentPharmacies, setRecentPharmacies] = useState([]);
+  const [exporting, setExporting] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   useEffect(() => {
     if (user && user.roleId !== 1) {
@@ -51,6 +53,76 @@ const AdminDashboardHome = () => {
       setError(err.response?.data?.message || "Failed to load dashboard data");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const generatePDFReport = async () => {
+    setExporting(true);
+    try {
+      const response = await fetch('http://localhost:3000/api/admin/reports/monthly-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          month: new Date().getMonth() + 1,
+          year: new Date().getFullYear(),
+        }),
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `PharmEasy_Monthly_Report_${new Date().toISOString().slice(0, 7)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF report');
+    } finally {
+      setExporting(false);
+      setShowExportModal(false);
+    }
+  };
+
+  const generateExcelReport = async () => {
+    setExporting(true);
+    try {
+      const response = await fetch('http://localhost:3000/api/admin/reports/monthly-excel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          month: new Date().getMonth() + 1,
+          year: new Date().getFullYear(),
+        }),
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `PharmEasy_Monthly_Report_${new Date().toISOString().slice(0, 7)}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('Error generating Excel:', error);
+      alert('Failed to generate Excel report');
+    } finally {
+      setExporting(false);
+      setShowExportModal(false);
     }
   };
 
@@ -141,6 +213,41 @@ const AdminDashboardHome = () => {
 
       {!isLoading && !error && (
         <>
+          {/* Header with Export Button */}
+          <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <h1 style={{ fontSize: "28px", fontWeight: "700", color: "#111827", marginBottom: "4px" }}>
+                Dashboard Overview
+              </h1>
+              <p style={{ color: "#6B7280", fontSize: "14px" }}>
+                Monthly Report for {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowExportModal(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "12px 24px",
+                backgroundColor: "#10B981",
+                color: "white",
+                border: "none",
+                borderRadius: "8px",
+                fontSize: "14px",
+                fontWeight: "600",
+                cursor: "pointer",
+                transition: "background-color 0.2s",
+                boxShadow: "0 4px 6px rgba(16, 185, 129, 0.2)",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#059669")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#10B981")}
+            >
+              <Download size={18} />
+              Generate Monthly Report
+            </button>
+          </div>
+
           {/* Stats Grid */}
           <div
             style={{
@@ -303,6 +410,145 @@ const AdminDashboardHome = () => {
               </button>
             </div>
           </div>
+
+          {/* Export Modal */}
+          {showExportModal && (
+            <div
+              style={{
+                position: "fixed",
+                inset: 0,
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 50,
+                padding: "16px",
+              }}
+              onClick={() => !exporting && setShowExportModal(false)}
+            >
+              <div
+                style={{
+                  backgroundColor: "white",
+                  borderRadius: "12px",
+                  boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+                  maxWidth: "500px",
+                  width: "100%",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ padding: "24px" }}>
+                  <h3 style={{ fontSize: "20px", fontWeight: "700", color: "#111827", marginBottom: "16px" }}>
+                    Export Monthly Report
+                  </h3>
+                  <p style={{ fontSize: "14px", color: "#6B7280", marginBottom: "24px" }}>
+                    Choose your preferred format for the report
+                  </p>
+
+                  <div style={{ display: "grid", gap: "12px" }}>
+                    <button
+                      onClick={generatePDFReport}
+                      disabled={exporting}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        padding: "16px",
+                        border: "2px solid #E5E7EB",
+                        borderRadius: "8px",
+                        backgroundColor: "white",
+                        cursor: exporting ? "not-allowed" : "pointer",
+                        transition: "all 0.2s",
+                        opacity: exporting ? 0.5 : 1,
+                      }}
+                      onMouseEnter={(e) => !exporting && (e.currentTarget.style.borderColor = "#EF4444")}
+                      onMouseLeave={(e) => !exporting && (e.currentTarget.style.borderColor = "#E5E7EB")}
+                    >
+                      <FileText size={24} color="#EF4444" />
+                      <div style={{ flex: 1, textAlign: "left" }}>
+                        <p style={{ fontSize: "16px", fontWeight: "600", color: "#111827" }}>
+                          PDF Format
+                        </p>
+                        <p style={{ fontSize: "12px", color: "#6B7280" }}>
+                          Professional document format
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={generateExcelReport}
+                      disabled={exporting}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        padding: "16px",
+                        border: "2px solid #E5E7EB",
+                        borderRadius: "8px",
+                        backgroundColor: "white",
+                        cursor: exporting ? "not-allowed" : "pointer",
+                        transition: "all 0.2s",
+                        opacity: exporting ? 0.5 : 1,
+                      }}
+                      onMouseEnter={(e) => !exporting && (e.currentTarget.style.borderColor = "#10B981")}
+                      onMouseLeave={(e) => !exporting && (e.currentTarget.style.borderColor = "#E5E7EB")}
+                    >
+                      <Table size={24} color="#10B981" />
+                      <div style={{ flex: 1, textAlign: "left" }}>
+                        <p style={{ fontSize: "16px", fontWeight: "600", color: "#111827" }}>
+                          Excel Format
+                        </p>
+                        <p style={{ fontSize: "12px", color: "#6B7280" }}>
+                          Editable spreadsheet format
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+
+                  {exporting && (
+                    <div style={{ marginTop: "16px", textAlign: "center" }}>
+                      <div
+                        style={{
+                          width: "24px",
+                          height: "24px",
+                          border: "3px solid #E5E7EB",
+                          borderTop: "3px solid #3B82F6",
+                          borderRadius: "50%",
+                          animation: "spin 1s linear infinite",
+                          margin: "0 auto 8px",
+                        }}
+                      />
+                      <p style={{ fontSize: "14px", color: "#6B7280" }}>
+                        Generating report...
+                      </p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => setShowExportModal(false)}
+                    disabled={exporting}
+                    style={{
+                      width: "100%",
+                      marginTop: "16px",
+                      padding: "12px",
+                      backgroundColor: "#F3F4F6",
+                      color: "#6B7280",
+                      border: "none",
+                      borderRadius: "8px",
+                      fontSize: "14px",
+                      fontWeight: "600",
+                      cursor: exporting ? "not-allowed" : "pointer",
+                      transition: "background-color 0.2s",
+                      opacity: exporting ? 0.5 : 1,
+                    }}
+                    onMouseEnter={(e) => !exporting && (e.currentTarget.style.backgroundColor = "#E5E7EB")}
+                    onMouseLeave={(e) => !exporting && (e.currentTarget.style.backgroundColor = "#F3F4F6")}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </AdminLayout>

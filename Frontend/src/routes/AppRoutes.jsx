@@ -45,6 +45,9 @@ import AdminPharmacyDetails from "../features/admin/pages/AdminPharmacyDetails";
 import AdminUsers from "../features/admin/pages/AdminUsers";
 import AdminLogs from "../features/admin/pages/AdminLogs";
 import AdminSettings from "../features/admin/pages/AdminSettings";
+import AdminMap from "../features/admin/pages/AdminMap";
+import AdminInventoryInsight from "../features/admin/pages/AdminInventoryInsight";
+import AdminCMS from "../features/admin/pages/AdminCMS";
 
 // Layouts & Components
 import ProtectedRoute from "./ProtectedRoute";
@@ -443,6 +446,18 @@ export const routes = [
       {
         path: "dashboard",
         element: <AdminDashboardHome />,
+      },
+      {
+        path: "map",
+        element: <AdminMap />,
+      },
+      {
+        path: "inventory-insights",
+        element: <AdminInventoryInsight />,
+      },
+      {
+        path: "cms",
+        element: <AdminCMS />,
       },
       {
         path: "pharmacies",
