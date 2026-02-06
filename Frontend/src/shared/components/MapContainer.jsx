@@ -101,7 +101,7 @@ export default function MapContainer({
   onPharmacyClick,
   height = "500px",
 }) {
-  const defaultCenter = [20.5937, 78.9629]; // Center of India as fallback
+  const defaultCenter = [27.7172, 85.3240]; // Kathmandu, Nepal as fallback
   const center = userLocation
     ? [userLocation.latitude, userLocation.longitude]
     : defaultCenter;
@@ -124,12 +124,12 @@ export default function MapContainer({
   };
 
   /**
-   * Format currency
+   * Format currency for Nepal
    */
   const formatPrice = (price) => {
-    return new Intl.NumberFormat("en-IN", {
+    return new Intl.NumberFormat("en-NP", {
       style: "currency",
-      currency: "INR",
+      currency: "NPR",
       maximumFractionDigits: 0,
     }).format(price);
   };

@@ -123,12 +123,12 @@ export default function SearchResults() {
     });
 
   /**
-   * Format price
+   * Format price for Nepal
    */
   const formatPrice = (price) => {
-    return new Intl.NumberFormat("en-IN", {
+    return new Intl.NumberFormat("en-NP", {
       style: "currency",
-      currency: "INR",
+      currency: "NPR",
       maximumFractionDigits: 0,
     }).format(price);
   };

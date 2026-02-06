@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { ChevronRight, FileText, MapPin, Navigation, ShieldCheck, Upload, CheckCircle } from "lucide-react";
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { useAuth } from "../../../context/AuthContext";
 import Layout from "../../../shared/layouts/Layout";
 import { Input, TextArea } from "../../../shared/components/ui/Input";
@@ -9,7 +12,59 @@ import { Button } from "../../../shared/components/ui/Button";
 import { Alert } from "../../../shared/components/ui/Alert";
 import { getMyPharmacy, submitPharmacyOnboarding } from "../../../core/services/pharmacy.service";
 
+// Fix Leaflet default icon issue
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
 const PHONE_REGEX = /^[+]?\d{7,15}$/;
+
+// Nepal geographic boundaries for validation
+const NEPAL_BOUNDS = {
+  minLat: 26.3478,
+  maxLat: 30.4469,
+  minLng: 80.0586,
+  maxLng: 88.2015,
+};
+
+// Major cities in Nepal for quick selection
+const NEPAL_CITIES = [
+  { name: "Kathmandu", lat: 27.7172, lng: 85.3240 },
+  { name: "Pokhara", lat: 28.2096, lng: 83.9856 },
+  { name: "Biratnagar", lat: 26.4525, lng: 87.2718 },
+  { name: "Bharatpur", lat: 27.6782, lng: 84.4351 },
+  { name: "Lalitpur", lat: 27.6667, lng: 85.3167 },
+  { name: "Dharan", lat: 26.8089, lng: 87.2823 },
+  { name: "Butwal", lat: 27.7000, lng: 83.4500 },
+  { name: "Hetauda", lat: 27.4287, lng: 85.0327 },
+  { name: "Nepalgunj", lat: 28.0500, lng: 81.6167 },
+  { name: "Dhangadhi", lat: 28.6939, lng: 80.5963 },
+];
+
+// Map location picker component
+function LocationPicker({ position, setPosition }) {
+  useMapEvents({
+    click(e) {
+      const { lat, lng } = e.latlng;
+      // Validate if within Nepal boundaries
+      if (
+        lat >= NEPAL_BOUNDS.minLat &&
+        lat <= NEPAL_BOUNDS.maxLat &&
+        lng >= NEPAL_BOUNDS.minLng &&
+        lng <= NEPAL_BOUNDS.maxLng
+      ) {
+        setPosition([lat, lng]);
+      } else {
+        alert('Please select a location within Nepal');
+      }
+    },
+  });
+
+  return position ? <Marker position={position} /> : null;
+}
 
 const PharmacyOnboarding = () => {
   const navigate = useNavigate();
@@ -22,6 +77,8 @@ const PharmacyOnboarding = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [existingPharmacy, setExistingPharmacy] = useState(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
+  const [mapPosition, setMapPosition] = useState(null);
+  const [showMap, setShowMap] = useState(false);
 
   const submitGuardRef = useRef(false);
 
@@ -175,6 +232,42 @@ const PharmacyOnboarding = () => {
       { enableHighAccuracy: true, timeout: 8000 }
     );
   };
+
+  // Handle map location selection
+  const handleMapLocationSelect = (position) => {
+    setMapPosition(position);
+    setValue("latitude", position[0].toFixed(6), { shouldValidate: true });
+    setValue("longitude", position[1].toFixed(6), { shouldValidate: true });
+    setNotice({
+      type: "success",
+      title: "Location selected",
+      message: "Coordinates updated from map selection.",
+    });
+  };
+
+  // Handle city quick selection
+  const handleCitySelect = (city) => {
+    const position = [city.lat, city.lng];
+    setMapPosition(position);
+    setValue("latitude", city.lat.toFixed(6), { shouldValidate: true });
+    setValue("longitude", city.lng.toFixed(6), { shouldValidate: true });
+    setNotice({
+      type: "success",
+      title: `Location set to ${city.name}`,
+      message: "You can fine-tune by clicking on the map.",
+    });
+  };
+
+  // Sync form fields with map position
+  useEffect(() => {
+    if (watchedLatitude && watchedLongitude) {
+      const lat = parseFloat(watchedLatitude);
+      const lng = parseFloat(watchedLongitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        setMapPosition([lat, lng]);
+      }
+    }
+  }, [watchedLatitude, watchedLongitude]);
 
   const onSubmit = async (values) => {
     if (submitGuardRef.current) return;
@@ -406,7 +499,7 @@ const PharmacyOnboarding = () => {
                 <Input
                   label="Contact Number"
                   type="tel"
-                  placeholder="+1 555 000 0000"
+                  placeholder="+977 9812345678"
                   required
                   error={errors.contactNumber?.message}
                   {...registerField("contactNumber", {
@@ -436,14 +529,15 @@ const PharmacyOnboarding = () => {
                 <Input
                   label="Latitude (optional)"
                   type="number"
-                  placeholder="12.9716"
+                  placeholder="27.7172"
                   error={errors.latitude?.message}
                   {...registerField("latitude", {
                     validate: (value) => {
                       if (!value) return true;
                       const numeric = Number(value);
                       if (Number.isNaN(numeric)) return "Enter a valid latitude";
-                      if (numeric < -90 || numeric > 90) return "Latitude must be between -90 and 90";
+                      if (numeric < NEPAL_BOUNDS.minLat || numeric > NEPAL_BOUNDS.maxLat) 
+                        return `Latitude must be within Nepal (${NEPAL_BOUNDS.minLat} to ${NEPAL_BOUNDS.maxLat})`;
                       return true;
                     },
                   })}
@@ -452,14 +546,15 @@ const PharmacyOnboarding = () => {
                 <Input
                   label="Longitude (optional)"
                   type="number"
-                  placeholder="77.5946"
+                  placeholder="85.3240"
                   error={errors.longitude?.message}
                   {...registerField("longitude", {
                     validate: (value) => {
                       if (!value) return true;
                       const numeric = Number(value);
                       if (Number.isNaN(numeric)) return "Enter a valid longitude";
-                      if (numeric < -180 || numeric > 180) return "Longitude must be between -180 and 180";
+                      if (numeric < NEPAL_BOUNDS.minLng || numeric > NEPAL_BOUNDS.maxLng) 
+                        return `Longitude must be within Nepal (${NEPAL_BOUNDS.minLng} to ${NEPAL_BOUNDS.maxLng})`;
                       return true;
                     },
                   })}
@@ -481,6 +576,65 @@ const PharmacyOnboarding = () => {
                   <Navigation className="w-4 h-4" />
                   Use my location
                 </button>
+              </div>
+
+              {/* Interactive Map for Location Selection */}
+              <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-xl p-6 border border-cyan-200">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-slate-900">Select Location on Map</h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowMap(!showMap)}
+                    className="text-sm text-cyan-600 hover:text-cyan-700 font-medium"
+                  >
+                    {showMap ? 'Hide Map' : 'Show Map'}
+                  </button>
+                </div>
+
+                {/* City Quick Select */}
+                <div className="mb-4">
+                  <p className="text-sm text-slate-600 mb-2">Quick select major city:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {NEPAL_CITIES.slice(0, 5).map((city) => (
+                      <button
+                        key={city.name}
+                        type="button"
+                        onClick={() => {
+                          handleCitySelect(city);
+                          setShowMap(true);
+                        }}
+                        className="px-3 py-1 text-sm bg-white border border-cyan-200 rounded-lg hover:bg-cyan-50 hover:border-cyan-400 transition-colors"
+                      >
+                        {city.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {showMap && (
+                  <div className="rounded-lg overflow-hidden border-2 border-cyan-300 shadow-lg">
+                    <MapContainer
+                      center={mapPosition || [27.7172, 85.3240]}
+                      zoom={mapPosition ? 13 : 7}
+                      style={{ height: '400px', width: '100%' }}
+                      scrollWheelZoom={true}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
+                      <LocationPicker 
+                        position={mapPosition} 
+                        setPosition={handleMapLocationSelect} 
+                      />
+                    </MapContainer>
+                  </div>
+                )}
+
+                <p className="text-xs text-slate-500 mt-3">
+                  💡 Click anywhere on the map within Nepal to set your pharmacy's exact location. 
+                  This helps patients find you more easily.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

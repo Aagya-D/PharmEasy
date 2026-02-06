@@ -48,13 +48,27 @@ const pharmacyIcon = L.divIcon({
   popupAnchor: [0, -20],
 });
 
+// Nepal Provinces/Regions for filtering
+const NEPAL_REGIONS = [
+  { name: 'All Nepal', center: [28.3949, 84.1240], zoom: 7 },
+  { name: 'Province 1 (Koshi)', center: [27.0, 87.0], zoom: 8 },
+  { name: 'Madhesh Province', center: [26.8, 85.5], zoom: 8 },
+  { name: 'Bagmati Province', center: [27.7172, 85.3240], zoom: 9 },
+  { name: 'Gandaki Province', center: [28.2096, 83.9856], zoom: 8 },
+  { name: 'Lumbini Province', center: [27.7, 83.0], zoom: 8 },
+  { name: 'Karnali Province', center: [29.0, 82.0], zoom: 8 },
+  { name: 'Sudurpashchim Province', center: [29.0, 80.5], zoom: 8 },
+];
+
 const AdminMap = () => {
   const [sosRequests, setSosRequests] = useState([]);
   const [pharmacies, setPharmacies] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [mapCenter, setMapCenter] = useState([20.5937, 78.9629]); // India center
+  const [mapCenter, setMapCenter] = useState([27.7172, 85.3240]); // Kathmandu, Nepal
+  const [mapZoom, setMapZoom] = useState(7);
   const [filter, setFilter] = useState('all'); // 'all', 'sos', 'pharmacies'
+  const [regionFilter, setRegionFilter] = useState('All Nepal');
 
   useEffect(() => {
     fetchMapData();
@@ -126,10 +140,10 @@ const AdminMap = () => {
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
                   <MapPin className="text-red-600" />
-                  Emergency SOS Heatmap
+                  Nepal Emergency SOS Map
                 </h1>
                 <p className="text-gray-600 mt-1">
-                  Real-time tracking of emergency requests and pharmacy locations
+                  Real-time tracking of emergency requests and pharmacy locations across Nepal
                 </p>
               </div>
               <button
@@ -187,37 +201,67 @@ const AdminMap = () => {
 
           {/* Filter Buttons */}
           <div className="bg-white rounded-lg shadow-sm p-4 mb-6 border border-gray-200">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setFilter('all')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === 'all'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Show All
-              </button>
-              <button
-                onClick={() => setFilter('sos')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === 'sos'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                SOS Only
-              </button>
-              <button
-                onClick={() => setFilter('pharmacies')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  filter === 'pharmacies'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Pharmacies Only
-              </button>
+            <div className="flex flex-col gap-4">
+              {/* Marker Type Filter */}
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">Filter by Type:</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setFilter('all')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      filter === 'all'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Show All
+                  </button>
+                  <button
+                    onClick={() => setFilter('sos')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      filter === 'sos'
+                        ? 'bg-red-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    SOS Only
+                  </button>
+                  <button
+                    onClick={() => setFilter('pharmacies')}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      filter === 'pharmacies'
+                        ? 'bg-green-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Pharmacies Only
+                  </button>
+                </div>
+              </div>
+
+              {/* Nepal Region Filter */}
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">Filter by Region (Nepal):</p>
+                <div className="flex flex-wrap gap-2">
+                  {NEPAL_REGIONS.map((region) => (
+                    <button
+                      key={region.name}
+                      onClick={() => {
+                        setRegionFilter(region.name);
+                        setMapCenter(region.center);
+                        setMapZoom(region.zoom);
+                      }}
+                      className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${
+                        regionFilter === region.name
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {region.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -226,8 +270,9 @@ const AdminMap = () => {
             <div style={{ height: '600px', width: '100%' }}>
               {!isLoading && (
                 <MapContainer
+                  key={regionFilter}
                   center={mapCenter}
-                  zoom={13}
+                  zoom={mapZoom}
                   style={{ height: '100%', width: '100%' }}
                   scrollWheelZoom={true}
                 >

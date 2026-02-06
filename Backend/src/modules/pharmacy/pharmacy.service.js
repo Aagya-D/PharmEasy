@@ -12,6 +12,14 @@
 import { prisma } from "../../database/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 
+// Nepal geographic boundaries for validation
+const NEPAL_BOUNDS = {
+  minLat: 26.3478,
+  maxLat: 30.4469,
+  minLng: 80.0586,
+  maxLng: 88.2015,
+};
+
 /**
  * Submit pharmacy onboarding details
  * User must be authenticated with roleId=2 (PHARMACY_ADMIN)
@@ -64,6 +72,13 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
     if (latitude < -90 || latitude > 90) {
       throw new AppError("Latitude must be between -90 and 90", 400);
     }
+    // Validate Nepal boundaries
+    if (latitude < NEPAL_BOUNDS.minLat || latitude > NEPAL_BOUNDS.maxLat) {
+      throw new AppError(
+        `Pharmacy location must be within Nepal. Latitude must be between ${NEPAL_BOUNDS.minLat} and ${NEPAL_BOUNDS.maxLat}`,
+        400
+      );
+    }
   }
 
   if (rawLongitude !== undefined && rawLongitude !== null && rawLongitude !== "") {
@@ -73,6 +88,13 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
     }
     if (longitude < -180 || longitude > 180) {
       throw new AppError("Longitude must be between -180 and 180", 400);
+    }
+    // Validate Nepal boundaries
+    if (longitude < NEPAL_BOUNDS.minLng || longitude > NEPAL_BOUNDS.maxLng) {
+      throw new AppError(
+        `Pharmacy location must be within Nepal. Longitude must be between ${NEPAL_BOUNDS.minLng} and ${NEPAL_BOUNDS.maxLng}`,
+        400
+      );
     }
   }
 
