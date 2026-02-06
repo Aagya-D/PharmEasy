@@ -5,12 +5,13 @@
 
 import pharmacyService from "./pharmacy.service.js";
 import logger from "../../utils/logger.js";
+import { createLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
 
 /**
  * POST /api/pharmacy/onboard
  * Submit pharmacy onboarding details with license document upload
  * Requires: Authentication, roleId=2 (PHARMACY_ADMIN)
- * Accepts: multipart/form-data with optional "licenseDocument" file
+ * Accepts: multipart/form-data with REQUIRED "licenseDocument" file
  */
 export const onboardPharmacy = async (req, res, next) => {
   try {
@@ -19,13 +20,28 @@ export const onboardPharmacy = async (req, res, next) => {
     logger.operation('PHARMACY', 'onboardPharmacy', 'START', { userId, hasFile: !!req.file });
 
     const pharmacyData = req.body;
-    logger.debug('PHARMACY', '[ONBOARD] Pharmacy data received', { pharmacyName: pharmacyData.pharmacyName, licenseNumber: pharmacyData.licenseNumber });
+    logger.debug('PHARMACY', '[ONBOARD] Pharmacy data received', { 
+      pharmacyName: pharmacyData.pharmacyName, 
+      licenseNumber: pharmacyData.licenseNumber,
+      hasFile: !!req.file,
+      fileName: req.file?.originalname,
+      fileSize: req.file?.size
+    });
 
     // If file was uploaded via Cloudinary, attach the URL
     if (req.file && req.file.path) {
-      logger.debug('PHARMACY', '[ONBOARD] File uploaded successfully', { fileName: req.file.originalname, cloudinaryUrl: req.file.path });
+      logger.debug('PHARMACY', '[ONBOARD] File uploaded successfully', { 
+        fileName: req.file.originalname, 
+        cloudinaryUrl: req.file.path,
+        fileSize: req.file.size
+      });
       pharmacyData.licenseDocument = req.file.path; // Cloudinary URL
       pharmacyData.licenseDocumentPublicId = req.file.filename; // Cloudinary public_id
+    } else {
+      logger.error('PHARMACY', '[ONBOARD] No file received in request', { 
+        hasFile: !!req.file,
+        bodyKeys: Object.keys(req.body)
+      });
     }
 
     const pharmacy = await pharmacyService.submitPharmacyOnboarding(
@@ -36,6 +52,19 @@ export const onboardPharmacy = async (req, res, next) => {
     const duration = Date.now() - startTime;
     logger.timing('PHARMACY', 'onboardPharmacy', duration, 'SUCCESS');
     logger.operation('PHARMACY', 'onboardPharmacy', 'SUCCESS', { pharmacyId: pharmacy.id, userId });
+
+    // Log activity
+    await createLog(
+      userId,
+      LOG_ACTIONS.PHARMACY_ONBOARDED,
+      `Pharmacy "${pharmacy.pharmacyName}" submitted onboarding application (License: ${pharmacy.licenseNumber})`,
+      "PHARMACY",
+      {
+        pharmacyId: pharmacy.id,
+        pharmacyName: pharmacy.pharmacyName,
+        licenseNumber: pharmacy.licenseNumber,
+      }
+    );
 
     res.status(201).json({
       success: true,

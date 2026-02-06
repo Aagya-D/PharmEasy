@@ -105,6 +105,15 @@ const adminService = {
     const response = await httpClient.patch("/admin/change-password", passwordData);
     return response.data;
   },
+
+  /**
+   * Get activity logs
+   * Endpoint: GET /api/admin/logs
+   */
+  getLogs: async (filters) => {
+    const response = await httpClient.get("/admin/logs", { params: filters });
+    return response.data;
+  },
 };
 
 export default adminService;

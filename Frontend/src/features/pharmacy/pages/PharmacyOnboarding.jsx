@@ -205,8 +205,16 @@ const PharmacyOnboarding = () => {
       if (values.longitude) formData.append("longitude", Number(values.longitude));
       if (values.email) formData.append("email", values.email.trim());
 
+      // Append license document file (REQUIRED)
       if (licenseFile) {
         formData.append("licenseDocument", licenseFile);
+        console.log('[ONBOARD] License file attached:', {
+          name: licenseFile.name,
+          type: licenseFile.type,
+          size: licenseFile.size
+        });
+      } else {
+        console.error('[ONBOARD] No license file - this should not happen!');
       }
 
       const response = await submitPharmacyOnboarding(formData);

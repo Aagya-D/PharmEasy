@@ -30,7 +30,8 @@ const router = express.Router();
  * POST /api/pharmacy/onboard
  * Submit pharmacy onboarding details with license document
  * Requires: JWT token, roleId=2 (PHARMACY_ADMIN)
- * Accepts: multipart/form-data with optional "licenseDocument" file (PDF/JPG/PNG, max 5MB)
+ * Accepts: multipart/form-data with REQUIRED "licenseDocument" file (PDF/JPG/PNG, max 5MB)
+ * Field name for file upload: "licenseDocument"
  */
 router.post(
   "/pharmacy/onboard",

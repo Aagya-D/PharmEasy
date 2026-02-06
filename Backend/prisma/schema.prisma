@@ -325,3 +325,39 @@ model SOSRequest {
   @@index([urgencyLevel])
   @@index([createdAt])
 }
+
+/// *
+/// * Log Model - System-wide activity logging and audit trail
+/// * 
+/// * Captures all critical system events for transparency and debugging
+/// * Categories: AUTH (login/logout), PHARMACY (approvals/rejections), SYSTEM (errors/alerts)
+/// * 
+/// * Usage:
+/// * - Admin approves pharmacy: category=PHARMACY, action=PHARMACY_APPROVED
+/// * - User logs in: category=AUTH, action=USER_LOGIN
+/// * - Profile updated: category=SYSTEM, action=PROFILE_UPDATED
+/// * 
+/// * Provides complete audit trail for compliance and security monitoring
+model Log {
+  id        String      @id @default(cuid())
+  action    String
+  message   String
+  userId    String?
+  category  LogCategory
+  metadata  Json?
+  createdAt DateTime    @default(now())
+
+  @@index([category])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
+}
+
+enum LogCategory {
+  AUTH
+  PHARMACY
+  SYSTEM
+  USER
+  INVENTORY
+  ORDER
+}

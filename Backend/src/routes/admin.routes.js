@@ -97,4 +97,30 @@ router.patch(
   adminController.changePassword
 );
 
+/**
+ * GET /api/admin/users
+ * Get all users with filtering options
+ * Query: ?role=1|2|3&search=text&status=APPROVED|PENDING|REJECTED
+ * Requires: JWT + roleId=1
+ */
+router.get(
+  "/users",
+  authenticate(),
+  requireSystemAdmin,
+  adminController.getAllUsers
+);
+
+/**
+ * GET /api/admin/logs
+ * Get activity logs with filtering and pagination
+ * Query: ?category=AUTH|PHARMACY|SYSTEM&userId=xxx&action=xxx&skip=0&take=50
+ * Requires: JWT + roleId=1
+ */
+router.get(
+  "/logs",
+  authenticate(),
+  requireSystemAdmin,
+  adminController.getLogs
+);
+
 export default router;

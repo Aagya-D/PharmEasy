@@ -8,18 +8,43 @@ import httpClient from "./httpClient";
 /**
  * Create pharmacy onboarding
  * Backend: POST /api/pharmacy/onboard
+ * Accepts FormData with file upload
  */
 export const createPharmacy = async (pharmacyData) => {
-  const response = await httpClient.post("/pharmacy/onboard", pharmacyData);
+  // When pharmacyData is FormData, we need to set proper headers
+  const config = {};
+  
+  // Check if pharmacyData is FormData (file upload)
+  if (pharmacyData instanceof FormData) {
+    // Let browser set Content-Type with boundary for multipart/form-data
+    config.headers = {
+      'Content-Type': 'multipart/form-data',
+    };
+  }
+  
+  const response = await httpClient.post("/pharmacy/onboard", pharmacyData, config);
   return response.data;
 };
 
 /**
  * Submit pharmacy onboarding (alias)
  * Backend: POST /api/pharmacy/onboard
+ * Accepts FormData with file upload
  */
 export const submitPharmacyOnboarding = async (pharmacyData) => {
-  const response = await httpClient.post("/pharmacy/onboard", pharmacyData);
+  // When pharmacyData is FormData, we need to set proper headers
+  const config = {};
+  
+  // Check if pharmacyData is FormData (file upload)
+  if (pharmacyData instanceof FormData) {
+    // Let browser set Content-Type with boundary for multipart/form-data
+    // Remove the default application/json header
+    config.headers = {
+      'Content-Type': 'multipart/form-data',
+    };
+  }
+  
+  const response = await httpClient.post("/pharmacy/onboard", pharmacyData, config);
   return response.data;
 };
 

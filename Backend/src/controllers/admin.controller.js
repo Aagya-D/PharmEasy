@@ -7,6 +7,7 @@
 import bcrypt from "bcrypt";
 import { prisma } from "../database/prisma.js";
 import { AppError } from "../middlewares/errorHandler.js";
+import { createLog, getLogs as getActivityLogs, LOG_ACTIONS } from "../utils/activityLogger.js";
 
 /**
  * GET /api/admin/pharmacies/pending
@@ -210,6 +211,20 @@ export const approvePharmacy = async (req, res, next) => {
       `[ADMIN] Pharmacy ${id} approved by admin ${adminUserId}`
     );
 
+    // Log activity
+    await createLog(
+      adminUserId,
+      LOG_ACTIONS.PHARMACY_APPROVED,
+      `Pharmacy "${updatedPharmacy.pharmacyName}" (License: ${updatedPharmacy.licenseNumber}) approved by admin ${updatedPharmacy.user.name}`,
+      "PHARMACY",
+      {
+        pharmacyId: id,
+        pharmacyName: updatedPharmacy.pharmacyName,
+        licenseNumber: updatedPharmacy.licenseNumber,
+        userId: updatedPharmacy.userId,
+      }
+    );
+
     res.status(200).json({
       success: true,
       message: "Pharmacy approved successfully",
@@ -285,6 +300,21 @@ export const rejectPharmacy = async (req, res, next) => {
       `[ADMIN] Pharmacy ${id} rejected by admin ${adminUserId}: ${reason}`
     );
 
+    // Log activity
+    await createLog(
+      adminUserId,
+      LOG_ACTIONS.PHARMACY_REJECTED,
+      `Pharmacy "${updatedPharmacy.pharmacyName}" rejected by admin ${updatedPharmacy.user.name}. Reason: ${reason}`,
+      "PHARMACY",
+      {
+        pharmacyId: id,
+        pharmacyName: updatedPharmacy.pharmacyName,
+        licenseNumber: updatedPharmacy.licenseNumber,
+        userId: updatedPharmacy.userId,
+        rejectionReason: reason,
+      }
+    );
+
     res.status(200).json({
       success: true,
       message: "Pharmacy rejected",
@@ -348,6 +378,18 @@ export const updateProfile = async (req, res, next) => {
     });
 
     console.log(`[ADMIN] Profile updated for user ${userId}`);
+
+    // Log activity
+    await createLog(
+      userId,
+      LOG_ACTIONS.PROFILE_UPDATED,
+      `Admin ${updatedUser.name} updated their profile`,
+      "SYSTEM",
+      {
+        updatedFields: Object.keys(updateData),
+        email: updatedUser.email,
+      }
+    );
 
     res.status(200).json({
       success: true,
@@ -432,12 +474,143 @@ export const changePassword = async (req, res, next) => {
 
     console.log(`[ADMIN] Password changed for user ${userId} (${user.email})`);
 
+    // Log activity
+    await createLog(
+      userId,
+      LOG_ACTIONS.PASSWORD_CHANGED,
+      `Admin ${user.name} changed their password`,
+      "SYSTEM",
+      {
+        email: user.email,
+        timestamp: new Date(),
+      }
+    );
+
     res.status(200).json({
       success: true,
       message: "Password changed successfully",
     });
   } catch (error) {
     next(error);
+  }
+};
+
+/**
+ * GET /api/admin/users
+ * Get all users with filtering options
+ * Query params:
+ * - role: Filter by roleId (1=Admin, 2=Pharmacy, 3=Patient)
+ * - search: Search by name or email
+ * - status: Filter by user status (APPROVED, PENDING, REJECTED, etc.)
+ * Requires: JWT + roleId=1
+ */
+export const getAllUsers = async (req, res, next) => {
+  try {
+    const { role, search, status } = req.query;
+
+    // Build where clause for filtering
+    const where = {};
+
+    // Filter by role
+    if (role && !isNaN(parseInt(role))) {
+      where.roleId = parseInt(role);
+    }
+
+    // Filter by status
+    if (status) {
+      where.status = status;
+    }
+
+    // Search by name or email
+    if (search && search.trim()) {
+      where.OR = [
+        { name: { contains: search.trim(), mode: 'insensitive' } },
+        { email: { contains: search.trim(), mode: 'insensitive' } },
+      ];
+    }
+
+    // Fetch users with role information, excluding password
+    const users = await prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        roleId: true,
+        status: true,
+        isVerified: true,
+        isActive: true,
+        lastLogin: true,
+        createdAt: true,
+        updatedAt: true,
+        role: {
+          select: {
+            name: true,
+            displayName: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    console.log(`[ADMIN] Fetched ${users.length} users with filters:`, { role, search, status });
+
+    res.status(200).json({
+      success: true,
+      count: users.length,
+      data: users,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/admin/logs
+ * Get activity logs with filtering and pagination
+ * Query params:
+ * - category: Filter by log category (AUTH, PHARMACY, SYSTEM, USER, INVENTORY, ORDER)
+ * - userId: Filter by user ID
+ * - action: Filter by action type
+ * - skip: Pagination skip (default: 0)
+ * - take: Pagination take (default: 50)
+ * Requires: JWT + roleId=1
+ */
+export const getLogs = async (req, res, next) => {
+  try {
+    const { category, userId, action, skip = 0, take = 50 } = req.query;
+
+    const filters = {
+      category,
+      userId,
+      action,
+      skip: parseInt(skip) || 0,
+      take: parseInt(take) || 50,
+    };
+
+    const result = await getActivityLogs(filters);
+
+    console.log(`[ADMIN] Fetched ${result.logs.length} logs (page ${result.page}/${result.totalPages})`);
+
+    // Always return 200 with the result, even if logs array is empty
+    res.status(200).json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    console.error("[ADMIN] Error fetching logs:", error);
+    // Return empty result on error instead of crashing
+    res.status(200).json({
+      success: true,
+      logs: [],
+      totalCount: 0,
+      page: 1,
+      pageSize: parseInt(req.query.take) || 50,
+      totalPages: 0,
+    });
   }
 };
 
@@ -449,4 +622,6 @@ export default {
   rejectPharmacy,
   updateProfile,
   changePassword,
+  getAllUsers,
+  getLogs,
 };

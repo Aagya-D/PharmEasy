@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
-import { Users as UsersIcon, Search, Shield, CheckCircle } from "lucide-react";
+import { Users as UsersIcon, Search, Shield, CheckCircle, User, Building, AlertCircle } from "lucide-react";
 import AdminLayout from "../components/AdminLayout";
-import httpClient from "../../../core/services/httpClient";
+import adminService from "../../../core/services/admin.service";
 
 const AdminUsers = () => {
   const navigate = useNavigate();
@@ -20,21 +20,34 @@ const AdminUsers = () => {
     }
   }, [user, navigate]);
 
+  // Debounced search and filter effect
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    const delayDebounce = setTimeout(() => {
+      fetchUsers();
+    }, 300);
+
+    return () => clearTimeout(delayDebounce);
+  }, [roleFilter, searchQuery]);
 
   const fetchUsers = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("accessToken");
-      const response = await httpClient.get("/admin/users", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setUsers(response.data.data || []);
+      const filters = {};
+      
+      if (roleFilter !== "ALL") {
+        filters.role = parseInt(roleFilter);
+      }
+      
+      if (searchQuery.trim()) {
+        filters.search = searchQuery.trim();
+      }
+
+      const response = await adminService.getAllUsers(filters);
+      setUsers(response.data || []);
     } catch (err) {
-      console.log("Users endpoint not available, using mock data");
+      console.error("Error fetching users:", err);
+      setError("Failed to load users. Please try again later.");
       setUsers([]);
     } finally {
       setIsLoading(false);
@@ -59,15 +72,44 @@ const AdminUsers = () => {
     }
   };
 
-  const filteredUsers = users.filter((u) => {
-    const matchesSearch = 
-      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesRole = roleFilter === "ALL" || u.roleId.toString() === roleFilter;
-    
-    return matchesSearch && matchesRole;
-  });
+  const getRoleIcon = (roleId) => {
+    switch (roleId) {
+      case 1: return <Shield size={14} />;
+      case 2: return <Building size={14} />;
+      case 3: return <User size={14} />;
+      default: return <User size={14} />;
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      APPROVED: { bg: "#DEF7EC", text: "#03543F", label: "Active" },
+      PENDING_VERIFICATION: { bg: "#FEF3C7", text: "#92400E", label: "Pending" },
+      REJECTED: { bg: "#FEE2E2", text: "#991B1B", label: "Rejected" },
+    };
+
+    const config = statusConfig[status] || { bg: "#F3F4F6", text: "#6B7280", label: status };
+    return config;
+  };
+
+  const filteredUsers = users;
+
+  const SkeletonRow = () => (
+    <tr style={{ borderTop: "1px solid #F3F4F6" }}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <td key={i} style={{ padding: "16px" }}>
+          <div
+            style={{
+              height: "16px",
+              backgroundColor: "#E5E7EB",
+              borderRadius: "4px",
+              animation: "pulse 1.5s ease-in-out infinite",
+            }}
+          />
+        </td>
+      ))}
+    </tr>
+  );
 
   if (!user || user.roleId !== 1) {
     return null;
@@ -75,9 +117,22 @@ const AdminUsers = () => {
 
   return (
     <AdminLayout>
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 100% {
+              opacity: 1;
+            }
+            50% {
+              opacity: 0.5;
+            }
+          }
+        `}
+      </style>
+      
       <div style={{ marginBottom: "24px" }}>
         <p style={{ fontSize: "14px", color: "#6B7280" }}>
-          View all registered users in the system. This is a read-only view.
+          View and manage all registered users in the system.
         </p>
       </div>
 
@@ -139,137 +194,170 @@ const AdminUsers = () => {
             border: "1px solid #FCA5A5",
             borderRadius: "8px",
             color: "#991B1B",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}
         >
+          <AlertCircle size={20} />
           {error}
         </div>
       )}
 
-      {isLoading && (
-        <div style={{ textAlign: "center", padding: "60px" }}>
-          <div
-            style={{
-              width: "40px",
-              height: "40px",
-              border: "3px solid #E5E7EB",
-              borderTop: "3px solid #3B82F6",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-              margin: "0 auto",
-            }}
-          />
-          <p style={{ marginTop: "16px", color: "#6B7280" }}>Loading users...</p>
-        </div>
-      )}
-
-      {!isLoading && (
-        <div style={{ backgroundColor: "white", borderRadius: "12px", border: "1px solid #E5E7EB", overflow: "hidden" }}>
-          {filteredUsers.length === 0 ? (
-            <div style={{ padding: "60px", textAlign: "center" }}>
-              <UsersIcon size={48} color="#D1D5DB" style={{ margin: "0 auto 16px" }} />
-              <p style={{ fontSize: "16px", color: "#6B7280" }}>
-                {users.length === 0 
-                  ? "No users found in the system. User management endpoint may not be available."
-                  : "No users match your search criteria"
-                }
-              </p>
-            </div>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead style={{ backgroundColor: "#F9FAFB" }}>
-                  <tr>
-                    <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
-                      Name
-                    </th>
-                    <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
-                      Email
-                    </th>
-                    <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
-                      Role
-                    </th>
-                    <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
-                      Status
-                    </th>
-                    <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
-                      Registered
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.map((u) => {
-                    const roleColor = getRoleColor(u.roleId);
-                    return (
-                      <tr
-                        key={u.id}
-                        style={{
-                          borderTop: "1px solid #F3F4F6",
-                          transition: "background-color 0.15s",
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#F9FAFB")}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "white")}
-                      >
-                        <td style={{ padding: "16px", fontSize: "14px", color: "#111827", fontWeight: "500" }}>
-                          {u.name}
-                        </td>
-                        <td style={{ padding: "16px", fontSize: "14px", color: "#6B7280" }}>
-                          {u.email}
-                        </td>
-                        <td style={{ padding: "16px" }}>
-                          <span
-                            style={{
-                              display: "inline-block",
-                              padding: "4px 12px",
-                              borderRadius: "12px",
-                              fontSize: "12px",
-                              fontWeight: "600",
-                              backgroundColor: roleColor.bg,
-                              color: roleColor.text,
-                            }}
-                          >
-                            {getRoleName(u.roleId)}
-                          </span>
-                        </td>
-                        <td style={{ padding: "16px" }}>
-                          <span
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              fontSize: "12px",
-                              fontWeight: "600",
-                              color: u.isVerified ? "#10B981" : "#F59E0B",
-                            }}
-                          >
-                            {u.isVerified && <CheckCircle size={16} />}
-                            {u.isVerified ? "Verified" : "Pending"}
-                          </span>
-                        </td>
-                        <td style={{ padding: "16px", fontSize: "14px", color: "#6B7280" }}>
-                          {new Date(u.createdAt).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+      <div style={{ backgroundColor: "white", borderRadius: "12px", border: "1px solid #E5E7EB", overflow: "hidden" }}>
+        {isLoading ? (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead style={{ backgroundColor: "#F9FAFB" }}>
+                <tr>
+                  <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
+                    Name
+                  </th>
+                  <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
+                    Email
+                  </th>
+                  <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
+                    Role
+                  </th>
+                  <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
+                    Status
+                  </th>
+                  <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
+                    Registered
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <SkeletonRow key={i} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div style={{ padding: "60px", textAlign: "center" }}>
+            <UsersIcon size={48} color="#D1D5DB" style={{ margin: "0 auto 16px" }} />
+            <p style={{ fontSize: "16px", color: "#6B7280", marginBottom: "8px" }}>
+              No users found
+            </p>
+            <p style={{ fontSize: "14px", color: "#9CA3AF" }}>
+              {searchQuery || roleFilter !== "ALL"
+                ? "Try adjusting your filters or search query"
+                : "No users are registered in the system yet"}
+            </p>
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead style={{ backgroundColor: "#F9FAFB" }}>
+                <tr>
+                  <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
+                    Name
+                  </th>
+                  <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
+                    Email
+                  </th>
+                  <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
+                    Role
+                  </th>
+                  <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
+                    Status
+                  </th>
+                  <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
+                    Registered
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map((u) => {
+                  const roleColor = getRoleColor(u.roleId);
+                  const statusBadge = getStatusBadge(u.status);
+                  return (
+                    <tr
+                      key={u.id}
+                      style={{
+                        borderTop: "1px solid #F3F4F6",
+                        transition: "background-color 0.15s",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#F9FAFB")}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "white")}
+                    >
+                      <td style={{ padding: "16px", fontSize: "14px", color: "#111827", fontWeight: "500" }}>
+                        {u.name}
+                      </td>
+                      <td style={{ padding: "16px", fontSize: "14px", color: "#6B7280" }}>
+                        {u.email}
+                      </td>
+                      <td style={{ padding: "16px" }}>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            padding: "4px 12px",
+                            borderRadius: "12px",
+                            fontSize: "12px",
+                            fontWeight: "600",
+                            backgroundColor: roleColor.bg,
+                            color: roleColor.text,
+                          }}
+                        >
+                          {getRoleIcon(u.roleId)}
+                          {u.role?.displayName || getRoleName(u.roleId)}
+                        </span>
+                      </td>
+                      <td style={{ padding: "16px" }}>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            padding: "4px 12px",
+                            borderRadius: "12px",
+                            fontSize: "12px",
+                            fontWeight: "600",
+                            backgroundColor: statusBadge.bg,
+                            color: statusBadge.text,
+                          }}
+                        >
+                          {u.status === "APPROVED" && <CheckCircle size={14} />}
+                          {statusBadge.label}
+                        </span>
+                      </td>
+                      <td style={{ padding: "16px", fontSize: "14px", color: "#6B7280" }}>
+                        {new Date(u.createdAt).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <div
         style={{
           marginTop: "24px",
           padding: "16px",
-          backgroundColor: "#FEF9C3",
-          border: "1px solid #FDE047",
+          backgroundColor: "#F0F9FF",
+          border: "1px solid #BAE6FD",
           borderRadius: "8px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
         }}
       >
-        <p style={{ fontSize: "14px", color: "#854D0E", display: "flex", alignItems: "center", gap: "8px" }}>
-          <Shield size={16} />
-          <strong>Read-Only View:</strong> User management actions are not available in this panel.
+        <p style={{ fontSize: "14px", color: "#075985", display: "flex", alignItems: "center", gap: "8px" }}>
+          <UsersIcon size={16} />
+          <strong>Total Users:</strong> {filteredUsers.length} {roleFilter !== "ALL" ? "filtered" : ""} user{filteredUsers.length !== 1 ? "s" : ""}
+        </p>
+        <p style={{ fontSize: "12px", color: "#0369A1" }}>
+          Updated in real-time
         </p>
       </div>
     </AdminLayout>

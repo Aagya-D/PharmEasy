@@ -3,6 +3,7 @@ import { generateAccessToken, generateRefreshToken } from "../../lib/auth.js";
 import { AuthenticationError, ValidationError } from "../../utils/errors.js";
 import jwt from "jsonwebtoken";
 import logger from "../../utils/logger.js";
+import { createLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -55,6 +56,19 @@ export const register = async (req, res, next) => {
     const duration = Date.now() - startTime;
     logger.timing('AUTH', 'register', duration, 'SUCCESS');
     logger.operation('AUTH', 'register', 'SUCCESS', { userId: result.userId, email: result.email });
+
+    // Log activity
+    await createLog(
+      result.userId,
+      LOG_ACTIONS.USER_REGISTERED,
+      `New user ${result.email} registered with role ${result.role}`,
+      "AUTH",
+      {
+        email: result.email,
+        role: result.role,
+        roleId: result.roleId,
+      }
+    );
 
     res.status(201).json({
       success: true,
@@ -201,6 +215,19 @@ export const login = async (req, res, next) => {
     const duration = Date.now() - startTime;
     logger.timing('AUTH', 'login', duration, 'SUCCESS');
     logger.operation('AUTH', 'login', 'SUCCESS', { userId: result.userId, roleId: result.roleId });
+
+    // Log activity
+    await createLog(
+      result.userId,
+      LOG_ACTIONS.USER_LOGIN,
+      `User ${result.name} (${result.email}) logged in`,
+      "AUTH",
+      {
+        email: result.email,
+        roleId: result.roleId,
+        role: result.role,
+      }
+    );
 
     // 4. RETURN USER DATA
     res.status(200).json({
