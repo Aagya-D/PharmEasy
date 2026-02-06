@@ -114,9 +114,62 @@ const patientService = {
     return response.data;
   },
 
-  // Emergency SOS
+  // Emergency SOS - Enhanced with full prescription/medicine details
   triggerSOS: async (location) => {
     const response = await httpClient.post("/patient/sos", { location });
+    return response.data;
+  },
+
+  // Submit SOS Request with medicine details and prescription
+  submitSOSRequest: async (sosData) => {
+    const formData = new FormData();
+    
+    // Add medicine details
+    formData.append("medicineName", sosData.medicineName);
+    formData.append("genericName", sosData.genericName || "");
+    formData.append("quantity", sosData.quantity);
+    formData.append("urgencyLevel", sosData.urgencyLevel);
+    
+    // Add patient contact info
+    formData.append("patientName", sosData.patientName);
+    formData.append("contactNumber", sosData.contactNumber);
+    formData.append("address", sosData.address);
+    formData.append("latitude", sosData.latitude);
+    formData.append("longitude", sosData.longitude);
+    formData.append("additionalNotes", sosData.additionalNotes || "");
+    formData.append("prescriptionRequired", sosData.prescriptionRequired);
+    
+    // Add prescription file if present
+    if (sosData.prescriptionFile) {
+      formData.append("prescription", sosData.prescriptionFile);
+    }
+    
+    const response = await httpClient.post("/patient/sos/request", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  },
+
+  // Get SOS history
+  getSOSHistory: async () => {
+    const response = await httpClient.get("/patient/sos/history");
+    return response.data;
+  },
+
+  // Get single SOS request details
+  getSOSDetails: async (sosId) => {
+    const response = await httpClient.get(`/patient/sos/${sosId}`);
+    return response.data;
+  },
+
+  // Search medicines with real-time pharmacy availability
+  searchMedicinesWithAvailability: async (query, latitude = null, longitude = null) => {
+    const params = { query };
+    if (latitude && longitude) {
+      params.latitude = latitude;
+      params.longitude = longitude;
+    }
+    const response = await httpClient.get("/medicines/search", { params });
     return response.data;
   },
 

@@ -20,7 +20,6 @@ import {
   AlertCircle,
   AlertTriangle,
 } from "lucide-react";
-import Layout from "../../../shared/layouts/Layout";
 
 /**
  * Medicine Search Results Page
@@ -204,11 +203,10 @@ export default function SearchResults() {
   };
 
   return (
-    <Layout>
-      <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50">
 
-      {/* Search Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
+    {/* Search Header */}
+    <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
             {/* Back and Search */}
@@ -688,8 +686,6 @@ export default function SearchResults() {
           )}
         </button>
       </div>
-      </div>
-    </Layout>
+    </div>
   );
 }
-

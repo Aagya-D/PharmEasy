@@ -16,6 +16,7 @@ import ResetPassword from "../features/auth/pages/ResetPassword";
 // Patient Pages
 import PatientPortal from "../features/patient/pages/PatientPortal";
 import SearchResults from "../features/patient/pages/SearchResults";
+import MedicineSearch from "../features/patient/pages/MedicineSearch";
 import EmergencySOS from "../features/patient/pages/EmergencySOS";
 import NotificationCenter from "../features/patient/pages/NotificationCenter";
 import PatientDashboard from "../features/patient/pages/Dashboard/PatientDashboard";
@@ -48,6 +49,7 @@ import AdminSettings from "../features/admin/pages/AdminSettings";
 // Layouts & Components
 import ProtectedRoute from "./ProtectedRoute";
 import Layout from "../shared/layouts/Layout";
+import PatientLayout from "../shared/layouts/PatientLayout";
 import ProtectedPharmacyLayout from "../shared/layouts/ProtectedPharmacyLayout";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
 
@@ -279,7 +281,9 @@ export const routes = [
     path: "/patient",
     element: (
       <ProtectedRoute allowedRoles={['PATIENT']}>
-        <Outlet />
+        <PatientLayout>
+          <Outlet />
+        </PatientLayout>
       </ProtectedRoute>
     ),
     children: [
@@ -313,13 +317,19 @@ export const routes = [
     path: "/",
     element: (
       <ProtectedRoute allowedRoles={['PATIENT']}>
-        <Outlet />
+        <PatientLayout>
+          <Outlet />
+        </PatientLayout>
       </ProtectedRoute>
     ),
     children: [
       {
         path: "search",
         element: <SearchResults />,
+      },
+      {
+        path: "medicine-search",
+        element: <MedicineSearch />,
       },
       {
         path: "map",

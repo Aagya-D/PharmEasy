@@ -460,6 +460,13 @@ export const getCurrentUser = async (req, res, next) => {
 
     logger.debug('AUTH', '[GET_CURRENT_USER] User retrieved', { userId, email: user.email, status: user.status });
 
+    // Calculate isOnboarded and needsOnboarding flags
+    const isPharmacy = user.roleId === 2;
+    const isOnboarded = isPharmacy 
+      ? (user.pharmacy && user.pharmacy.verificationStatus === 'VERIFIED') 
+      : true; // Patients are always considered onboarded
+    const needsOnboarding = isPharmacy && !user.pharmacy;
+
     res.status(200).json({
       success: true,
       message: "User data retrieved",
@@ -472,6 +479,8 @@ export const getCurrentUser = async (req, res, next) => {
           role: user.role.name,
           status: user.status,
           isVerified: user.isVerified,
+          isOnboarded,
+          needsOnboarding,
         },
         pharmacy: user.pharmacy ? {
           id: user.pharmacy.id,

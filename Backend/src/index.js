@@ -16,6 +16,7 @@ import validateEnvironment from "./utils/validateEnv.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import pharmacyRoutes from "./modules/pharmacy/pharmacy.routes.js";
 import inventoryRoutes from "./modules/inventory/inventory.routes.js";
+import patientRoutes from "./modules/patient/patient.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 
 // ES Module __dirname workaround
@@ -44,26 +45,46 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 // ============================================
 
 // CORS Configuration
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "http://127.0.0.1:3000",
-  "http://127.0.0.1:5173",
-];
+const allowedOrigins = new Set(
+  [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    process.env.FRONTEND_URL,
+    process.env.CORS_ORIGIN,
+  ].filter(Boolean)
+);
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin) {
         callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
+        return;
       }
+
+      if (allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      if (NODE_ENV === "development") {
+        const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/;
+        if (isLocalhost.test(origin)) {
+          callback(null, true);
+          return;
+        }
+      }
+
+      callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 200,
   })
 );
 
@@ -156,6 +177,10 @@ app.get(
 
 // Authentication routes
 app.use("/api/auth", authRoutes);
+
+// Patient routes (dashboard, orders, prescriptions, medications, SOS)
+// Routes include: /patient/dashboard, /patient/orders, /patient/prescriptions, /patient/sos/request, etc.
+app.use("/api/patient", patientRoutes);
 
 // Pharmacy routes (onboarding, pharmacy management & admin verification)
 // Routes include: /pharmacy/onboard, /pharmacy/my-pharmacy, /admin/pharmacies, /admin/pharmacy/:id, etc.

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -19,7 +19,7 @@ import {
   Plus,
   Minus,
 } from "lucide-react";
-import Layout from "../../../shared/layouts/Layout";
+import patientService from "../services/patient.service";
 
 /**
  * Emergency SOS Request Form
@@ -34,6 +34,8 @@ export default function EmergencySOS()
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState("");
+  const [prescriptionFile, setPrescriptionFile] = useState(null);
+  const [submitError, setSubmitError] = useState("");
 
   const [formData, setFormData] = useState({
     medicineName: "",
@@ -102,12 +104,31 @@ export default function EmergencySOS()
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setSubmitError("");
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      // Validate required fields
+      if (!formData.medicineName || !formData.patientName || !formData.contactNumber || !formData.address) {
+        throw new Error("Please fill in all required fields");
+      }
 
-    setIsSubmitting(false);
-    setIsSubmitted(true);
+      // Call backend SOS API with all form data
+      const sosData = {
+        ...formData,
+        prescriptionFile: prescriptionFile,
+      };
+
+      const response = await patientService.submitSOSRequest(sosData);
+      
+      console.log("[SOS] Request submitted successfully:", response);
+      setIsSubmitting(false);
+      setIsSubmitted(true);
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || err.message || "Failed to submit SOS request";
+      setSubmitError(errorMessage);
+      setIsSubmitting(false);
+      console.error("[SOS] Submission failed:", err);
+    }
   };
 
   const handleQuantityChange = (delta) => {
@@ -193,17 +214,16 @@ export default function EmergencySOS()
   }
 
   return (
-    <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50">
-        {/* Disclaimer Modal */}
-        <AnimatePresence>
-          {showDisclaimer && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
-            >
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50">
+      {/* Disclaimer Modal */}
+      <AnimatePresence>
+        {showDisclaimer && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -624,6 +644,53 @@ export default function EmergencySOS()
             />
           </div>
 
+          {/* Prescription Upload */}
+          {formData.prescriptionRequired && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                Upload Prescription
+              </h2>
+              <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-red-500 transition-colors">
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setPrescriptionFile(file);
+                    }
+                  }}
+                  className="hidden"
+                  id="prescription-upload"
+                />
+                <label htmlFor="prescription-upload" className="cursor-pointer">
+                  <div className="flex justify-center mb-3">
+                    <div className="w-12 h-12 bg-red-50 rounded-lg flex items-center justify-center">
+                      <AlertTriangle size={24} className="text-red-600" />
+                    </div>
+                  </div>
+                  <p className="text-sm font-medium text-gray-900 mb-1">
+                    {prescriptionFile ? prescriptionFile.name : "Click to upload prescription"}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    PDF, JPG, PNG (Max 5MB)
+                  </p>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Error Alert */}
+          {submitError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+              <AlertTriangle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+              <div>
+                <p className="font-semibold text-red-900">Submission Failed</p>
+                <p className="text-red-700 text-sm">{submitError}</p>
+              </div>
+            </div>
+          )}
+
           {/* Submit Button */}
           <motion.button
             type="submit"
@@ -651,8 +718,7 @@ export default function EmergencySOS()
           </p>
         </motion.form>
       </div>
-      </div>
-    </Layout>
+    </div>
   );
 }
 

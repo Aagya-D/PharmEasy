@@ -81,6 +81,10 @@ model User {
   pharmacy       Pharmacy?
   refreshTokens  RefreshToken[]
   role           Role                 @relation(fields: [roleId], references: [id])
+  orders         Order[]              @relation("PatientOrders")
+  prescriptions  Prescription[]       @relation("PatientPrescriptions")
+  medications    Medication[]         @relation("PatientMedications")
+  sosRequests    SOSRequest[]         @relation("PatientSOSRequests")
 
   @@index([email])
   @@index([roleId])
@@ -229,4 +233,95 @@ enum PharmacyStatus {
   PENDING_VERIFICATION
   VERIFIED
   REJECTED
+}
+
+/// *
+/// * Order Model - Patient medication orders
+/// * 
+/// * Represents an order from a patient to a pharmacy
+/// * Status flow: PENDING → CONFIRMED → DELIVERED or CANCELLED
+model Order {
+  id          String    @id @default(cuid())
+  patientId   String
+  pharmacyId  String?
+  status      String    @default("pending")
+  totalAmount Float?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  patient     User      @relation("PatientOrders", fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+/// *
+/// * Prescription Model - Patient prescriptions
+/// * 
+/// * Stores prescription documents and history
+model Prescription {
+  id          String    @id @default(cuid())
+  patientId   String
+  documentUrl String?
+  issuedDate  DateTime?
+  expiryDate  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  patient     User      @relation("PatientPrescriptions", fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([issuedDate])
+}
+
+/// *
+/// * Medication Model - Patient medication history
+/// * 
+/// * Tracks medications a patient is taking or has taken
+model Medication {
+  id          String    @id @default(cuid())
+  patientId   String
+  medicineName String
+  genericName String?
+  dosage      String?
+  frequency   String?
+  isActive    Boolean   @default(true)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  patient     User      @relation("PatientMedications", fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([isActive])
+}
+
+/// *
+/// * SOSRequest Model - Emergency SOS medication requests
+/// * 
+/// * Urgent medicine requests that need quick fulfillment
+/// * Status: pending → fulfilled → expired
+model SOSRequest {
+  id                   String    @id @default(cuid())
+  patientId            String
+  medicineName         String
+  genericName          String?
+  quantity             Int       @default(1)
+  urgencyLevel         String    @default("high")
+  patientName          String
+  contactNumber        String
+  address              String
+  latitude             Float?
+  longitude            Float?
+  additionalNotes      String?
+  prescriptionRequired Boolean   @default(false)
+  status               String    @default("pending")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  patient              User      @relation("PatientSOSRequests", fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([status])
+  @@index([urgencyLevel])
+  @@index([createdAt])
 }
