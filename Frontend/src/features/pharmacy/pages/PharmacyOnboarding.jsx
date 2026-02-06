@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { ChevronRight, FileText, MapPin, Navigation, ShieldCheck, Upload } from "lucide-react";
+import { ChevronRight, FileText, MapPin, Navigation, ShieldCheck, Upload, CheckCircle } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import Layout from "../../../shared/layouts/Layout";
 import { Input, TextArea } from "../../../shared/components/ui/Input";
@@ -17,6 +17,7 @@ const PharmacyOnboarding = () => {
 
   const [licensePreview, setLicensePreview] = useState(null);
   const [licenseFile, setLicenseFile] = useState(null);
+  const [licenseError, setLicenseError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [existingPharmacy, setExistingPharmacy] = useState(null);
@@ -113,6 +114,7 @@ const PharmacyOnboarding = () => {
 
     const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/jpg"];
     if (!allowedTypes.includes(file.type)) {
+      setLicenseError("Unsupported file type. Please upload PDF, JPG, or PNG.");
       setNotice({
         type: "error",
         title: "Unsupported file",
@@ -122,6 +124,7 @@ const PharmacyOnboarding = () => {
     }
 
     if (file.size > 5 * 1024 * 1024) {
+      setLicenseError("File size exceeds 5MB limit.");
       setNotice({
         type: "error",
         title: "File too large",
@@ -131,6 +134,7 @@ const PharmacyOnboarding = () => {
     }
 
     setLicenseFile(file);
+    setLicenseError(null);
     setNotice(null);
 
     if (file.type.startsWith("image/")) {
@@ -174,8 +178,21 @@ const PharmacyOnboarding = () => {
 
   const onSubmit = async (values) => {
     if (submitGuardRef.current) return;
+    
+    // Validate license document is uploaded
+    if (!licenseFile) {
+      setLicenseError("Pharmacy License is required to proceed with onboarding.");
+      setNotice({
+        type: "error",
+        title: "Missing License Document",
+        message: "Please upload your pharmacy license to continue.",
+      });
+      return;
+    }
+    
     submitGuardRef.current = true;
     setNotice(null);
+    setLicenseError(null);
 
     try {
       const formData = new FormData();
@@ -210,6 +227,7 @@ const PharmacyOnboarding = () => {
       reset();
       setLicenseFile(null);
       setLicensePreview(null);
+      setLicenseError(null);
     } catch (error) {
       setNotice({
         type: "error",
@@ -222,7 +240,7 @@ const PharmacyOnboarding = () => {
     }
   };
 
-  const submitDisabled = !isValid || isSubmitting;
+  const submitDisabled = !isValid || isSubmitting || !licenseFile;
 
   if (checkingStatus) {
     return (
@@ -460,14 +478,20 @@ const PharmacyOnboarding = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
-                    License Document (optional)
+                    License Document <span style={{ color: "#EF4444", fontWeight: "bold" }}>*</span>
                   </label>
-                  <div className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50">
+                  <div className={`border ${licenseError ? 'border-red-500' : 'border-dashed border-slate-300'} rounded-xl p-4 ${licenseError ? 'bg-red-50' : 'bg-slate-50'}`}>
                     <div className="flex items-center gap-3">
-                      <Upload className="w-5 h-5 text-slate-500" />
+                      {licenseFile ? (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      ) : (
+                        <Upload className="w-5 h-5 text-slate-500" />
+                      )}
                       <div>
-                        <p className="text-sm text-slate-700 font-medium">Upload PDF or image</p>
-                        <p className="text-xs text-slate-500">Maximum size 5MB.</p>
+                        <p className={`text-sm font-medium ${licenseFile ? 'text-green-700' : 'text-slate-700'}`}>
+                          {licenseFile ? 'Document uploaded ✓' : 'Upload PDF or image'}
+                        </p>
+                        <p className="text-xs text-slate-500">Maximum size 5MB. Required field.</p>
                       </div>
                     </div>
                     <input
@@ -475,10 +499,16 @@ const PharmacyOnboarding = () => {
                       accept=".pdf,.png,.jpg,.jpeg"
                       onChange={handleFileChange}
                       className="mt-3 block w-full text-sm text-slate-600"
+                      required
                     />
                   </div>
+                  {licenseError && (
+                    <p className="mt-2 text-sm text-red-600 font-medium">
+                      {licenseError}
+                    </p>
+                  )}
                   {licensePreview && (
-                    <div className="mt-3 p-3 border border-slate-200 rounded-lg bg-white flex items-center gap-3">
+                    <div className="mt-3 p-3 border border-green-200 rounded-lg bg-green-50 flex items-center gap-3">
                       {licensePreview.type === "image" ? (
                         <img
                           src={licensePreview.url}
@@ -486,13 +516,16 @@ const PharmacyOnboarding = () => {
                           className="w-16 h-16 object-cover rounded-lg border"
                         />
                       ) : (
-                        <div className="w-16 h-16 rounded-lg border flex items-center justify-center bg-slate-50">
-                          <FileText className="w-6 h-6 text-slate-500" />
+                        <div className="w-16 h-16 rounded-lg border flex items-center justify-center bg-white">
+                          <FileText className="w-6 h-6 text-red-500" />
                         </div>
                       )}
-                      <div>
-                        <p className="text-sm font-medium text-slate-800">{licensePreview.name}</p>
-                        <p className="text-xs text-slate-500">Ready to upload</p>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-green-800">{licensePreview.name}</p>
+                        <p className="text-xs text-green-600 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" />
+                          Ready to upload
+                        </p>
                       </div>
                     </div>
                   )}
@@ -522,13 +555,14 @@ const PharmacyOnboarding = () => {
                       reset();
                       setLicenseFile(null);
                       setLicensePreview(null);
+                      setLicenseError(null);
                       setNotice(null);
                     }}
                   >
                     Reset
                   </Button>
                   <Button type="submit" loading={isSubmitting} disabled={submitDisabled}>
-                    Submit for Verification
+                    {!licenseFile ? 'Upload License to Continue' : 'Submit for Verification'}
                   </Button>
                 </div>
               </div>
@@ -538,6 +572,10 @@ const PharmacyOnboarding = () => {
               <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
                 <h2 className="text-lg font-semibold text-slate-900">Submission Checklist</h2>
                 <ul className="mt-4 space-y-3 text-sm text-slate-600">
+                  <li className="flex items-start gap-2">
+                    <span className="w-2 h-2 rounded-full bg-cyan-500 mt-2" />
+                    <strong className="text-slate-900">Upload a valid pharmacy license document (Required)</strong>
+                  </li>
                   <li className="flex items-start gap-2">
                     <span className="w-2 h-2 rounded-full bg-cyan-500 mt-2" />
                     Ensure license number matches official records.

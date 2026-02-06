@@ -12,7 +12,9 @@ import {
   XCircle,
   ExternalLink,
   User,
-  Mail
+  Mail,
+  ZoomIn,
+  Download
 } from "lucide-react";
 import AdminLayout from "../components/AdminLayout";
 
@@ -26,6 +28,7 @@ const AdminPharmacyDetails = () => {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
 
   useEffect(() => {
     if (user && user.roleId !== 1) {
@@ -95,7 +98,7 @@ const AdminPharmacyDetails = () => {
     <AdminLayout>
       <div style={{ marginBottom: "24px" }}>
         <button
-          onClick={() => navigate("/system-admin/pharmacies")}
+          onClick={() => navigate("/admin/pharmacies")}
           style={{
             display: "flex",
             alignItems: "center",
@@ -277,34 +280,229 @@ const AdminPharmacyDetails = () => {
               <h3 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "16px", color: "#111827" }}>
                 License Document
               </h3>
-              {pharmacy.licenseDocument ? (
-                <div>
-                  <a
-                    href={pharmacy.licenseDocument}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      padding: "12px 16px",
-                      backgroundColor: "#EFF6FF",
-                      color: "#3B82F6",
-                      border: "1px solid #DBEAFE",
-                      borderRadius: "8px",
-                      textDecoration: "none",
-                      fontSize: "14px",
-                      fontWeight: "600",
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    <FileText size={20} />
-                    View License Document
-                    <ExternalLink size={16} />
-                  </a>
-                </div>
+              {pharmacy.licenseDocument || pharmacy.licenseDocumentUrl ? (
+                (() => {
+                  const docUrl = pharmacy.licenseDocument || pharmacy.licenseDocumentUrl;
+                  const isImage = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(docUrl);
+                  const isPDF = /\.pdf$/i.test(docUrl);
+                  
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {isImage ? (
+                        <>
+                          <div
+                            style={{
+                              position: "relative",
+                              width: "100%",
+                              height: "300px",
+                              borderRadius: "8px",
+                              overflow: "hidden",
+                              border: "1px solid #E5E7EB",
+                              cursor: "pointer",
+                              transition: "transform 0.2s",
+                            }}
+                            onClick={() => setShowImageModal(true)}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = "scale(1.02)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = "scale(1)";
+                            }}
+                          >
+                            <img
+                              src={docUrl}
+                              alt="License Document"
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                              }}
+                              onError={(e) => {
+                                e.target.style.display = "none";
+                                e.target.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#6B7280;font-size:14px;">Failed to load image</div>';
+                              }}
+                            />
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: "50%",
+                                left: "50%",
+                                transform: "translate(-50%, -50%)",
+                                backgroundColor: "rgba(0, 0, 0, 0.6)",
+                                color: "white",
+                                padding: "12px 24px",
+                                borderRadius: "8px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                                fontSize: "14px",
+                                fontWeight: "600",
+                                pointerEvents: "none",
+                              }}
+                            >
+                              <ZoomIn size={20} />
+                              Click to Enlarge
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <a
+                              href={docUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                flex: 1,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "8px",
+                                padding: "10px 16px",
+                                backgroundColor: "#EFF6FF",
+                                color: "#3B82F6",
+                                border: "1px solid #DBEAFE",
+                                borderRadius: "8px",
+                                textDecoration: "none",
+                                fontSize: "14px",
+                                fontWeight: "600",
+                              }}
+                            >
+                              <ExternalLink size={16} />
+                              Open in New Tab
+                            </a>
+                            <a
+                              href={docUrl}
+                              download
+                              style={{
+                                flex: 1,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "8px",
+                                padding: "10px 16px",
+                                backgroundColor: "#F0FDF4",
+                                color: "#10B981",
+                                border: "1px solid #D1FAE5",
+                                borderRadius: "8px",
+                                textDecoration: "none",
+                                fontSize: "14px",
+                                fontWeight: "600",
+                              }}
+                            >
+                              <Download size={16} />
+                              Download
+                            </a>
+                          </div>
+                        </>
+                      ) : isPDF ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                          <div
+                            style={{
+                              padding: "40px",
+                              backgroundColor: "#F9FAFB",
+                              border: "1px solid #E5E7EB",
+                              borderRadius: "8px",
+                              textAlign: "center",
+                            }}
+                          >
+                            <FileText size={48} color="#EF4444" style={{ margin: "0 auto 12px" }} />
+                            <p style={{ fontSize: "14px", color: "#6B7280", marginBottom: "16px" }}>
+                              PDF Document
+                            </p>
+                          </div>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <a
+                              href={docUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                flex: 1,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "8px",
+                                padding: "12px 16px",
+                                backgroundColor: "#EFF6FF",
+                                color: "#3B82F6",
+                                border: "1px solid #DBEAFE",
+                                borderRadius: "8px",
+                                textDecoration: "none",
+                                fontSize: "14px",
+                                fontWeight: "600",
+                              }}
+                            >
+                              <FileText size={20} />
+                              View PDF
+                              <ExternalLink size={16} />
+                            </a>
+                            <a
+                              href={docUrl}
+                              download
+                              style={{
+                                flex: 1,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "8px",
+                                padding: "12px 16px",
+                                backgroundColor: "#F0FDF4",
+                                color: "#10B981",
+                                border: "1px solid #D1FAE5",
+                                borderRadius: "8px",
+                                textDecoration: "none",
+                                fontSize: "14px",
+                                fontWeight: "600",
+                              }}
+                            >
+                              <Download size={16} />
+                              Download
+                            </a>
+                          </div>
+                        </div>
+                      ) : (
+                        <a
+                          href={docUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "8px",
+                            padding: "12px 16px",
+                            backgroundColor: "#EFF6FF",
+                            color: "#3B82F6",
+                            border: "1px solid #DBEAFE",
+                            borderRadius: "8px",
+                            textDecoration: "none",
+                            fontSize: "14px",
+                            fontWeight: "600",
+                          }}
+                        >
+                          <FileText size={20} />
+                          View Document
+                          <ExternalLink size={16} />
+                        </a>
+                      )}
+                    </div>
+                  );
+                })()
               ) : (
-                <p style={{ fontSize: "14px", color: "#6B7280" }}>No document uploaded</p>
+                <div
+                  style={{
+                    padding: "40px",
+                    backgroundColor: "#FEF2F2",
+                    border: "1px solid #FCA5A5",
+                    borderRadius: "8px",
+                    textAlign: "center",
+                  }}
+                >
+                  <XCircle size={32} color="#EF4444" style={{ margin: "0 auto 8px" }} />
+                  <p style={{ fontSize: "14px", color: "#991B1B", fontWeight: "600" }}>
+                    No document uploaded
+                  </p>
+                  <p style={{ fontSize: "12px", color: "#7F1D1D", marginTop: "4px" }}>
+                    This pharmacy has not provided a license document
+                  </p>
+                </div>
               )}
             </div>
 
@@ -495,6 +693,68 @@ const AdminPharmacyDetails = () => {
                 {actionLoading ? "Rejecting..." : "Confirm Rejection"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Enlargement Modal */}
+      {showImageModal && pharmacy && (pharmacy.licenseDocument || pharmacy.licenseDocumentUrl) && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.9)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "20px",
+          }}
+          onClick={() => setShowImageModal(false)}
+        >
+          <div
+            style={{
+              position: "relative",
+              maxWidth: "90vw",
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowImageModal(false)}
+              style={{
+                position: "absolute",
+                top: "-40px",
+                right: "0",
+                backgroundColor: "white",
+                color: "#111827",
+                border: "none",
+                borderRadius: "8px",
+                padding: "8px 16px",
+                cursor: "pointer",
+                fontSize: "14px",
+                fontWeight: "600",
+              }}
+            >
+              ✕ Close
+            </button>
+            <img
+              src={pharmacy.licenseDocument || pharmacy.licenseDocumentUrl}
+              alt="License Document - Full Size"
+              style={{
+                maxWidth: "100%",
+                maxHeight: "90vh",
+                objectFit: "contain",
+                borderRadius: "8px",
+                boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3)",
+              }}
+            />
           </div>
         </div>
       )}

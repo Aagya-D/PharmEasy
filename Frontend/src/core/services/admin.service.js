@@ -87,6 +87,24 @@ const adminService = {
     const response = await httpClient.get("/admin/dashboard/stats");
     return response.data;
   },
+
+  /**
+   * Update admin profile
+   * Endpoint: PATCH /api/admin/profile
+   */
+  updateProfile: async (profileData) => {
+    const response = await httpClient.patch("/admin/profile", profileData);
+    return response.data;
+  },
+
+  /**
+   * Change admin password
+   * Endpoint: PATCH /api/admin/change-password
+   */
+  changePassword: async (passwordData) => {
+    const response = await httpClient.patch("/admin/change-password", passwordData);
+    return response.data;
+  },
 };
 
 export default adminService;

@@ -33,6 +33,25 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
     throw new AppError("Missing required pharmacy details", 400);
   }
 
+  // CRITICAL: Validate license document is provided
+  // This is the most important piece of documentation for pharmacy verification
+  if (!licenseDocument || 
+      (typeof licenseDocument === 'object' && Object.keys(licenseDocument).length === 0) ||
+      (typeof licenseDocument === 'string' && licenseDocument.trim().length === 0)) {
+    throw new AppError(
+      "Onboarding failed: Missing required license documentation. Please upload a valid pharmacy license document.",
+      400
+    );
+  }
+
+  // Ensure licenseDocument is a valid string (URL from Cloudinary)
+  if (typeof licenseDocument !== 'string') {
+    throw new AppError(
+      "Onboarding failed: Invalid license document format. Document must be a valid file URL.",
+      400
+    );
+  }
+
   // Convert latitude/longitude from string to Float (HTML forms send strings)
   let latitude = null;
   let longitude = null;
@@ -111,10 +130,21 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
   // Create pharmacy record with PENDING_VERIFICATION status
   // Also update user status from ONBOARDING_REQUIRED to PENDING
   const pharmacy = await prisma.$transaction(async (tx) => {
+    // Normalize and validate license document
+    // Must be a non-empty string (Cloudinary URL)
     const normalizedLicenseDocument =
       typeof licenseDocument === "string" && licenseDocument.trim().length > 0
         ? licenseDocument.trim()
         : null;
+
+    // Double-check: This should never be null at this point due to validation above
+    // But we add this as a defense-in-depth measure
+    if (!normalizedLicenseDocument) {
+      throw new AppError(
+        "Critical error: License document validation failed. Cannot proceed with onboarding.",
+        400
+      );
+    }
 
     // Update user status to PENDING (awaiting admin approval)
     await tx.user.update({

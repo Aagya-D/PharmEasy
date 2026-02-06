@@ -17,6 +17,7 @@ import authRoutes from "./modules/auth/auth.routes.js";
 import pharmacyRoutes from "./modules/pharmacy/pharmacy.routes.js";
 import inventoryRoutes from "./modules/inventory/inventory.routes.js";
 import patientRoutes from "./modules/patient/patient.routes.js";
+import searchRoutes from "./modules/search/search.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 
 // ES Module __dirname workaround
@@ -178,6 +179,10 @@ app.get(
 // Authentication routes
 app.use("/api/auth", authRoutes);
 
+// Search routes (public access - no authentication required)
+// Routes include: /api/search, /api/search/nearby, /api/search/stats
+app.use("/api", searchRoutes);
+
 // Patient routes (dashboard, orders, prescriptions, medications, SOS)
 // Routes include: /patient/dashboard, /patient/orders, /patient/prescriptions, /patient/sos/request, etc.
 app.use("/api/patient", patientRoutes);
@@ -190,9 +195,9 @@ app.use("/api", pharmacyRoutes);
 // Routes include: /inventory, /inventory/my-stock, /inventory/:id
 app.use("/api", inventoryRoutes);
 
-// NOTE: Admin routes from admin.routes.js are now consolidated in pharmacy.routes.js
-// Keeping adminRoutes import for backward compatibility but no longer mounting it
-// TODO: Remove admin.routes.js file and admin controller in future refactor
+// Admin routes (profile settings, password change, pharmacy management)
+// Routes include: /admin/profile, /admin/change-password, /admin/pharmacies, etc.
+app.use("/api/admin", adminRoutes);
 
 // Root API endpoint
 app.get("/api", (req, res) => {

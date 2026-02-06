@@ -156,7 +156,7 @@ const AdminDashboardHome = () => {
               value={stats.totalPharmacies}
               color="#3B82F6"
               bgColor="#EFF6FF"
-              onClick={() => navigate("/system-admin/pharmacies")}
+              onClick={() => navigate("/admin/pharmacies?status=ALL")}
             />
             <StatCard
               icon={CheckCircle}
@@ -164,7 +164,7 @@ const AdminDashboardHome = () => {
               value={stats.verified}
               color="#10B981"
               bgColor="#ECFDF5"
-              onClick={() => navigate("/system-admin/pharmacies?status=VERIFIED")}
+              onClick={() => navigate("/admin/pharmacies?status=VERIFIED")}
             />
             <StatCard
               icon={Clock}
@@ -172,7 +172,7 @@ const AdminDashboardHome = () => {
               value={stats.pending}
               color="#F59E0B"
               bgColor="#FFFBEB"
-              onClick={() => navigate("/system-admin/pharmacies?status=PENDING_VERIFICATION")}
+              onClick={() => navigate("/admin/pharmacies?status=PENDING_VERIFICATION")}
             />
             <StatCard
               icon={XCircle}
@@ -180,7 +180,7 @@ const AdminDashboardHome = () => {
               value={stats.rejected}
               color="#EF4444"
               bgColor="#FEF2F2"
-              onClick={() => navigate("/system-admin/pharmacies?status=REJECTED")}
+              onClick={() => navigate("/admin/pharmacies?status=REJECTED")}
             />
           </div>
 
@@ -232,7 +232,7 @@ const AdminDashboardHome = () => {
                           cursor: "pointer",
                           transition: "background-color 0.15s",
                         }}
-                        onClick={() => navigate(`/system-admin/pharmacies/${pharmacy.id}`)}
+                        onClick={() => navigate(`/admin/pharmacy/${pharmacy.id}`)}
                         onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#F9FAFB")}
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                       >
@@ -284,7 +284,7 @@ const AdminDashboardHome = () => {
 
             <div style={{ marginTop: "20px", textAlign: "center" }}>
               <button
-                onClick={() => navigate("/system-admin/pharmacies")}
+                onClick={() => navigate("/admin/pharmacies?status=ALL")}
                 style={{
                   padding: "10px 24px",
                   backgroundColor: "#3B82F6",

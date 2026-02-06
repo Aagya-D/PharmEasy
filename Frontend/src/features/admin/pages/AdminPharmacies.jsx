@@ -43,8 +43,10 @@ const AdminPharmacies = () => {
       let response;
       if (filterStatus === "PENDING_VERIFICATION") {
         response = await getPendingPharmacies();
+      } else if (filterStatus === "ALL") {
+        response = await getAllPharmacies({ status: "ALL" });
       } else {
-        response = await getAllPharmacies(filterStatus);
+        response = await getAllPharmacies({ status: filterStatus });
       }
       setPharmacies(response.data || []);
     } catch (err) {
@@ -232,6 +234,11 @@ const AdminPharmacies = () => {
                     <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
                       Status
                     </th>
+                    {filterStatus === "REJECTED" && (
+                      <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
+                        Rejection Reason
+                      </th>
+                    )}
                     <th style={{ textAlign: "left", padding: "16px", fontSize: "14px", fontWeight: "600", color: "#6B7280" }}>
                       Submitted
                     </th>
@@ -290,13 +297,18 @@ const AdminPharmacies = () => {
                           {pharmacy.verificationStatus === "REJECTED" && "Rejected"}
                         </span>
                       </td>
+                      {filterStatus === "REJECTED" && (
+                        <td style={{ padding: "16px", fontSize: "14px", color: "#6B7280", maxWidth: "300px" }}>
+                          {pharmacy.rejectionReason || "No reason provided"}
+                        </td>
+                      )}
                       <td style={{ padding: "16px", fontSize: "14px", color: "#6B7280" }}>
                         {new Date(pharmacy.createdAt).toLocaleDateString()}
                       </td>
                       <td style={{ padding: "16px" }}>
                         <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
                           <button
-                            onClick={() => navigate(`/system-admin/pharmacies/${pharmacy.id}`)}
+                            onClick={() => navigate(`/admin/pharmacy/${pharmacy.id}`)}
                             style={{
                               padding: "8px 12px",
                               backgroundColor: "#EFF6FF",

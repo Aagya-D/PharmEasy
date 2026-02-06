@@ -70,10 +70,10 @@ export const getPendingPharmacies = async () => {
 
 /**
  * Approve pharmacy (Admin endpoint)
- * Backend: PATCH /api/admin/pharmacy/:id/verify
+ * Backend: PATCH /api/admin/pharmacy/:id/approve
  */
 export const approvePharmacy = async (pharmacyId) => {
-  const response = await httpClient.patch(`/admin/pharmacy/${pharmacyId}/verify`);
+  const response = await httpClient.patch(`/admin/pharmacy/${pharmacyId}/approve`);
   return response.data;
 };
 

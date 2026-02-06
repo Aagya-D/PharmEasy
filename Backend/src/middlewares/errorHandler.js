@@ -29,6 +29,7 @@ export const errorHandler = (err, req, res, next) => {
   logger.error(feature, `${req.method} ${req.path} - ${message}`, {
     statusCode,
     message,
+    errorName: err.name,
     path: req.path,
     method: req.method,
     userId: req.user?.id,
@@ -37,10 +38,25 @@ export const errorHandler = (err, req, res, next) => {
     query: process.env.NODE_ENV === 'development' ? req.query : undefined,
   });
 
-  // Handle validation errors
-  if (err.name === "ValidationError") {
+  // Handle custom error classes (from utils/errors.js)
+  if (err.name === "BadRequestError" || err.name === "ValidationError") {
     statusCode = 400;
-    message = "Validation failed";
+  }
+
+  if (err.name === "AuthenticationError" || err.name === "UnauthorizedError") {
+    statusCode = 401;
+  }
+
+  if (err.name === "ForbiddenError") {
+    statusCode = 403;
+  }
+
+  if (err.name === "NotFoundError") {
+    statusCode = 404;
+  }
+
+  if (err.name === "ConflictError") {
+    statusCode = 409;
   }
 
   // Handle JWT errors

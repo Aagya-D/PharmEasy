@@ -72,4 +72,29 @@ router.patch(
   adminController.rejectPharmacy
 );
 
+/**
+ * PATCH /api/admin/profile
+ * Update admin profile (name, email, phone)
+ * Requires: JWT + roleId=1
+ */
+router.patch(
+  "/profile",
+  authenticate(),
+  requireSystemAdmin,
+  adminController.updateProfile
+);
+
+/**
+ * PATCH /api/admin/change-password
+ * Change password with current password verification
+ * Body: { currentPassword: string, newPassword: string }
+ * Requires: JWT + roleId=1
+ */
+router.patch(
+  "/change-password",
+  authenticate(),
+  requireSystemAdmin,
+  adminController.changePassword
+);
+
 export default router;

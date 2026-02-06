@@ -4,6 +4,7 @@
  * NO schema changes required
  */
 
+import bcrypt from "bcrypt";
 import { prisma } from "../database/prisma.js";
 import { AppError } from "../middlewares/errorHandler.js";
 
@@ -58,7 +59,7 @@ export const getAllPharmacies = async (req, res, next) => {
     const { status } = req.query;
 
     const where = {};
-    if (status) {
+    if (status && status !== "ALL") {
       where.verificationStatus = status;
     }
 
@@ -125,12 +126,13 @@ export const getPharmacyById = async (req, res, next) => {
       throw new AppError("Pharmacy not found", 404);
     }
 
-    // Include license document URL in response for admin review
+    // Return pharmacy with license document URL
     res.status(200).json({
       success: true,
       data: {
         ...pharmacy,
-        licenseDocumentUrl: pharmacy.licenseDocument, // Cloudinary URL
+        // Ensure both fields are available for backward compatibility
+        licenseDocumentUrl: pharmacy.licenseDocument,
       },
     });
   } catch (error) {
@@ -293,10 +295,158 @@ export const rejectPharmacy = async (req, res, next) => {
   }
 };
 
+/**
+ * PATCH /api/admin/profile
+ * Update admin profile (name, email, phone)
+ * Security: Only the logged-in admin can update their own profile
+ */
+export const updateProfile = async (req, res, next) => {
+  try {
+    const userId = req.user.userId; // From JWT token
+    const { name, email, phone } = req.body;
+
+    // Validate at least one field is provided
+    if (!name && !email && !phone) {
+      throw new AppError("At least one field (name, email, or phone) must be provided", 400);
+    }
+
+    // If email is being changed, check if it's already taken by another user
+    if (email) {
+      const existingUser = await prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (existingUser && existingUser.id !== userId) {
+        throw new AppError("Email is already registered to another account", 409);
+      }
+    }
+
+    // Build update data object
+    const updateData = {};
+    if (name) updateData.name = name.trim();
+    if (email) updateData.email = email.trim().toLowerCase();
+    if (phone) updateData.phone = phone.trim();
+
+    // Update user profile
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        roleId: true,
+        role: {
+          select: {
+            name: true,
+            displayName: true,
+          },
+        },
+        updatedAt: true,
+      },
+    });
+
+    console.log(`[ADMIN] Profile updated for user ${userId}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      data: {
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          name: updatedUser.name,
+          phone: updatedUser.phone,
+          roleId: updatedUser.roleId,
+          role: updatedUser.role.name,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PATCH /api/admin/change-password
+ * Change password with current password verification
+ * Security:
+ * - Requires current password verification
+ * - Hashes new password before saving
+ * - Updates updatedAt timestamp for audit trail
+ */
+export const changePassword = async (req, res, next) => {
+  try {
+    const userId = req.user.userId; // From JWT token
+    const { currentPassword, newPassword } = req.body;
+
+    // Validate required fields
+    if (!currentPassword || !newPassword) {
+      throw new AppError("Current password and new password are required", 400);
+    }
+
+    // Validate new password strength
+    if (newPassword.length < 8) {
+      throw new AppError("New password must be at least 8 characters long", 400);
+    }
+
+    // Get user with password
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError("User not found", 404);
+    }
+
+    // Verify current password using bcrypt
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+
+    if (!isPasswordValid) {
+      throw new AppError("The current password you entered is incorrect.", 400);
+    }
+
+    // Check that new password is different from current
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      throw new AppError("New password must be different from current password", 400);
+    }
+
+    // Hash new password with salt rounds = 12
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    // Update password in database
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashedPassword,
+        // updatedAt is automatically updated by Prisma @updatedAt
+      },
+    });
+
+    console.log(`[ADMIN] Password changed for user ${userId} (${user.email})`);
+
+    res.status(200).json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export default {
   getPendingPharmacies,
   getAllPharmacies,
   getPharmacyById,
   approvePharmacy,
   rejectPharmacy,
+  updateProfile,
+  changePassword,
 };
