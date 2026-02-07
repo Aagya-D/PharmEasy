@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
   User,
   Lock,
-  MapPin,
   Save,
   Eye,
   EyeOff,
@@ -12,75 +11,20 @@ import {
   AlertCircle,
   Mail,
   Phone,
-  Building,
-  Navigation,
 } from "lucide-react";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
 import { useAuth } from "../../../context/AuthContext";
 import httpClient from "../../../core/services/httpClient";
 
-// Fix for default marker icon in react-leaflet
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
-
-// Custom marker component that updates position on drag
-function DraggableMarker({ position, setPosition }) {
-  const markerRef = useRef(null);
-
-  const eventHandlers = {
-    dragend() {
-      const marker = markerRef.current;
-      if (marker != null) {
-        const pos = marker.getLatLng();
-        setPosition([pos.lat, pos.lng]);
-      }
-    },
-  };
-
-  return (
-    <Marker
-      draggable={true}
-      eventHandlers={eventHandlers}
-      position={position}
-      ref={markerRef}
-    />
-  );
-}
-
-// Map click handler component
-function MapClickHandler({ setPosition }) {
-  useMapEvents({
-    click(e) {
-      setPosition([e.latlng.lat, e.latlng.lng]);
-    },
-  });
-  return null;
-}
-
-export default function PharmacySettings() {
+export default function PatientSettings() {
   const { user, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState(null);
-  const [pharmacy, setPharmacy] = useState(null);
 
-  // Map position state (default to Kathmandu, Nepal)
-  const [mapPosition, setMapPosition] = useState([27.7172, 85.324]);
-
-  // Location form state
-  const [locationData, setLocationData] = useState({
-    latitude: "",
-    longitude: "",
-    address: "",
+  // Profile form state
+  const [profileData, setProfileData] = useState({
+    name: user?.name || "",
+    phone: user?.phone || "",
   });
 
   // Password form state
@@ -96,71 +40,29 @@ export default function PharmacySettings() {
     confirm: false,
   });
 
-  // Fetch pharmacy data on mount
-  useEffect(() => {
-    fetchPharmacyData();
-  }, []);
-
-  const fetchPharmacyData = async () => {
-    try {
-      const response = await httpClient.get("/pharmacy/my-pharmacy");
-      if (response.data.success) {
-        const pharmacyData = response.data.data;
-        setPharmacy(pharmacyData);
-
-        // Set location data if available
-        if (pharmacyData.latitude && pharmacyData.longitude) {
-          setLocationData({
-            latitude: pharmacyData.latitude.toString(),
-            longitude: pharmacyData.longitude.toString(),
-            address: pharmacyData.address || "",
-          });
-          setMapPosition([pharmacyData.latitude, pharmacyData.longitude]);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to fetch pharmacy data:", error);
-    }
-  };
-
-  // Update location inputs when map position changes
-  useEffect(() => {
-    setLocationData((prev) => ({
-      ...prev,
-      latitude: mapPosition[0].toFixed(6),
-      longitude: mapPosition[1].toFixed(6),
-    }));
-  }, [mapPosition]);
-
   // Show notification
   const showNotification = (type, message) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 5000);
   };
 
-  // Handle location update
-  const handleLocationUpdate = async (e) => {
+  // Handle profile update
+  const handleProfileUpdate = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const response = await httpClient.patch("/pharmacy/update-location", {
-        latitude: parseFloat(locationData.latitude),
-        longitude: parseFloat(locationData.longitude),
-        address: locationData.address,
-      });
+      const response = await httpClient.put("/patient/profile", profileData);
 
       if (response.data.success) {
-        showNotification(
-          "success",
-          `Location updated for ${pharmacy.pharmacyName} successfully!`
-        );
-        await fetchPharmacyData();
+        // Refresh user context
+        await refreshUser();
+        showNotification("success", "Profile updated successfully!");
       }
     } catch (error) {
       showNotification(
         "error",
-        error.response?.data?.message || "Failed to update location"
+        error.response?.data?.message || "Failed to update profile"
       );
     } finally {
       setLoading(false);
@@ -229,7 +131,7 @@ export default function PharmacySettings() {
       <header className="bg-white border-b border-gray-200 px-6 py-6">
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-sm text-gray-500">
-          Manage your pharmacy settings and configuration
+          Manage your account settings and preferences
         </p>
       </header>
 
@@ -258,7 +160,7 @@ export default function PharmacySettings() {
         </motion.div>
       )}
 
-      <main className="p-6 max-w-6xl mx-auto">
+      <main className="p-6 max-w-5xl mx-auto">
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
           <div className="flex border-b border-gray-200">
@@ -270,7 +172,7 @@ export default function PharmacySettings() {
                   : "text-gray-600 hover:text-gray-900"
               }`}
             >
-              <Building size={20} />
+              <User size={20} />
               Profile Details
             </button>
             <button
@@ -284,17 +186,6 @@ export default function PharmacySettings() {
               <Lock size={20} />
               Security
             </button>
-            <button
-              onClick={() => setActiveTab("location")}
-              className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors ${
-                activeTab === "location"
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              <MapPin size={20} />
-              Location
-            </button>
           </div>
 
           {/* Tab Content */}
@@ -307,32 +198,32 @@ export default function PharmacySettings() {
                 transition={{ duration: 0.3 }}
               >
                 <h2 className="text-xl font-semibold text-gray-900 mb-6">
-                  Pharmacy Information
+                  Personal Information
                 </h2>
-                <div className="space-y-6">
-                  {/* Pharmacy Name */}
+                <form onSubmit={handleProfileUpdate} className="space-y-6">
+                  {/* Name */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Pharmacy Name
+                      Full Name
                     </label>
                     <div className="relative">
-                      <Building
+                      <User
                         className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                         size={20}
                       />
                       <input
                         type="text"
-                        value={pharmacy?.pharmacyName || ""}
-                        disabled
-                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+                        value={profileData.name}
+                        onChange={(e) =>
+                          setProfileData({ ...profileData, name: e.target.value })
+                        }
+                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Enter your full name"
                       />
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Contact support to change pharmacy name
-                    </p>
                   </div>
 
-                  {/* Email */}
+                  {/* Email (Read-only) */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Email Address
@@ -354,37 +245,44 @@ export default function PharmacySettings() {
                     </p>
                   </div>
 
-                  {/* License Number */}
+                  {/* Phone */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      License Number
+                      Phone Number
                     </label>
-                    <input
-                      type="text"
-                      value={pharmacy?.licenseNumber || ""}
-                      disabled
-                      className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
-                    />
+                    <div className="relative">
+                      <Phone
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                        size={20}
+                      />
+                      <input
+                        type="tel"
+                        value={profileData.phone}
+                        onChange={(e) =>
+                          setProfileData({ ...profileData, phone: e.target.value })
+                        }
+                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Enter your phone number"
+                      />
+                    </div>
                   </div>
 
-                  {/* Verification Status */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Verification Status
-                    </label>
-                    <span
-                      className={`inline-flex px-4 py-2 rounded-full text-sm font-medium ${
-                        pharmacy?.verificationStatus === "VERIFIED"
-                          ? "bg-green-100 text-green-700"
-                          : pharmacy?.verificationStatus === "PENDING"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
+                  {/* Submit Button */}
+                  <div className="flex justify-end pt-4">
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {pharmacy?.verificationStatus || "Unknown"}
-                    </span>
+                      {loading ? (
+                        <Loader className="animate-spin" size={20} />
+                      ) : (
+                        <Save size={20} />
+                      )}
+                      Save Changes
+                    </button>
                   </div>
-                </div>
+                </form>
               </motion.div>
             )}
 
@@ -555,149 +453,6 @@ export default function PharmacySettings() {
                         <Lock size={20} />
                       )}
                       Change Password
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            )}
-
-            {/* Location Tab */}
-            {activeTab === "location" && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">
-                  Pharmacy Location
-                </h2>
-                <form onSubmit={handleLocationUpdate} className="space-y-6">
-                  {/* Map */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Drag the marker to set your pharmacy location
-                    </label>
-                    <div className="h-96 rounded-lg overflow-hidden border border-gray-200">
-                      <MapContainer
-                        center={mapPosition}
-                        zoom={13}
-                        style={{ height: "100%", width: "100%" }}
-                      >
-                        <TileLayer
-                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        />
-                        <DraggableMarker
-                          position={mapPosition}
-                          setPosition={setMapPosition}
-                        />
-                        <MapClickHandler setPosition={setMapPosition} />
-                      </MapContainer>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Click on the map or drag the marker to update your location
-                    </p>
-                  </div>
-
-                  {/* Coordinates */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Latitude
-                      </label>
-                      <div className="relative">
-                        <Navigation
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                          size={20}
-                        />
-                        <input
-                          type="text"
-                          value={locationData.latitude}
-                          onChange={(e) => {
-                            setLocationData({
-                              ...locationData,
-                              latitude: e.target.value,
-                            });
-                            const lat = parseFloat(e.target.value);
-                            if (!isNaN(lat)) {
-                              setMapPosition([lat, mapPosition[1]]);
-                            }
-                          }}
-                          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="27.7172"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Longitude
-                      </label>
-                      <div className="relative">
-                        <Navigation
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                          size={20}
-                        />
-                        <input
-                          type="text"
-                          value={locationData.longitude}
-                          onChange={(e) => {
-                            setLocationData({
-                              ...locationData,
-                              longitude: e.target.value,
-                            });
-                            const lng = parseFloat(e.target.value);
-                            if (!isNaN(lng)) {
-                              setMapPosition([mapPosition[0], lng]);
-                            }
-                          }}
-                          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="85.324"
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Address */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Address
-                    </label>
-                    <div className="relative">
-                      <MapPin
-                        className="absolute left-3 top-3 text-gray-400"
-                        size={20}
-                      />
-                      <textarea
-                        value={locationData.address}
-                        onChange={(e) =>
-                          setLocationData({
-                            ...locationData,
-                            address: e.target.value,
-                          })
-                        }
-                        rows={3}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Enter complete address"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Submit Button */}
-                  <div className="flex justify-end pt-4">
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? (
-                        <Loader className="animate-spin" size={20} />
-                      ) : (
-                        <Save size={20} />
-                      )}
-                      Update Location
                     </button>
                   </div>
                 </form>

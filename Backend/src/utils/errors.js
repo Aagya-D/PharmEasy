@@ -4,6 +4,19 @@
  */
 
 /**
+ * AppError - Base custom error class
+ * Generic error class that accepts custom message and statusCode
+ * Use this when specific error classes don't fit the use case
+ */
+export class AppError extends Error {
+  constructor(message = "An error occurred", statusCode = 500) {
+    super(message);
+    this.name = "AppError";
+    this.statusCode = statusCode;
+  }
+}
+
+/**
  * BadRequestError - 400
  * Used for invalid request parameters, query strings, or body data
  */

@@ -498,6 +498,16 @@ export const login = async (
     `[LOGIN] Tokens issued for user: ${user.id}, refresh expires in 7 days`
   );
 
+  // ✅ FIX: Calculate isOnboarded based on role
+  // - SYSTEM_ADMIN (roleId=1): Always onboarded (no onboarding needed)
+  // - PHARMACY_ADMIN (roleId=2): Onboarded only if pharmacy exists
+  // - PATIENT (roleId=3): Always onboarded (no onboarding needed)
+  let isOnboarded = true; // Default for SYSTEM_ADMIN and PATIENT
+  if (user.roleId === 2) {
+    // Pharmacy Admin needs pharmacy to be onboarded
+    isOnboarded = !!user.pharmacy;
+  }
+
   return {
     userId: user.id,
     email: user.email,
@@ -511,7 +521,7 @@ export const login = async (
       verificationStatus: user.pharmacy.verificationStatus,
       isOnboarded: true,
     } : null,
-    isOnboarded: user.pharmacy ? true : false,
+    isOnboarded,
     accessToken,
     refreshToken,
     expiresIn: 900, // 15 minutes

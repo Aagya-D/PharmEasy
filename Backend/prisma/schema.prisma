@@ -302,28 +302,54 @@ model Medication {
 /// * Urgent medicine requests that need quick fulfillment
 /// * Status: pending → fulfilled → expired
 model SOSRequest {
-  id                   String    @id @default(cuid())
+  id                   String              @id @default(cuid())
   patientId            String
   medicineName         String
   genericName          String?
-  quantity             Int       @default(1)
-  urgencyLevel         String    @default("high")
+  quantity             Int                 @default(1)
+  urgencyLevel         String              @default("high")
   patientName          String
   contactNumber        String
   address              String
   latitude             Float?
   longitude            Float?
   additionalNotes      String?
-  prescriptionRequired Boolean   @default(false)
-  status               String    @default("pending")
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  patient              User      @relation("PatientSOSRequests", fields: [patientId], references: [id], onDelete: Cascade)
+  prescriptionRequired Boolean             @default(false)
+  prescriptionUrl      String?
+  status               String              @default("pending")
+  acceptedBy           String?
+  acceptedAt           DateTime?
+  rejectionNote        String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  patient              User                @relation("PatientSOSRequests", fields: [patientId], references: [id], onDelete: Cascade)
+  pharmacyResponses    PharmacyResponse[]
 
   @@index([patientId])
   @@index([status])
   @@index([urgencyLevel])
   @@index([createdAt])
+}
+
+/// *
+/// * PharmacyResponse Model - Tracks pharmacy responses to SOS requests
+/// * 
+/// * Allows multiple pharmacies to reject the same request while keeping it visible to others
+/// * Only one pharmacy can accept a request (acceptedBy field in SOSRequest)
+model PharmacyResponse {
+  id          String      @id @default(cuid())
+  sosId       String
+  pharmacyId  String
+  response    String      @default("rejected")
+  note        String?
+  respondedAt DateTime    @default(now())
+  createdAt   DateTime    @default(now())
+  sos         SOSRequest  @relation(fields: [sosId], references: [id], onDelete: Cascade)
+
+  @@unique([sosId, pharmacyId])
+  @@index([sosId])
+  @@index([pharmacyId])
+  @@index([response])
 }
 
 /// *

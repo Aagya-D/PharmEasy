@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
+import { AnnouncementBanner } from "../../../shared/components/AnnouncementBanner";
 import { getDashboardStats } from "../../../core/services/pharmacy.service";
 import { getMyInventory } from "../../../core/services/inventory.service";
 
@@ -247,6 +248,11 @@ export default function PharmacyDashboard() {
           </div>
         </div>
       </header>
+
+      {/* Announcement Banner */}
+      <div className="px-6 pt-6">
+        <AnnouncementBanner targetRole="PHARMACY" />
+      </div>
 
       <main className="p-6 overflow-y-auto">
         {/* Error Alert */}

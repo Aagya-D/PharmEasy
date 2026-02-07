@@ -70,4 +70,8 @@ router.get("/me", authenticate(), authController.getCurrentUser);
 // Logout and revoke refresh token
 router.post("/logout", authenticate(), authController.logout);
 
+// POST /auth/change-password
+// Change password (requires current password verification)
+router.post("/change-password", authenticate(), authController.changePassword);
+
 export default router;

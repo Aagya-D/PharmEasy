@@ -3,17 +3,22 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../../context/AuthContext";
 import { QuickStats } from "../../components/Dashboard/QuickStats";
 import { OrderCard } from "../../components/Dashboard/OrderCard";
+import { AnnouncementBanner } from "../../../../shared/components/AnnouncementBanner";
 import patientService from "../../services/patient.service";
+import contentService from "../../../../core/services/content.service";
 import { Package, MapPin, FileText, Pill, Lightbulb, Heart } from "lucide-react";
 
 export function PatientDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [orders, setOrders] = useState([]);
+  const [healthTip, setHealthTip] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [tipLoading, setTipLoading] = useState(true);
 
   useEffect(() => {
     loadDashboardData();
+    loadHealthTip();
   }, []);
 
   const loadDashboardData = async () => {
@@ -32,6 +37,22 @@ export function PatientDashboard() {
     }
   };
 
+  const loadHealthTip = async () => {
+    try {
+      setTipLoading(true);
+      const response = await contentService.getLatestHealthTip();
+      if (response.success && response.data) {
+        setHealthTip(response.data);
+      }
+    } catch (err) {
+      console.error("[PATIENT DASHBOARD] Error loading health tip:", err);
+      // Use fallback tip if API fails
+      setHealthTip(null);
+    } finally {
+      setTipLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -42,6 +63,9 @@ export function PatientDashboard() {
           </h1>
           <p className="text-slate-600 text-lg">Here's your health overview for today</p>
         </div>
+
+        {/* Announcement Banner */}
+        <AnnouncementBanner targetRole="PATIENT" className="mb-6" />
 
         {/* Quick Stats */}
         <div className="mb-8">
@@ -157,11 +181,35 @@ export function PatientDashboard() {
                 <div className="p-2 bg-yellow-100 rounded-lg">
                   <Lightbulb className="text-yellow-600" size={24} />
                 </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 mb-2 text-lg">💡 Health Tip of the Day</h3>
-                  <p className="text-sm text-slate-700 leading-relaxed">
-                    Take your medications at the same time daily for better effectiveness. Set phone reminders to help maintain consistency and improve treatment outcomes.
-                  </p>
+                <div className="flex-1">
+                  {tipLoading ? (
+                    <div className="animate-pulse space-y-2">
+                      <div className="h-5 bg-slate-200 rounded w-2/3"></div>
+                      <div className="h-4 bg-slate-200 rounded"></div>
+                      <div className="h-4 bg-slate-200 rounded w-5/6"></div>
+                    </div>
+                  ) : healthTip ? (
+                    <>
+                      <h3 className="font-bold text-slate-900 mb-2 text-lg">
+                        💡 {healthTip.title}
+                      </h3>
+                      <p className="text-sm text-slate-700 leading-relaxed">
+                        {healthTip.content}
+                      </p>
+                      {healthTip.category && (
+                        <span className="inline-block mt-3 px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
+                          {healthTip.category}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="font-bold text-slate-900 mb-2 text-lg">💡 Health Tip of the Day</h3>
+                      <p className="text-sm text-slate-700 leading-relaxed">
+                        Take your medications at the same time daily for better effectiveness. Set phone reminders to help maintain consistency and improve treatment outcomes.
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

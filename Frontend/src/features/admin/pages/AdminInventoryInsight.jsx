@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Package, AlertTriangle, TrendingDown, Send, RefreshCw, Filter, Search } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
+import { httpClient } from '../../../core/services/httpClient';
 
 const AdminInventoryInsight = () => {
   const [inventoryData, setInventoryData] = useState([]);
@@ -20,12 +21,8 @@ const AdminInventoryInsight = () => {
   const fetchInventoryInsights = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:3000/api/admin/inventory/insights', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      const data = await response.json();
+      const response = await httpClient.get('/admin/inventory/insights');
+      const data = response.data;
       
       if (data.success) {
         setShortages(data.data.shortages || []);
@@ -55,19 +52,12 @@ const AdminInventoryInsight = () => {
     
     setSendingAlert(true);
     try {
-      const response = await fetch('http://localhost:3000/api/admin/inventory/restock-alert', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          genericName: selectedMedicine.genericName,
-          message: notificationMessage,
-        }),
+      const response = await httpClient.post('/admin/inventory/restock-alert', {
+        genericName: selectedMedicine.genericName,
+        message: notificationMessage,
       });
 
-      const data = await response.json();
+      const data = response.data;
       
       if (data.success) {
         setAlertSent(true);

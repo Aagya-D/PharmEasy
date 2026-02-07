@@ -126,6 +126,7 @@ router.get(
 /**
  * GET /api/admin/sos-locations
  * Get all SOS emergency location requests from patients
+ * Query: ?status=pending|fulfilled&limit=100
  * Requires: JWT + roleId=1
  */
 router.get(

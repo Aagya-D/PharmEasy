@@ -199,7 +199,7 @@ const AdminSettings = () => {
 
   const fetch2FAStatus = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/admin/2fa/status', {
+      const response = await fetch('http://localhost:5000/api/admin/2fa/status', {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
@@ -215,7 +215,7 @@ const AdminSettings = () => {
 
   const enable2FA = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/admin/2fa/enable', {
+      const response = await fetch('http://localhost:5000/api/admin/2fa/enable', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -236,7 +236,7 @@ const AdminSettings = () => {
 
   const verify2FA = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/admin/2fa/verify', {
+      const response = await fetch('http://localhost:5000/api/admin/2fa/verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -263,7 +263,7 @@ const AdminSettings = () => {
     if (!confirm('Are you sure you want to disable 2FA? This will reduce your account security.')) return;
     
     try {
-      const response = await fetch('http://localhost:3000/api/admin/2fa/disable', {
+      const response = await fetch('http://localhost:5000/api/admin/2fa/disable', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,

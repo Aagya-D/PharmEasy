@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import { MapPin, AlertCircle, Check, RefreshCw } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
+import { httpClient } from '../../../core/services/httpClient';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -79,21 +80,14 @@ const AdminMap = () => {
 
   const fetchMapData = async () => {
     try {
-      // Fetch SOS requests
-      const sosResponse = await fetch('http://localhost:3000/api/admin/sos-locations', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      const sosData = await sosResponse.json();
+      // Fetch SOS requests and pharmacies in parallel
+      const [sosResponse, pharmacyResponse] = await Promise.all([
+        httpClient.get('/admin/sos-locations'),
+        httpClient.get('/admin/pharmacies')
+      ]);
       
-      // Fetch pharmacies
-      const pharmacyResponse = await fetch('http://localhost:3000/api/admin/pharmacies', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      const pharmacyData = await pharmacyResponse.json();
+      const sosData = sosResponse.data;
+      const pharmacyData = pharmacyResponse.data;
 
       // Filter active SOS requests with coordinates
       const activeSOS = (sosData.data || []).filter(
@@ -396,7 +390,7 @@ const AdminMap = () => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         @keyframes ping {
           75%, 100% {
             transform: scale(2);

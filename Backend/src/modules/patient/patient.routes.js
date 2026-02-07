@@ -6,6 +6,7 @@
 import express from "express";
 import { authenticate } from "../../middlewares/auth.js";
 import { requirePatient } from "../../middlewares/roleCheck.js";
+import { uploadPrescription } from "../../middlewares/upload.middleware.js";
 import * as patientController from "./patient.controller.js";
 
 const router = express.Router();
@@ -60,8 +61,9 @@ router.get("/medications", patientController.getMedications);
  * @route   POST /api/patient/sos/request
  * @desc    Submit emergency SOS request
  * @access  Private (Patient only)
+ * @note    Accepts optional prescription file upload
  */
-router.post("/sos/request", patientController.submitSOSRequest);
+router.post("/sos/request", uploadPrescription, patientController.submitSOSRequest);
 
 /**
  * @route   GET /api/patient/sos/history

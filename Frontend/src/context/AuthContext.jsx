@@ -277,11 +277,17 @@ export function AuthProvider({ children }) {
               return httpClient(originalRequest);
             }
           } catch (refreshError) {
-            // Refresh failed, logout user
+            // Refresh failed, logout user and redirect to login
+            logger.warn("Token refresh failed, redirecting to login", { error: refreshError.message });
             dispatch({ type: ACTIONS.LOGOUT });
             localStorage.removeItem("accessToken");
             localStorage.removeItem("refreshToken");
             localStorage.removeItem("user");
+            
+            // ✅ FIX: Redirect to login on token expiry
+            if (typeof window !== 'undefined') {
+              window.location.href = '/login';
+            }
           }
         }
 

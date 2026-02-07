@@ -67,6 +67,32 @@ router.post(
   pharmacyController.resetOnboarding
 );
 
+/**
+ * GET /api/pharmacy/sos/nearby
+ * Get nearby pending SOS requests based on pharmacy location
+ * Query params: ?radius=10 (default 10km)
+ * Requires: JWT token, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
+ */
+router.get(
+  "/pharmacy/sos/nearby",
+  authenticate(),
+  requirePharmacyAdmin,
+  pharmacyController.getNearbySOS
+);
+
+/**
+ * POST /api/pharmacy/sos/:id/respond
+ * Respond to an SOS request (accept or reject)
+ * Body: { response: 'accepted' | 'rejected', note?: string }
+ * Requires: JWT token, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
+ */
+router.post(
+  "/pharmacy/sos/:id/respond",
+  authenticate(),
+  requirePharmacyAdmin,
+  pharmacyController.respondToSOS
+);
+
 // ============================================
 // SYSTEM ADMIN ROUTES
 // ============================================
@@ -144,6 +170,18 @@ router.patch(
   authenticate(),
   requireSystemAdmin,
   pharmacyController.updatePharmacyStatus
+);
+
+/**
+ * PATCH /api/pharmacy/update-location
+ * Update pharmacy location (latitude, longitude, address)
+ * Requires: JWT token, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
+ */
+router.patch(
+  "/pharmacy/update-location",
+  authenticate(),
+  requirePharmacyAdmin,
+  pharmacyController.updateLocation
 );
 
 export default router;

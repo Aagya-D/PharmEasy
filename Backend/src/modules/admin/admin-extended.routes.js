@@ -14,9 +14,9 @@ const router = express.Router();
 router.use(authenticateToken);
 router.use(checkRole([1])); // Only System Admin (roleId: 1)
 
-// Support & Ticketing Routes
-router.get('/tickets', adminExtendedController.getAllTickets);
-router.patch('/tickets/:id', adminExtendedController.updateTicket);
+// // Support & Ticketing Routes
+// router.get('/tickets', adminExtendedController.getAllTickets);
+// router.patch('/tickets/:id', adminExtendedController.updateTicket);
 
 // Emergency Map Routes
 router.get('/sos-requests', adminExtendedController.getSOSRequests);

@@ -4,6 +4,8 @@ import { AuthenticationError, ValidationError } from "../../utils/errors.js";
 import jwt from "jsonwebtoken";
 import logger from "../../utils/logger.js";
 import { createLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
+import { hashPassword, comparePassword } from "../../utils/password.js";
+import { prisma } from "../../database/prisma.js";
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -145,6 +147,15 @@ export const verifyEmailOTP = async (req, res, next) => {
     logger.timing('AUTH', 'verifyEmailOTP', duration, 'SUCCESS');
     logger.operation('AUTH', 'verifyEmailOTP', 'SUCCESS', { userId: user.id });
 
+    // ✅ FIX: Calculate isOnboarded based on role (consistent with login)
+    // - SYSTEM_ADMIN (roleId=1): Always onboarded
+    // - PHARMACY_ADMIN (roleId=2): Onboarded only if pharmacy exists
+    // - PATIENT (roleId=3): Always onboarded
+    let isOnboarded = true; // Default for SYSTEM_ADMIN and PATIENT
+    if (user.roleId === 2) {
+      isOnboarded = !!user.pharmacy;
+    }
+
     res.status(201).json({
       success: true,
       message: "Email verified successfully.",
@@ -164,7 +175,7 @@ export const verifyEmailOTP = async (req, res, next) => {
           verificationStatus: user.pharmacy.verificationStatus,
           isOnboarded: true,
         } : null,
-        isOnboarded: user.pharmacy ? true : false,
+        isOnboarded,
         needsOnboarding: user.roleId === 2 && !user.pharmacy,
         accessToken,
         refreshToken,
@@ -230,6 +241,9 @@ export const login = async (req, res, next) => {
     );
 
     // 4. RETURN USER DATA
+    // ✅ FIX: Ensure needsOnboarding is false for SYSTEM_ADMIN and PATIENT
+    const needsOnboarding = result.roleId === 2 && !result.pharmacy;
+
     res.status(200).json({
       success: true,
       message: "Login successful",
@@ -242,7 +256,7 @@ export const login = async (req, res, next) => {
         status: result.status,
         pharmacy: result.pharmacy,
         isOnboarded: result.isOnboarded,
-        needsOnboarding: result.roleId === 2 && !result.pharmacy,
+        needsOnboarding,
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
       },
@@ -519,6 +533,101 @@ export const getCurrentUser = async (req, res, next) => {
     });
   } catch (err) {
     logger.error('AUTH', `[GET_CURRENT_USER] Failed: ${err.message}`, err);
+    next(err);
+  }
+};
+
+// ---------------- CHANGE PASSWORD ----------------
+export const changePassword = async (req, res, next) => {
+  const startTime = Date.now();
+  try {
+    const userId = req.user.userId;
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    logger.operation('AUTH', 'changePassword', 'START', { userId });
+
+    // Validation
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "All password fields are required"
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password and confirmation do not match"
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "New password must be at least 8 characters long"
+      });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New password must be different from current password"
+      });
+    }
+
+    // Get user from database
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, password: true, name: true }
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // Verify current password
+    const isCurrentPasswordValid = await comparePassword(currentPassword, user.password);
+    if (!isCurrentPasswordValid) {
+      logger.warn('AUTH', '[CHANGE_PASSWORD] Invalid current password', { userId });
+      return res.status(401).json({
+        success: false,
+        message: "Current password is incorrect"
+      });
+    }
+
+    // Hash new password
+    const hashedNewPassword = await hashPassword(newPassword);
+
+    // Update password in database
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedNewPassword }
+    });
+
+    const duration = Date.now() - startTime;
+    logger.timing('AUTH', 'changePassword', duration, 'SUCCESS');
+    logger.operation('AUTH', 'changePassword', 'SUCCESS', { userId });
+
+    // Log activity
+    await createLog(
+      userId,
+      LOG_ACTIONS.PASSWORD_CHANGED,
+      `User ${user.email} changed their password`,
+      "SECURITY",
+      { email: user.email }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Password changed successfully"
+    });
+  } catch (err) {
+    const duration = Date.now() - startTime;
+    logger.timing('AUTH', 'changePassword', duration, 'ERROR');
+    logger.error('AUTH', `[CHANGE_PASSWORD] Failed: ${err.message}`, err);
     next(err);
   }
 };

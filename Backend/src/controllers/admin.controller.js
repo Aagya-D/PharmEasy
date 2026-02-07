@@ -643,12 +643,25 @@ export const getSOSLocations = async (req, res, next) => {
       id: sos.id,
       latitude: sos.latitude,
       longitude: sos.longitude,
+      medicineName: sos.medicineName,
+      genericName: sos.genericName,
+      quantity: sos.quantity,
+      urgencyLevel: sos.urgencyLevel,
+      patientName: sos.patientName,
+      contactNumber: sos.contactNumber,
+      address: sos.address,
+      additionalNotes: sos.additionalNotes,
+      prescriptionRequired: sos.prescriptionRequired,
+      prescriptionUrl: sos.prescriptionUrl,
       status: sos.status,
-      patientName: sos.patient?.name || "Unknown",
-      patientPhone: sos.patient?.phone || "N/A",
-      urgencyLevel: sos.urgencyLevel || "MEDIUM",
+      patient: {
+        id: sos.patient?.id,
+        name: sos.patient?.name,
+        email: sos.patient?.email,
+        phone: sos.patient?.phone
+      },
       createdAt: sos.createdAt,
-      message: sos.message || "",
+      updatedAt: sos.updatedAt,
     }));
 
     res.status(200).json({
@@ -775,7 +788,7 @@ export const sendRestockAlert = async (req, res, next) => {
 
     // Log the alert
     await createLog(
-      req.user.id,
+      req.user.userId,
       "INVENTORY_ALERT_SENT",
       "INVENTORY",
       null,
@@ -829,6 +842,11 @@ export const getHealthTips = async (req, res, next) => {
  */
 export const createHealthTip = async (req, res, next) => {
   try {
+    // Validate admin authentication
+    if (!req.user || !req.user.userId) {
+      throw new AppError("Unauthorized: Admin authentication required", 401);
+    }
+
     const { title, content, category, imageUrl, isActive } = req.body;
 
     if (!title || !content || !category) {
@@ -842,13 +860,13 @@ export const createHealthTip = async (req, res, next) => {
         category,
         imageUrl,
         isActive: isActive !== undefined ? isActive : true,
-        createdBy: req.user.id,
+        createdBy: req.user.userId,
       },
     });
 
     // Log activity
     await createLog(
-      req.user.id,
+      req.user.userId,
       LOG_ACTIONS.CONTENT_CREATED,
       "HEALTH_TIP",
       healthTip.id,
@@ -888,7 +906,7 @@ export const updateHealthTip = async (req, res, next) => {
 
     // Log activity
     await createLog(
-      req.user.id,
+      req.user.userId,
       LOG_ACTIONS.CONTENT_UPDATED,
       "HEALTH_TIP",
       healthTip.id,
@@ -920,7 +938,7 @@ export const deleteHealthTip = async (req, res, next) => {
 
     // Log activity
     await createLog(
-      req.user.id,
+      req.user.userId,
       LOG_ACTIONS.CONTENT_DELETED,
       "HEALTH_TIP",
       id,
@@ -966,6 +984,11 @@ export const getAnnouncements = async (req, res, next) => {
  */
 export const createAnnouncement = async (req, res, next) => {
   try {
+    // Validate admin authentication
+    if (!req.user || !req.user.userId) {
+      throw new AppError("Unauthorized: Admin authentication required", 401);
+    }
+
     const {
       title,
       message,
@@ -991,13 +1014,13 @@ export const createAnnouncement = async (req, res, next) => {
         publishDate: publishDate ? new Date(publishDate) : new Date(),
         expiryDate: expiryDate ? new Date(expiryDate) : null,
         isActive: isActive !== undefined ? isActive : true,
-        createdBy: req.user.id,
+        createdBy: req.user.userId,
       },
     });
 
     // Log activity
     await createLog(
-      req.user.id,
+      req.user.userId,
       LOG_ACTIONS.CONTENT_CREATED,
       "ANNOUNCEMENT",
       announcement.id,
@@ -1051,7 +1074,7 @@ export const updateAnnouncement = async (req, res, next) => {
 
     // Log activity
     await createLog(
-      req.user.id,
+      req.user.userId,
       LOG_ACTIONS.CONTENT_UPDATED,
       "ANNOUNCEMENT",
       announcement.id,
@@ -1083,7 +1106,7 @@ export const deleteAnnouncement = async (req, res, next) => {
 
     // Log activity
     await createLog(
-      req.user.id,
+      req.user.userId,
       LOG_ACTIONS.CONTENT_DELETED,
       "ANNOUNCEMENT",
       id,

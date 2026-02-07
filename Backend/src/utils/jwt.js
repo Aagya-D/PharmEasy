@@ -4,11 +4,12 @@
  */
 
 import jwt from "jsonwebtoken";
+import config from "../config/environment.js";
 
-const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || "access_secret_dev";
-const JWT_REFRESH_SECRET =
-  process.env.JWT_REFRESH_SECRET || "refresh_secret_dev";
-const JWT_RESET_SECRET = process.env.JWT_RESET_SECRET || "reset_secret_dev";
+// Use centralized config for JWT secrets
+const JWT_ACCESS_SECRET = config.jwt.accessSecret;
+const JWT_REFRESH_SECRET = config.jwt.refreshSecret;
+const JWT_RESET_SECRET = config.jwt.resetSecret;
 
 // Token expiry times (in seconds)
 const TOKEN_EXPIRY = {

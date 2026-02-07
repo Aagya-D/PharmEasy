@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
+import { AnnouncementBanner } from "../../../shared/components/AnnouncementBanner";
 import { getAllPharmacies } from "../../../core/services/pharmacy.service";
 import { Package, CheckCircle, Clock, XCircle, Users, TrendingUp, Download, FileText, Table } from "lucide-react";
 import AdminLayout from "../components/AdminLayout";
@@ -59,7 +60,7 @@ const AdminDashboardHome = () => {
   const generatePDFReport = async () => {
     setExporting(true);
     try {
-      const response = await fetch('http://localhost:3000/api/admin/reports/monthly-pdf', {
+      const response = await fetch('http://localhost:5000/api/admin/reports/monthly-pdf', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -94,7 +95,7 @@ const AdminDashboardHome = () => {
   const generateExcelReport = async () => {
     setExporting(true);
     try {
-      const response = await fetch('http://localhost:3000/api/admin/reports/monthly-excel', {
+      const response = await fetch('http://localhost:5000/api/admin/reports/monthly-excel', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -210,6 +211,11 @@ const AdminDashboardHome = () => {
           {error}
         </div>
       )}
+
+      {/* Announcement Banner */}
+      <div style={{ marginBottom: "24px" }}>
+        <AnnouncementBanner targetRole="ADMIN" />
+      </div>
 
       {!isLoading && !error && (
         <>

@@ -5,6 +5,7 @@
 
 import { prisma } from "../../database/prisma.js";
 import logger from "../../utils/logger.js";
+import { createLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
 
 /**
  * Get patient dashboard data
@@ -150,6 +151,15 @@ export const updateProfile = async (req, res) => {
         phone: true,
       }
     });
+
+    // Log activity
+    await createLog(
+      patientId,
+      LOG_ACTIONS.PATIENT_UPDATED,
+      `Patient profile updated: ${updatedPatient.name}`,
+      "PATIENT",
+      { name, phone }
+    );
 
     logger.info("[PATIENT] Profile updated", { userId: patientId });
 
@@ -298,6 +308,23 @@ export const getMedications = async (req, res) => {
  */
 export const submitSOSRequest = async (req, res) => {
   const patientId = req.user?.userId;
+
+  // Validate user identity first
+  if (!patientId) {
+    return res.status(401).json({
+      success: false,
+      message: "Authentication required"
+    });
+  }
+
+  // Check if req.body exists (multer should populate this)
+  if (!req.body || Object.keys(req.body).length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Request body is empty. Please ensure you're sending form data correctly."
+    });
+  }
+
   const { 
     medicineName, 
     genericName, 
@@ -312,14 +339,6 @@ export const submitSOSRequest = async (req, res) => {
     prescriptionRequired
   } = req.body;
 
-  // Validate user identity
-  if (!patientId) {
-    return res.status(401).json({
-      success: false,
-      message: "Authentication required"
-    });
-  }
-
   try {
     // Validate required fields
     if (!medicineName || !patientName || !contactNumber || !address) {
@@ -329,29 +348,38 @@ export const submitSOSRequest = async (req, res) => {
       });
     }
 
+    // Prepare SOS request data
+    const sosData = {
+      patientId,
+      medicineName,
+      genericName: genericName || null,
+      quantity: parseInt(quantity) || 1,
+      urgencyLevel: urgencyLevel || 'high',
+      patientName,
+      contactNumber,
+      address,
+      latitude: latitude ? parseFloat(latitude) : null,
+      longitude: longitude ? parseFloat(longitude) : null,
+      additionalNotes: additionalNotes || null,
+      prescriptionRequired: prescriptionRequired === 'true' || prescriptionRequired === true,
+      status: 'pending',
+    };
+
+    // Add prescription URL if file was uploaded
+    if (req.file && req.file.path) {
+      sosData.prescriptionUrl = req.file.path;
+    }
+
     // Create SOS request
     const sosRequest = await prisma.sOSRequest.create({
-      data: {
-        patientId,
-        medicineName,
-        genericName: genericName || null,
-        quantity: quantity || 1,
-        urgencyLevel: urgencyLevel || 'high',
-        patientName,
-        contactNumber,
-        address,
-        latitude: latitude ? parseFloat(latitude) : null,
-        longitude: longitude ? parseFloat(longitude) : null,
-        additionalNotes: additionalNotes || null,
-        prescriptionRequired: prescriptionRequired || false,
-        status: 'pending',
-      }
+      data: sosData
     });
 
     logger.info("[PATIENT] SOS request created", { 
       sosId: sosRequest.id, 
       userId: patientId,
-      urgency: urgencyLevel 
+      urgency: urgencyLevel,
+      hasPrescription: !!req.file
     });
 
     return res.status(201).json({

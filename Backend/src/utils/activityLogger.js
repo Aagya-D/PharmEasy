@@ -46,6 +46,20 @@ export const createLog = async (userId, action, message, category, metadata = nu
 };
 
 /**
+ * Create activity log using object parameters (alternative API)
+ * @param {object} options - Log options
+ * @param {string|null} options.userId - ID of the user performing the action
+ * @param {string} options.action - Action identifier
+ * @param {string} options.message - Human-readable description
+ * @param {string} options.category - Log category
+ * @param {object} options.metadata - Optional additional data
+ * @returns {Promise<object>} Created log entry
+ */
+export const logActivity = async ({ userId, action, message, category, metadata = null }) => {
+  return createLog(userId, action, message, category, metadata);
+};
+
+/**
  * Retrieve logs with pagination and filtering
  * @param {object} filters - Filter options
  * @param {string} filters.category - Filter by category
@@ -144,6 +158,7 @@ export const LOG_ACTIONS = {
 
 export default {
   createLog,
+  logActivity,
   getLogs,
   LOG_ACTIONS,
 };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, Megaphone, Plus, Edit2, Trash2, Eye, EyeOff, Calendar, RefreshCw } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
+import { httpClient } from '../../../core/services/httpClient';
 
 const AdminCMS = () => {
   const [activeTab, setActiveTab] = useState('healthTips');
@@ -31,17 +32,11 @@ const AdminCMS = () => {
     setIsLoading(true);
     try {
       if (activeTab === 'healthTips') {
-        const response = await fetch('http://localhost:3000/api/admin/health-tips', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-        const data = await response.json();
-        if (data.success) setHealthTips(data.data || []);
+        const response = await httpClient.get('/admin/health-tips');
+        if (response.data.success) setHealthTips(response.data.data || []);
       } else {
-        const response = await fetch('http://localhost:3000/api/admin/announcements', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-        const data = await response.json();
-        if (data.success) setAnnouncements(data.data || []);
+        const response = await httpClient.get('/admin/announcements');
+        if (response.data.success) setAnnouncements(response.data.data || []);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -91,11 +86,6 @@ const AdminCMS = () => {
     
     try {
       const endpoint = modalType === 'healthTip' ? 'health-tips' : 'announcements';
-      const url = editingItem
-        ? `http://localhost:3000/api/admin/${endpoint}/${editingItem.id}`
-        : `http://localhost:3000/api/admin/${endpoint}`;
-      
-      const method = editingItem ? 'PATCH' : 'POST';
       
       const payload = modalType === 'healthTip'
         ? {
@@ -118,18 +108,14 @@ const AdminCMS = () => {
             isActive: formData.isActive,
           };
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
+      let response;
+      if (editingItem) {
+        response = await httpClient.patch(`/admin/${endpoint}/${editingItem.id}`, payload);
+      } else {
+        response = await httpClient.post(`/admin/${endpoint}`, payload);
+      }
       
-      if (data.success) {
+      if (response.data.success) {
         setShowModal(false);
         fetchData();
       }
@@ -144,14 +130,8 @@ const AdminCMS = () => {
     
     try {
       const endpoint = type === 'healthTip' ? 'health-tips' : 'announcements';
-      const response = await fetch(`http://localhost:3000/api/admin/${endpoint}/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
-
-      if (response.ok) {
-        fetchData();
-      }
+      await httpClient.delete(`/admin/${endpoint}/${id}`);
+      fetchData();
     } catch (error) {
       console.error('Error deleting:', error);
       alert('Failed to delete');
@@ -161,18 +141,8 @@ const AdminCMS = () => {
   const toggleActive = async (id, isActive, type) => {
     try {
       const endpoint = type === 'healthTip' ? 'health-tips' : 'announcements';
-      const response = await fetch(`http://localhost:3000/api/admin/${endpoint}/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({ isActive: !isActive }),
-      });
-
-      if (response.ok) {
-        fetchData();
-      }
+      await httpClient.patch(`/admin/${endpoint}/${id}`, { isActive: !isActive });
+      fetchData();
     } catch (error) {
       console.error('Error toggling status:', error);
     }

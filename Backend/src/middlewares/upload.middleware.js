@@ -104,6 +104,17 @@ const upload = multer({
 export const uploadLicenseDocument = upload.single("licenseDocument");
 
 /**
+ * Middleware: Upload optional prescription for SOS requests
+ * Field name: "prescription"
+ * 
+ * This middleware is optional - SOS requests can be made without prescriptions
+ * After successful upload:
+ * - req.file.path contains Cloudinary URL
+ * - req.file.filename contains public_id
+ */
+export const uploadPrescription = upload.single("prescription");
+
+/**
  * Error Handler for Multer Errors
  * Catches file upload errors and formats them properly
  */
