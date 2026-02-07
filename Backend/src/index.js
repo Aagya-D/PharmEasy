@@ -18,6 +18,7 @@ import pharmacyRoutes from "./modules/pharmacy/pharmacy.routes.js";
 import inventoryRoutes from "./modules/inventory/inventory.routes.js";
 import patientRoutes from "./modules/patient/patient.routes.js";
 import searchRoutes from "./modules/search/search.routes.js";
+import notificationRoutes from "./modules/notifications/notification.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import contentRoutes from "./routes/content.routes.js";
 // Note: adminExtendedRoutes uses CommonJS, will need conversion or dynamic import
@@ -94,6 +95,17 @@ app.use(
 // Body Parser
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
+
+// Response Helper Middleware
+app.use((req, res, next) => {
+  res.success = (data) => {
+    res.status(200).json({
+      success: true,
+      ...data,
+    });
+  };
+  next();
+});
 
 // Request/Response Logger (comprehensive)
 app.use(loggingMiddleware);
@@ -188,6 +200,10 @@ app.use("/api", searchRoutes);
 // Patient routes (dashboard, orders, prescriptions, medications, SOS)
 // Routes include: /patient/dashboard, /patient/orders, /patient/prescriptions, /patient/sos/request, etc.
 app.use("/api/patient", patientRoutes);
+
+// Notification routes (user notifications, real-time alerts)
+// Routes include: /notifications, /notifications/unread-count, /notifications/:id/read, etc.
+app.use("/api/notifications", notificationRoutes);
 
 // Pharmacy routes (onboarding, pharmacy management & admin verification)
 // Routes include: /pharmacy/onboard, /pharmacy/my-pharmacy, /admin/pharmacies, /admin/pharmacy/:id, etc.

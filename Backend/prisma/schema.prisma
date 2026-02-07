@@ -85,6 +85,7 @@ model User {
   prescriptions  Prescription[]       @relation("PatientPrescriptions")
   medications    Medication[]         @relation("PatientMedications")
   sosRequests    SOSRequest[]         @relation("PatientSOSRequests")
+  notifications  Notification[]
 
   @@index([email])
   @@index([roleId])
@@ -386,6 +387,41 @@ enum LogCategory {
   USER
   INVENTORY
   ORDER
+}
+
+enum NotificationType {
+  CMS_ALERT
+  SOS_UPDATE
+  MEDICINE_ALERT
+  SYSTEM_MESSAGE
+}
+
+/// *
+/// * Notification Model - Real-time user notifications
+/// * 
+/// * Event-driven notifications system:
+/// * - CMS_ALERT: Admin announcements and updates
+/// * - SOS_UPDATE: SOS request status changes (accepted/rejected by pharmacies)
+/// * - MEDICINE_ALERT: Medicine availability updates
+/// * - SYSTEM_MESSAGE: System-wide notifications
+/// * 
+/// * Unread badges are calculated from isRead: false count
+/// * Supports bulk insert for broadcast notifications (Announcements to all users)
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String           @db.Text
+  type      NotificationType
+  isRead    Boolean          @default(false)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@index([type])
 }
 
 /// *

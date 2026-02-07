@@ -7,6 +7,7 @@ import pharmacyService from "./pharmacy.service.js";
 import logger from "../../utils/logger.js";
 import { createLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
 import prisma from "../../database/prisma.js";
+import notificationService from "../notifications/notification.service.js";
 
 /**
  * POST /api/pharmacy/onboard
@@ -516,6 +517,21 @@ export const respondToSOS = async (req, res, next) => {
         patientId: sosRequest.patientId
       });
 
+      // Trigger notification to patient
+      try {
+        await notificationService.notifySosStatusChange(
+          sosRequest.patientId,
+          pharmacy.pharmacyName,
+          'accepted',
+          sosRequest.medicineName,
+          sosId
+        );
+        console.log(`[PHARMACY] Notification sent to patient ${sosRequest.patientId}`);
+      } catch (notificationError) {
+        console.error('[PHARMACY] Failed to send SOS acceptance notification:', notificationError);
+        // Continue despite notification failure
+      }
+
       return res.status(200).json({
         success: true,
         message: "SOS request accepted successfully. Please contact the patient.",
@@ -543,6 +559,21 @@ export const respondToSOS = async (req, res, next) => {
         pharmacyId: pharmacy.id,
         sosId
       });
+
+      // Trigger notification to patient
+      try {
+        await notificationService.notifySosStatusChange(
+          sosRequest.patientId,
+          pharmacy.pharmacyName,
+          'rejected',
+          sosRequest.medicineName,
+          sosId
+        );
+        console.log(`[PHARMACY] Notification sent to patient ${sosRequest.patientId}`);
+      } catch (notificationError) {
+        console.error('[PHARMACY] Failed to send SOS rejection notification:', notificationError);
+        // Continue despite notification failure
+      }
 
       return res.status(200).json({
         success: true,

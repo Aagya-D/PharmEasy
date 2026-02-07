@@ -27,7 +27,7 @@ export default function NearbyPharmacies() {
   const [pharmacies, setPharmacies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [radius, setRadius] = useState(5);
+  const [radius, setRadius] = useState(50);
   const [viewMode, setViewMode] = useState("split"); // 'split', 'list', 'map'
   const [selectedPharmacy, setSelectedPharmacy] = useState(null);
 

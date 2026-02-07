@@ -5,6 +5,7 @@
 
 import { prisma } from '../../database/prisma.js';
 import { logActivity } from '../../utils/activityLogger.js';
+import notificationService from '../notifications/notification.service.js';
 
 /**
  * Get all tickets (with optional filtering)
@@ -32,7 +33,7 @@ export const getAllTickets = async (req, res) => {
 /**
  * Update ticket status and resolution
  */
-const updateTicket = async (req, res) => {
+export const updateTicket = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, resolution } = req.body;
@@ -68,7 +69,7 @@ const updateTicket = async (req, res) => {
 /**
  * Get SOS requests for map
  */
-const getSOSRequests = async (req, res) => {
+export const getSOSRequests = async (req, res) => {
   try {
     const sosRequests = await prisma.sOSRequest.findMany({
       where: {
@@ -89,7 +90,7 @@ const getSOSRequests = async (req, res) => {
 /**
  * Get pharmacy locations for map
  */
-const getPharmacyLocations = async (req, res) => {
+export const getPharmacyLocations = async (req, res) => {
   try {
     const pharmacies = await prisma.pharmacy.findMany({
       where: {
@@ -119,7 +120,7 @@ const getPharmacyLocations = async (req, res) => {
 /**
  * Get inventory insights - shortage tracker
  */
-const getInventoryInsights = async (req, res) => {
+export const getInventoryInsights = async (req, res) => {
   try {
     // Get all inventory items grouped by generic name
     const inventory = await prisma.inventory.groupBy({
@@ -167,7 +168,7 @@ const getInventoryInsights = async (req, res) => {
 /**
  * Send restock alert to pharmacies
  */
-const sendRestockAlert = async (req, res) => {
+export const sendRestockAlert = async (req, res) => {
   try {
     const { genericName, message } = req.body;
 
@@ -203,7 +204,7 @@ const sendRestockAlert = async (req, res) => {
 /**
  * Get all health tips
  */
-const getHealthTips = async (req, res) => {
+export const getHealthTips = async (req, res) => {
   try {
     const healthTips = await prisma.healthTip.findMany({
       orderBy: { createdAt: 'desc' },
@@ -219,7 +220,7 @@ const getHealthTips = async (req, res) => {
 /**
  * Create health tip
  */
-const createHealthTip = async (req, res) => {
+export const createHealthTip = async (req, res) => {
   try {
     const { title, content, category, imageUrl, publishDate, expiryDate, isActive } = req.body;
 
@@ -254,7 +255,7 @@ const createHealthTip = async (req, res) => {
 /**
  * Update health tip
  */
-const updateHealthTip = async (req, res) => {
+export const updateHealthTip = async (req, res) => {
   try {
     const { id } = req.params;
     const { title, content, category, imageUrl, publishDate, expiryDate, isActive } = req.body;
@@ -290,7 +291,7 @@ const updateHealthTip = async (req, res) => {
 /**
  * Delete health tip
  */
-const deleteHealthTip = async (req, res) => {
+export const deleteHealthTip = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -314,7 +315,7 @@ const deleteHealthTip = async (req, res) => {
 /**
  * Get all announcements
  */
-const getAnnouncements = async (req, res) => {
+export const getAnnouncements = async (req, res) => {
   try {
     const announcements = await prisma.announcement.findMany({
       orderBy: { createdAt: 'desc' },
@@ -330,7 +331,7 @@ const getAnnouncements = async (req, res) => {
 /**
  * Create announcement
  */
-const createAnnouncement = async (req, res) => {
+export const createAnnouncement = async (req, res) => {
   try {
     const { title, message, type, priority, targetRole, publishDate, expiryDate, isActive } = req.body;
 
@@ -356,6 +357,15 @@ const createAnnouncement = async (req, res) => {
       metadata: { announcementId: announcement.id, priority },
     });
 
+    // Broadcast notification to all target users
+    try {
+      const notificationCount = await notificationService.notifyAnnouncement(announcement);
+      console.log(`[ADMIN] Broadcast notification sent to ${notificationCount} users for announcement: ${title}`);
+    } catch (notificationError) {
+      console.error('[ADMIN] Failed to broadcast announcement notification:', notificationError);
+      // Continue despite notification failure
+    }
+
     res.json({ success: true, data: announcement });
   } catch (error) {
     console.error('Error creating announcement:', error);
@@ -366,7 +376,7 @@ const createAnnouncement = async (req, res) => {
 /**
  * Update announcement
  */
-const updateAnnouncement = async (req, res) => {
+export const updateAnnouncement = async (req, res) => {
   try {
     const { id } = req.params;
     const { title, message, type, priority, targetRole, publishDate, expiryDate, isActive } = req.body;

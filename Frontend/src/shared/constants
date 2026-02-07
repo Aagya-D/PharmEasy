@@ -45,7 +45,7 @@ export const REGISTRATION_ROLES = [
  * Helper function to get role by ID
  * Fast lookup without API call
  */
-export const getRoleById = (roleId) => {
+export const getRoleById = (roleId: number) => {
   return REGISTRATION_ROLES.find((role) => role.id === roleId);
 };
 
@@ -53,6 +53,6 @@ export const getRoleById = (roleId) => {
  * Helper function to get role by name
  * Useful for display purposes
  */
-export const getRoleByName = (name) => {
+export const getRoleByName = (name: string) => {
   return REGISTRATION_ROLES.find((role) => role.name === name);
 };

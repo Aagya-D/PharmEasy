@@ -1,157 +1,71 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Bell,
-  AlertTriangle,
   CheckCircle,
-  Package,
   Clock,
   X,
-  Filter,
   Search,
   Settings,
   Trash2,
-  ChevronRight,
-  Info,
-  AlertCircle,
-  MoreVertical,
   Check,
-  RefreshCw,
-  Pill,
-  MapPin,
-  Phone,
-  Eye,
+  Megaphone,
+  Heart,
+  AlertCircle,
+  Loader,
   ArrowLeft,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import Layout from "../../../shared/layouts/Layout";
+import notificationService from "../../../core/services/notification.service";
 
 /**
  * Notification & Activity Center
- * Color-coded notifications for patients and pharmacy admins
+ * Real-time notifications from backend (SOS updates, Admin announcements)
  */
 export default function NotificationCenter() {
   const [activeTab, setActiveTab] = useState("all");
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock notifications data
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: "sos-claimed",
-      title: "SOS Request Claimed",
-      message:
-        'Apollo Pharmacy has claimed your urgent request for "Insulin Injection"',
-      time: "2 minutes ago",
-      read: false,
-      pharmacy: {
-        name: "Apollo Pharmacy",
-        phone: "+91 98765 43210",
-        address: "123 MG Road, Koramangala",
-        distance: "0.8 km",
-      },
-      medicine: "Insulin Injection",
-      eta: "15 minutes",
-    },
-    {
-      id: 2,
-      type: "low-stock",
-      title: "Low Stock Alert",
-      message: "Paracetamol 500mg is running low (5 units remaining)",
-      time: "15 minutes ago",
-      read: false,
-      medicine: "Paracetamol 500mg",
-      currentStock: 5,
-      threshold: 10,
-    },
-    {
-      id: 3,
-      type: "stock-refilled",
-      title: "Stock Refilled",
-      message: "Amoxicillin 250mg has been restocked (100 units added)",
-      time: "1 hour ago",
-      read: true,
-      medicine: "Amoxicillin 250mg",
-      addedQuantity: 100,
-      totalStock: 150,
-    },
-    {
-      id: 4,
-      type: "sos-claimed",
-      title: "SOS Request Fulfilled",
-      message:
-        'MedPlus has prepared your order for "Metformin 500mg". Ready for pickup.',
-      time: "2 hours ago",
-      read: true,
-      pharmacy: {
-        name: "MedPlus",
-        phone: "+91 98765 43211",
-        address: "456 Brigade Road, Bangalore",
-        distance: "1.2 km",
-      },
-      medicine: "Metformin 500mg",
-      status: "ready",
-    },
-    {
-      id: 5,
-      type: "low-stock",
-      title: "Critical Stock Alert",
-      message: "Azithromycin 500mg is out of stock!",
-      time: "3 hours ago",
-      read: false,
-      medicine: "Azithromycin 500mg",
-      currentStock: 0,
-      threshold: 10,
-    },
-    {
-      id: 6,
-      type: "stock-refilled",
-      title: "Bulk Stock Update",
-      message: "15 medicines have been restocked from CSV upload",
-      time: "5 hours ago",
-      read: true,
-      totalItems: 15,
-      method: "CSV Upload",
-    },
-    {
-      id: 7,
-      type: "info",
-      title: "New Feature Available",
-      message:
-        "You can now reserve medicines directly from the search results page!",
-      time: "1 day ago",
-      read: true,
-    },
-    {
-      id: 8,
-      type: "sos-claimed",
-      title: "SOS Request Expired",
-      message:
-        'No pharmacy claimed your request for "Cetirizine 10mg". Please try again.',
-      time: "1 day ago",
-      read: true,
-      medicine: "Cetirizine 10mg",
-      status: "expired",
-    },
-  ]);
+  // Fetch notifications from backend on mount
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const fetchNotifications = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await notificationService.getNotifications(50, 0);
+      const notifs = Array.isArray(response.data) ? response.data : response.data?.data || [];
+      setNotifications(notifs);
+      console.log("[NOTIFICATION CENTER] Fetched notifications:", notifs.length);
+    } catch (err) {
+      console.error("[NOTIFICATION CENTER] Failed to fetch notifications:", err);
+      setError("Failed to load notifications. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const tabs = [
     { id: "all", label: "All", count: notifications.length },
     {
       id: "sos",
       label: "SOS Updates",
-      count: notifications.filter((n) => n.type === "sos-claimed").length,
+      count: notifications.filter((n) => n.type === "SOS_UPDATE").length,
     },
     {
-      id: "stock",
-      label: "Stock Alerts",
-      count: notifications.filter(
-        (n) => n.type === "low-stock" || n.type === "stock-refilled"
-      ).length,
+      id: "announcements",
+      label: "Announcements",
+      count: notifications.filter((n) => n.type === "CMS_ALERT").length,
     },
-    { id: "unread", label: "Unread", count: notifications.filter((n) => !n.read).length },
+    { id: "unread", label: "Unread", count: notifications.filter((n) => !n.isRead).length },
   ];
 
   const filteredNotifications = notifications.filter((notification) => {
@@ -161,39 +75,37 @@ export default function NotificationCenter() {
 
     const matchesTab =
       activeTab === "all" ||
-      (activeTab === "sos" && notification.type === "sos-claimed") ||
-      (activeTab === "stock" &&
-        (notification.type === "low-stock" ||
-          notification.type === "stock-refilled")) ||
-      (activeTab === "unread" && !notification.read);
+      (activeTab === "sos" && notification.type === "SOS_UPDATE") ||
+      (activeTab === "announcements" && notification.type === "CMS_ALERT") ||
+      (activeTab === "unread" && !notification.isRead);
 
     return matchesSearch && matchesTab;
   });
 
   const getNotificationIcon = (type) => {
     switch (type) {
-      case "sos-claimed":
+      case "SOS_UPDATE":
+        return (
+          <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+            <Heart className="text-red-600" size={20} />
+          </div>
+        );
+      case "CMS_ALERT":
         return (
           <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-            <AlertTriangle className="text-blue-600" size={20} />
+            <Megaphone className="text-blue-600" size={20} />
           </div>
         );
-      case "low-stock":
-        return (
-          <div className="w-10 h-10 bg-yellow-100 rounded-xl flex items-center justify-center">
-            <AlertCircle className="text-yellow-600" size={20} />
-          </div>
-        );
-      case "stock-refilled":
+      case "MEDICINE_ALERT":
         return (
           <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-            <CheckCircle className="text-green-600" size={20} />
+            <AlertCircle className="text-green-600" size={20} />
           </div>
         );
-      case "info":
+      case "SYSTEM_MESSAGE":
         return (
           <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
-            <Info className="text-gray-600" size={20} />
+            <Bell className="text-gray-600" size={20} />
           </div>
         );
       default:
@@ -207,37 +119,82 @@ export default function NotificationCenter() {
 
   const getNotificationBorderColor = (type) => {
     switch (type) {
-      case "sos-claimed":
+      case "SOS_UPDATE":
+        return "border-l-red-500";
+      case "CMS_ALERT":
         return "border-l-blue-500";
-      case "low-stock":
-        return "border-l-yellow-500";
-      case "stock-refilled":
+      case "MEDICINE_ALERT":
         return "border-l-green-500";
+      case "SYSTEM_MESSAGE":
+        return "border-l-gray-400";
       default:
         return "border-l-gray-300";
     }
   };
 
-  const markAsRead = (id) => {
-    setNotifications(
-      notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
-  };
-
-  const markAllAsRead = () => {
-    setNotifications(notifications.map((n) => ({ ...n, read: true })));
-  };
-
-  const deleteNotification = (id) => {
-    setNotifications(notifications.filter((n) => n.id !== id));
-    if (selectedNotification?.id === id) {
-      setSelectedNotification(null);
+  const markAsRead = async (id) => {
+    try {
+      await notificationService.markNotificationAsRead(id);
+      setNotifications(
+        notifications.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+      );
+      console.log("[NOTIFICATION CENTER] Marked as read:", id);
+    } catch (err) {
+      console.error("[NOTIFICATION CENTER] Failed to mark as read:", err);
     }
   };
 
-  const clearAll = () => {
-    setNotifications([]);
-    setSelectedNotification(null);
+  const markAllAsRead = async () => {
+    try {
+      await notificationService.markAllAsRead();
+      setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
+      console.log("[NOTIFICATION CENTER] Marked all as read");
+    } catch (err) {
+      console.error("[NOTIFICATION CENTER] Failed to mark all as read:", err);
+    }
+  };
+
+  const deleteNotification = async (id) => {
+    try {
+      await notificationService.deleteNotification(id);
+      setNotifications(notifications.filter((n) => n.id !== id));
+      if (selectedNotification?.id === id) {
+        setSelectedNotification(null);
+      }
+      console.log("[NOTIFICATION CENTER] Deleted notification:", id);
+    } catch (err) {
+      console.error("[NOTIFICATION CENTER] Failed to delete notification:", err);
+    }
+  };
+
+  const clearAll = async () => {
+    try {
+      // Delete all notifications one by one
+      for (const notif of notifications) {
+        await notificationService.deleteNotification(notif.id);
+      }
+      setNotifications([]);
+      setSelectedNotification(null);
+      console.log("[NOTIFICATION CENTER] Cleared all notifications");
+    } catch (err) {
+      console.error("[NOTIFICATION CENTER] Failed to clear all:", err);
+    }
+  };
+
+  // Format timestamp to relative time
+  const formatTime = (date) => {
+    const now = new Date();
+    const notifDate = new Date(date);
+    const diffMs = now - notifDate;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return notifDate.toLocaleDateString();
   };
 
   return (
@@ -338,24 +295,42 @@ export default function NotificationCenter() {
 
             {/* Notifications */}
             <div className="space-y-3">
-              <AnimatePresence>
-                {filteredNotifications.length === 0 ? (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="bg-white rounded-xl p-12 text-center"
+              {loading ? (
+                <div className="bg-white rounded-xl p-12 text-center">
+                  <Loader className="animate-spin text-blue-600 mx-auto mb-4" size={32} />
+                  <p className="text-gray-500">Loading notifications...</p>
+                </div>
+              ) : error ? (
+                <div className="bg-white rounded-xl p-12 text-center">
+                  <AlertCircle className="text-red-600 mx-auto mb-4" size={32} />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Error</h3>
+                  <p className="text-gray-500 mb-4">{error}</p>
+                  <button
+                    onClick={fetchNotifications}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                   >
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Bell className="text-gray-400" size={32} />
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      No notifications
-                    </h3>
-                    <p className="text-gray-500">
-                      You're all caught up! New notifications will appear here.
-                    </p>
-                  </motion.div>
-                ) : (
+                    Try Again
+                  </button>
+                </div>
+              ) : (
+                <AnimatePresence>
+                  {filteredNotifications.length === 0 ? (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="bg-white rounded-xl p-12 text-center"
+                    >
+                      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <CheckCircle className="text-green-600" size={32} />
+                      </div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">
+                        All Caught Up!
+                      </h3>
+                      <p className="text-gray-500">
+                        You have no notifications at the moment. New updates will appear here.
+                      </p>
+                    </motion.div>
+                  ) : (
                   filteredNotifications.map((notification) => (
                     <motion.div
                       key={notification.id}
@@ -386,7 +361,7 @@ export default function NotificationCenter() {
                               <div>
                                 <h3
                                   className={`font-semibold text-gray-900 ${
-                                    !notification.read ? "font-bold" : ""
+                                    !notification.isRead ? "font-bold" : ""
                                   }`}
                                 >
                                   {notification.title}
@@ -395,7 +370,7 @@ export default function NotificationCenter() {
                                   {notification.message}
                                 </p>
                               </div>
-                              {!notification.read && (
+                              {!notification.isRead && (
                                 <span className="w-2.5 h-2.5 bg-blue-500 rounded-full flex-shrink-0 mt-1.5" />
                               )}
                             </div>
@@ -403,27 +378,14 @@ export default function NotificationCenter() {
                             <div className="flex items-center gap-4 mt-3">
                               <span className="flex items-center gap-1 text-xs text-gray-400">
                                 <Clock size={12} />
-                                {notification.time}
+                                {formatTime(notification.createdAt)}
                               </span>
-
-                              {notification.type === "sos-claimed" &&
-                                notification.eta && (
-                                  <span className="text-xs text-blue-600 font-medium">
-                                    ETA: {notification.eta}
-                                  </span>
-                                )}
-
-                              {notification.type === "low-stock" && (
-                                <span
-                                  className={`text-xs font-medium ${
-                                    notification.currentStock === 0
-                                      ? "text-red-600"
-                                      : "text-yellow-600"
-                                  }`}
-                                >
-                                  {notification.currentStock} units left
-                                </span>
-                              )}
+                              <span className="text-xs text-gray-500">
+                                {notification.type === "SOS_UPDATE" && "SOS Update"}
+                                {notification.type === "CMS_ALERT" && "Announcement"}
+                                {notification.type === "MEDICINE_ALERT" && "Medicine Alert"}
+                                {notification.type === "SYSTEM_MESSAGE" && "System"}
+                              </span>
                             </div>
                           </div>
 
@@ -440,8 +402,9 @@ export default function NotificationCenter() {
                       </div>
                     </motion.div>
                   ))
-                )}
-              </AnimatePresence>
+                  )}
+                </AnimatePresence>
+              )}
             </div>
           </div>
 
@@ -464,7 +427,7 @@ export default function NotificationCenter() {
                             {selectedNotification.title}
                           </h3>
                           <p className="text-sm text-gray-500">
-                            {selectedNotification.time}
+                            {formatTime(selectedNotification.createdAt)}
                           </p>
                         </div>
                       </div>
@@ -482,151 +445,53 @@ export default function NotificationCenter() {
                       {selectedNotification.message}
                     </p>
 
-                    {/* SOS Claimed Details */}
-                    {selectedNotification.type === "sos-claimed" &&
-                      selectedNotification.pharmacy && (
-                        <div className="space-y-4">
-                          <div className="bg-blue-50 rounded-xl p-4">
-                            <h4 className="font-medium text-blue-900 mb-3">
-                              Pharmacy Details
-                            </h4>
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2 text-sm">
-                                <Pill className="text-blue-600" size={16} />
-                                <span className="text-gray-700">
-                                  {selectedNotification.pharmacy.name}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 text-sm">
-                                <MapPin className="text-blue-600" size={16} />
-                                <span className="text-gray-600">
-                                  {selectedNotification.pharmacy.address}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 text-sm">
-                                <Phone className="text-blue-600" size={16} />
-                                <span className="text-gray-600">
-                                  {selectedNotification.pharmacy.phone}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {selectedNotification.eta && (
-                            <div className="flex items-center justify-between p-4 bg-green-50 rounded-xl">
-                              <span className="text-sm text-green-700">
-                                Estimated Time
-                              </span>
-                              <span className="font-semibold text-green-700">
-                                {selectedNotification.eta}
+                    {/* Metadata Display */}
+                    {selectedNotification.metadata && (
+                      <div className="bg-gray-50 rounded-xl p-4 mb-4">
+                        <h4 className="font-medium text-gray-900 mb-3">
+                          Additional Details
+                        </h4>
+                        <div className="space-y-2 text-sm">
+                          {selectedNotification.metadata.pharmacyName && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Pharmacy:</span>
+                              <span className="font-medium text-gray-900">
+                                {selectedNotification.metadata.pharmacyName}
                               </span>
                             </div>
                           )}
-
-                          <div className="flex gap-3">
-                            <a
-                              href={`tel:${selectedNotification.pharmacy.phone}`}
-                              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
-                            >
-                              <Phone size={18} />
-                              Call Pharmacy
-                            </a>
-                            <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors">
-                              <MapPin size={18} />
-                              Directions
-                            </button>
-                          </div>
+                          {selectedNotification.metadata.medicineName && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Medicine:</span>
+                              <span className="font-medium text-gray-900">
+                                {selectedNotification.metadata.medicineName}
+                              </span>
+                            </div>
+                          )}
+                          {selectedNotification.metadata.status && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Status:</span>
+                              <span className={`font-medium capitalize ${
+                                selectedNotification.metadata.status === 'accepted' 
+                                  ? 'text-green-600' 
+                                  : 'text-red-600'
+                              }`}>
+                                {selectedNotification.metadata.status}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                      )}
-
-                    {/* Low Stock Details */}
-                    {selectedNotification.type === "low-stock" && (
-                      <div className="space-y-4">
-                        <div className="bg-yellow-50 rounded-xl p-4">
-                          <h4 className="font-medium text-yellow-900 mb-3">
-                            Stock Status
-                          </h4>
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">
-                              Current Stock
-                            </span>
-                            <span
-                              className={`font-bold ${
-                                selectedNotification.currentStock === 0
-                                  ? "text-red-600"
-                                  : "text-yellow-600"
-                              }`}
-                            >
-                              {selectedNotification.currentStock} units
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="text-sm text-gray-600">
-                              Threshold
-                            </span>
-                            <span className="font-medium text-gray-900">
-                              {selectedNotification.threshold} units
-                            </span>
-                          </div>
-                        </div>
-
-                        <Link
-                          to="/admin/inventory"
-                          className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-yellow-500 text-white rounded-xl font-medium hover:bg-yellow-600 transition-colors"
-                        >
-                          <RefreshCw size={18} />
-                          Restock Now
-                        </Link>
                       </div>
                     )}
 
-                    {/* Stock Refilled Details */}
-                    {selectedNotification.type === "stock-refilled" && (
-                      <div className="space-y-4">
-                        <div className="bg-green-50 rounded-xl p-4">
-                          <h4 className="font-medium text-green-900 mb-3">
-                            Stock Update
-                          </h4>
-                          {selectedNotification.addedQuantity && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-600">
-                                Added
-                              </span>
-                              <span className="font-bold text-green-600">
-                                +{selectedNotification.addedQuantity} units
-                              </span>
-                            </div>
-                          )}
-                          {selectedNotification.totalStock && (
-                            <div className="flex items-center justify-between mt-2">
-                              <span className="text-sm text-gray-600">
-                                Total Stock
-                              </span>
-                              <span className="font-medium text-gray-900">
-                                {selectedNotification.totalStock} units
-                              </span>
-                            </div>
-                          )}
-                          {selectedNotification.totalItems && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-600">
-                                Items Updated
-                              </span>
-                              <span className="font-bold text-green-600">
-                                {selectedNotification.totalItems} medicines
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        <Link
-                          to="/admin/inventory"
-                          className="flex items-center justify-center gap-2 w-full px-4 py-3 border border-gray-200 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
-                        >
-                          <Eye size={18} />
-                          View Inventory
-                        </Link>
-                      </div>
+                    {/* View SOS Details Button */}
+                    {selectedNotification.type === "SOS_UPDATE" && selectedNotification.metadata?.link && (
+                      <Link
+                        to={selectedNotification.metadata.link}
+                        className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
+                      >
+                        View SOS Details
+                      </Link>
                     )}
                   </div>
 
@@ -694,9 +559,9 @@ export default function NotificationCenter() {
 
                 <label className="flex items-center justify-between cursor-pointer">
                   <div>
-                    <p className="font-medium text-gray-900">Low Stock Alerts</p>
+                    <p className="font-medium text-gray-900">Admin Announcements</p>
                     <p className="text-sm text-gray-500">
-                      Get notified when inventory is running low
+                      Get notified about system announcements
                     </p>
                   </div>
                   <input
@@ -708,9 +573,9 @@ export default function NotificationCenter() {
 
                 <label className="flex items-center justify-between cursor-pointer">
                   <div>
-                    <p className="font-medium text-gray-900">Stock Updates</p>
+                    <p className="font-medium text-gray-900">Medicine Alerts</p>
                     <p className="text-sm text-gray-500">
-                      Get notified when stock is refilled
+                      Get notified about medicine availability
                     </p>
                   </div>
                   <input

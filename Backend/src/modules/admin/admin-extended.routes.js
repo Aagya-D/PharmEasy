@@ -5,14 +5,14 @@
 
 import express from 'express';
 import * as adminExtendedController from './admin-extended.controller.js';
-import { authenticateToken } from '../../middlewares/auth.js';
-import { checkRole } from '../../middlewares/roleCheck.js';
+import { authenticate } from '../../middlewares/auth.js';
+import { requireSystemAdmin } from '../../middlewares/roleCheck.js';
 
 const router = express.Router();
 
 // All routes require authentication and admin role
-router.use(authenticateToken);
-router.use(checkRole([1])); // Only System Admin (roleId: 1)
+router.use(authenticate());
+router.use(requireSystemAdmin);
 
 // // Support & Ticketing Routes
 // router.get('/tickets', adminExtendedController.getAllTickets);

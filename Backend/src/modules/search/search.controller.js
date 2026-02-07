@@ -76,7 +76,7 @@ class SearchController {
       latitude: latitude ? parseFloat(latitude) : undefined,
       longitude: longitude ? parseFloat(longitude) : undefined,
       includeOutOfStock: includeOutOfStock === "true",
-      maxDistance: maxDistance ? parseFloat(maxDistance) : undefined,
+      maxDistance: maxDistance ? parseFloat(maxDistance) : 50,
       limit: limit ? Math.min(parseInt(limit), 100) : 50,
     };
 

@@ -8,6 +8,7 @@ import bcrypt from "bcrypt";
 import { prisma } from "../database/prisma.js";
 import { AppError } from "../middlewares/errorHandler.js";
 import { createLog, getLogs as getActivityLogs, LOG_ACTIONS } from "../utils/activityLogger.js";
+import notificationService from "../modules/notifications/notification.service.js";
 
 /**
  * GET /api/admin/pharmacies/pending
@@ -1026,6 +1027,15 @@ export const createAnnouncement = async (req, res, next) => {
       announcement.id,
       `Created announcement: ${title}`
     );
+
+    // Trigger notification broadcast to target users
+    try {
+      const notificationCount = await notificationService.notifyAnnouncement(announcement);
+      console.log(`[ADMIN] Announcement broadcast to ${notificationCount} users`);
+    } catch (notificationError) {
+      console.error("[ADMIN] Failed to broadcast notification:", notificationError);
+      // Continue despite notification failure - don't block announcement creation
+    }
 
     res.status(201).json({
       success: true,
