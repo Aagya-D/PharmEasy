@@ -14,8 +14,10 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import httpClient from "../../../core/services/httpClient";
+import { useSOSContext } from "../../../context/SOSContext";
 
 export default function PharmacySOSRequests() {
+  const { updateSOSCount } = useSOSContext();
   const [sosRequests, setSosRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -49,7 +51,10 @@ export default function PharmacySOSRequests() {
       });
 
       if (response.data.success) {
-        setSosRequests(response.data.data.sosRequests || []);
+        const sosData = response.data.data.sosRequests || [];
+        setSosRequests(sosData);
+        // Update global SOS count
+        updateSOSCount(sosData);
       }
     } catch (err) {
       console.error("Error fetching SOS requests:", err);
@@ -223,7 +228,7 @@ export default function PharmacySOSRequests() {
                         </div>
                         <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                           <User size={18} />
-                          {request.patient.firstName} {request.patient.lastName}
+                          {request.patientName || request.patient?.name || 'Anonymous Patient'}
                         </h3>
                       </div>
                     </div>
@@ -231,17 +236,17 @@ export default function PharmacySOSRequests() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="flex items-center gap-2 text-gray-600">
                         <Phone size={16} className="text-blue-600" />
-                        <span className="text-sm">{request.patient.phone}</span>
+                        <span className="text-sm">{request.contactNumber || request.patient?.phone || 'N/A'}</span>
                       </div>
                       
                       <div className="flex items-center gap-2 text-gray-600">
                         <MapPin size={16} className="text-green-600" />
-                        <span className="text-sm">{request.distance.toFixed(1)} km away</span>
+                        <span className="text-sm">{request.distance ? request.distance.toFixed(1) : '0.0'} km away</span>
                       </div>
 
                       <div className="flex items-center gap-2 text-gray-600 col-span-2">
                         <AlertTriangle size={16} className="text-orange-600" />
-                        <span className="text-sm font-medium">{request.notes || "No additional notes"}</span>
+                        <span className="text-sm font-medium">{request.additionalNotes || "No additional notes"}</span>
                       </div>
                     </div>
 
@@ -249,7 +254,13 @@ export default function PharmacySOSRequests() {
                     {request.prescriptionUrl && (
                       <div className="mt-4">
                         <button
-                          onClick={() => setSelectedPrescription(request.prescriptionUrl)}
+                          onClick={() => {
+                            // Construct full URL if it's a relative path
+                            const prescriptionUrl = request.prescriptionUrl.startsWith('http')
+                              ? request.prescriptionUrl
+                              : `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${request.prescriptionUrl}`;
+                            setSelectedPrescription(prescriptionUrl);
+                          }}
                           className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
                         >
                           <Eye size={16} />

@@ -343,7 +343,8 @@ export const getNearbySOS = async (req, res, next) => {
             id: true,
             name: true,
             email: true,
-            phone: true
+            phone: true,
+            createdAt: true
           }
         }
       },

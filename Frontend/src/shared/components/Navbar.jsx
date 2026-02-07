@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation as useLocationRouter } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useLocation } from "../../context/LocationContext";
-import LocationSelector from "./LocationSelector";
+import LocationModal from "./LocationModal";
 import { ROLE_IDS } from "../../core/constants/roles";
 import { 
   Menu, 
@@ -355,7 +355,7 @@ export function Navbar() {
       )}
 
       {/* Location Selector Modal */}
-      <LocationSelector
+      <LocationModal
         isOpen={isLocationSelectorOpen}
         onClose={() => setIsLocationSelectorOpen(false)}
       />

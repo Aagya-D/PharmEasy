@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useLocation as useLocationContext } from "../../context/LocationContext";
+import LocationModal from "../components/LocationModal";
 import {
   Search,
   ShoppingCart,
@@ -34,14 +36,14 @@ export function PatientLayout({ children, searchEnabled = true }) {
   const navigate = useNavigate();
   const routeLocation = useLocation();
   const { user, logout } = useAuth();
+  const { selectedLocation } = useLocationContext();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [cartCount] = useState(0); // TODO: Connect to actual cart state
   const [notificationCount] = useState(0); // TODO: Connect to notifications
-  const [location, setLocation] = useState("Kathmandu"); // TODO: Connect to geolocation
-  const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -89,23 +91,14 @@ export function PatientLayout({ children, searchEnabled = true }) {
             {/* Desktop Search Bar with Location */}
             {searchEnabled && (
               <div className="hidden md:flex flex-1 mx-8 gap-2">
-                {/* Location Selector */}
-                <div className="relative">
-                  <button
-                    onClick={() => setIsLocationMenuOpen(!isLocationMenuOpen)}
-                    className="h-full px-3 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg flex items-center gap-2 text-sm font-medium text-gray-700 transition-colors whitespace-nowrap"
-                  >
-                    <MapPin size={16} className="text-teal-600" />
-                    <span className="hidden lg:inline">{location}</span>
-                  </button>
-                  {isLocationMenuOpen && (
-                    <div className="absolute top-full mt-2 left-0 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-50 min-w-48">
-                      <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-slate-50" onClick={() => { setLocation("Kathmandu"); setIsLocationMenuOpen(false); }}>Kathmandu</button>
-                      <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-slate-50" onClick={() => { setLocation("Pokhara"); setIsLocationMenuOpen(false); }}>Pokhara</button>
-                      <button className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-slate-50" onClick={() => { setLocation("Lalitpur"); setIsLocationMenuOpen(false); }}>Lalitpur</button>
-                    </div>
-                  )}
-                </div>
+                {/* Location Selector Button */}
+                <button
+                  onClick={() => setIsLocationModalOpen(true)}
+                  className="h-full px-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg flex items-center gap-2 text-sm font-medium text-gray-700 transition-all hover:shadow-md whitespace-nowrap min-w-fit"
+                >
+                  <MapPin size={16} className="text-teal-600 flex-shrink-0" />
+                  <span className="hidden lg:inline max-w-[150px] truncate">{selectedLocation?.name || "Select Location"}</span>
+                </button>
                 {/* Search Bar */}
                 <form onSubmit={handleSearch} className="flex-1 relative">
                   <input
@@ -427,6 +420,12 @@ export function PatientLayout({ children, searchEnabled = true }) {
           </div>
         </div>
       </footer>
+
+      {/* Location Modal */}
+      <LocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+      />
     </div>
   );
 }

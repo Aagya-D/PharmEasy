@@ -13,12 +13,13 @@ import {
   Pill,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import { useSOSContext } from "../../context/SOSContext";
 
 const NAV_ITEMS = [
   { name: "Dashboard", path: "/pharmacy/dashboard", icon: Home },
   { name: "Inventory", path: "/pharmacy/inventory", icon: Package },
   { name: "Orders", path: "/pharmacy/orders", icon: ClipboardList },
-  { name: "SOS Requests", path: "/pharmacy/sos-requests", icon: AlertTriangle, badge: 3 },
+  { name: "SOS Requests", path: "/pharmacy/sos-requests", icon: AlertTriangle, hasDynamicBadge: true },
   { name: "Customers", path: "/pharmacy/customers", icon: Users },
   { name: "Analytics", path: "/pharmacy/analytics", icon: BarChart3 },
   { name: "Reports", path: "/pharmacy/reports", icon: FileText },
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
 export default function Sidebar({ isOpen, onClose }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { sosCount } = useSOSContext();
 
   const handleLogout = async () => {
     await logout();
@@ -83,9 +85,9 @@ export default function Sidebar({ isOpen, onClose }) {
                   <item.icon size={20} />
                   <span>{item.name}</span>
                 </div>
-                {item.badge && (
-                  <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                    {item.badge}
+                {item.hasDynamicBadge && sosCount > 0 && (
+                  <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold">
+                    {sosCount}
                   </span>
                 )}
               </NavLink>

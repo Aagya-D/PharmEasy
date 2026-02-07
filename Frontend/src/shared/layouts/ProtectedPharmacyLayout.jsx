@@ -1,17 +1,22 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { SOSProvider, useSOSContext } from "../../context/SOSContext";
 import Sidebar from "../components/Sidebar";
+import httpClient from "../../core/services/httpClient";
 
 /**
- * Protected Pharmacy Layout
- * - Renders Sidebar only for approved pharmacy users
- * - Ensures onboarding/pending/rejected pages stay full-width
+ * Inner component to initialize SOS count
  */
-export function ProtectedPharmacyLayout({ children }) {
-  const { user } = useAuth();
+function ProtectedPharmacyLayoutInner({ children, isApprovedPharmacy }) {
+  const { fetchSOSRequests } = useSOSContext();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const isApprovedPharmacy = user?.roleId === 2 && user?.status === "APPROVED";
+  // Initialize SOS count on mount for approved pharmacies
+  useEffect(() => {
+    if (isApprovedPharmacy) {
+      fetchSOSRequests(httpClient);
+    }
+  }, [isApprovedPharmacy, fetchSOSRequests]);
 
   if (!isApprovedPharmacy) {
     return <main className="min-h-screen w-full">{children}</main>;
@@ -35,6 +40,25 @@ export function ProtectedPharmacyLayout({ children }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Protected Pharmacy Layout
+ * - Renders Sidebar only for approved pharmacy users
+ * - Wraps all pharmacy routes with SOSProvider for dynamic badge
+ * - Ensures onboarding/pending/rejected pages stay full-width
+ */
+export function ProtectedPharmacyLayout({ children }) {
+  const { user } = useAuth();
+  const isApprovedPharmacy = user?.roleId === 2 && user?.status === "APPROVED";
+
+  return (
+    <SOSProvider>
+      <ProtectedPharmacyLayoutInner isApprovedPharmacy={isApprovedPharmacy}>
+        {children}
+      </ProtectedPharmacyLayoutInner>
+    </SOSProvider>
   );
 }
 
