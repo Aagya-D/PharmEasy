@@ -200,6 +200,17 @@ class SearchService {
       },
     });
 
+    // DEBUG: Log pharmacy data for diagnostics
+    console.log(`[SEARCH SERVICE] Found ${pharmacies.length} verified pharmacies`);
+    console.log(`[SEARCH SERVICE] User location: ${latitude}, ${longitude} | Radius: ${radius}km`);
+    if (pharmacies.length > 0) {
+      console.log(`[SEARCH SERVICE] Sample pharmacy coords:`, {
+        name: pharmacies[0].pharmacyName,
+        lat: pharmacies[0].latitude,
+        lng: pharmacies[0].longitude,
+      });
+    }
+
     // Calculate distances and filter by radius
     let results = pharmacies
       .map((pharmacy) => {
@@ -226,6 +237,15 @@ class SearchService {
       })
       .filter((pharmacy) => pharmacy.distance <= radius)
       .sort((a, b) => a.distance - b.distance);
+
+    // DEBUG: Log results
+    console.log(`[SEARCH SERVICE] After radius filter (${radius}km): ${results.length} pharmacies`);
+    if (results.length > 0) {
+      console.log(`[SEARCH SERVICE] Closest pharmacy:`, {
+        name: results[0].name,
+        distance: results[0].distanceFormatted,
+      });
+    }
 
     return results.slice(0, limit);
   }

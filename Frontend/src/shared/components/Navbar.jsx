@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation as useLocationRouter } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "../../context/LocationContext";
+import LocationSelector from "./LocationSelector";
 import { ROLE_IDS } from "../../core/constants/roles";
 import { 
   Menu, 
@@ -17,7 +19,8 @@ import {
   Package,
   Users,
   FileText,
-  Shield
+  Shield,
+  MapPin,
 } from "lucide-react";
 
 /**
@@ -63,11 +66,13 @@ const NAV_CONFIG = {
  */
 export function Navbar() {
   const { isAuthenticated, logout, user, isSessionRestoring } = useAuth();
+  const { selectedLocation } = useLocation();
   const navigate = useNavigate();
-  const location = useLocation();
+  const location = useLocationRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isLocationSelectorOpen, setIsLocationSelectorOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
@@ -187,6 +192,16 @@ export function Navbar() {
                     {link.name}
                   </Link>
                 ))}
+                
+                {/* Location Selector Button */}
+                <button
+                  onClick={() => setIsLocationSelectorOpen(true)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-blue-50 transition-all"
+                >
+                  <MapPin size={18} className="text-blue-600" />
+                  <span className="max-w-[120px] truncate">{selectedLocation?.name || "Kathmandu"}</span>
+                </button>
+                
                 <div className="h-6 w-px bg-gray-200" />
               </>
             )}
@@ -338,6 +353,12 @@ export function Navbar() {
           onClick={() => setShowUserMenu(false)}
         />
       )}
+
+      {/* Location Selector Modal */}
+      <LocationSelector
+        isOpen={isLocationSelectorOpen}
+        onClose={() => setIsLocationSelectorOpen(false)}
+      />
     </nav>
   );
 }

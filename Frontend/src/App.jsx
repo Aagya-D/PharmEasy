@@ -1,6 +1,7 @@
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { LocationProvider } from "./context/LocationContext";
 import { DarkModeProvider } from "./context/DarkModeContext";
 import { routes } from "./routes/AppRoutes";
 import StateMonitor from "./shared/components/StateMonitor";
@@ -28,12 +29,14 @@ function App() {
     <BrowserRouter>
       <DarkModeProvider>
         <AuthProvider>
-          <Routes>
-            {renderRoutes(routes)}
-          </Routes>
-          
-          {/* Development-only state monitor (Ctrl+Shift+L to toggle) */}
-          <StateMonitor />
+          <LocationProvider>
+            <Routes>
+              {renderRoutes(routes)}
+            </Routes>
+            
+            {/* Development-only state monitor (Ctrl+Shift+L to toggle) */}
+            <StateMonitor />
+          </LocationProvider>
         </AuthProvider>
       </DarkModeProvider>
     </BrowserRouter>

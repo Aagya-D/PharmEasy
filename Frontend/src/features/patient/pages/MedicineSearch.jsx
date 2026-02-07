@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import searchService from "../../../core/services/search.service";
 import useGeoLocation from "../../../shared/hooks/useGeoLocation";
+import { useLocation } from "../../../context/LocationContext";
 
 /**
  * Medicine Search & Discovery Page
@@ -34,6 +35,9 @@ export default function MedicineSearch() {
   // Use custom geolocation hook
   const { location, loading: locationLoading, error: geoError, getLocation } = useGeoLocation(false);
 
+  // Location context - user's selected search location
+  const { selectedLocation } = useLocation();
+
   // Get user's location on mount (with fallback to Kathmandu)
   useEffect(() => {
     getLocation();
@@ -48,6 +52,19 @@ export default function MedicineSearch() {
     }
   }, [geoError]);
 
+  // Auto-search when user selects a new location from the location selector
+  useEffect(() => {
+    if (searchQuery.trim() && selectedLocation) {
+      console.log("[MEDICINE SEARCH] Location changed to:", selectedLocation.name);
+      // Trigger search after a brief delay to ensure state updates
+      const timer = setTimeout(() => {
+        const formEvent = new Event("submit", { bubbles: true });
+        document.querySelector("form")?.dispatchEvent(formEvent);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedLocation]);
+
   const handleSearch = async (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) {
@@ -59,9 +76,18 @@ export default function MedicineSearch() {
     setError(null);
 
     try {
-      // Use location if available, otherwise default to Kathmandu
-      const lat = location?.latitude || 27.7172;
-      const lng = location?.longitude || 85.3240;
+      // Use selected location from context (user's chosen location or detected geolocation)
+      // Fallback to selectedLocation context coordinates
+      const lat = selectedLocation?.lat || location?.latitude || 27.7172;
+      const lng = selectedLocation?.lng || location?.longitude || 85.3240;
+
+      console.log("[MEDICINE SEARCH] Searching with:", {
+        query: searchQuery,
+        lat,
+        lng,
+        location: selectedLocation?.name || "Geolocation",
+        nearbyOnly: filters.nearbyOnly,
+      });
 
       const response = await searchService.searchMedicines(
         searchQuery,
@@ -79,7 +105,7 @@ export default function MedicineSearch() {
       setMedicines(Array.isArray(results) ? results : []);
 
       if (results.length === 0) {
-        setError(`No pharmacies found with "${searchQuery}". Try a different medicine name.`);
+        setError(`No pharmacies found with "${searchQuery}" in ${selectedLocation?.name || "your area"}. Try a different medicine name or location.`);
       }
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || "Search failed";

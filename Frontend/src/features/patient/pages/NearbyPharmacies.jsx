@@ -14,6 +14,7 @@ import {
 import { Link } from "react-router-dom";
 import searchService from "../../../core/services/search.service";
 import useGeoLocation from "../../../shared/hooks/useGeoLocation";
+import { useLocation } from "../../../context/LocationContext";
 import MapContainer from "../../../shared/components/MapContainer";
 
 /**
@@ -34,21 +35,29 @@ export default function NearbyPharmacies() {
   const { location, loading: locationLoading, error: locationError, getLocation } =
     useGeoLocation(true); // Auto-fetch on mount
 
+  // Location context - user's selected search location
+  const { selectedLocation } = useLocation();
+
   /**
    * Search for nearby pharmacies
    */
   const findNearbyPharmacies = async () => {
-    if (!location) {
-      setError("Unable to detect your location. Please enable location services.");
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
     try {
-      const lat = location.latitude || 27.7172;
-      const lng = location.longitude || 85.3240;
+      // Use selected location from context (user's chosen location or detected geolocation)
+      // Fallback to selectedLocation context coordinates
+      const lat = selectedLocation?.lat || location?.latitude || 27.7172;
+      const lng = selectedLocation?.lng || location?.longitude || 85.3240;
+
+      console.log("[NEARBY PHARMACIES] Searching with:", {
+        lat,
+        lng,
+        radius,
+        selectedLocation: selectedLocation?.name,
+        location: location ? `GPS(${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)})` : "Not detected",
+      });
 
       const response = await searchService.findNearbyPharmacies(lat, lng, radius, 50);
 
@@ -56,11 +65,13 @@ export default function NearbyPharmacies() {
       const resultData = response.data?.data || response.data || [];
       const safeResults = Array.isArray(resultData) ? resultData : [];
 
+      console.log("[NEARBY PHARMACIES] Results received:", safeResults);
+
       setPharmacies(safeResults);
 
       if (safeResults.length === 0) {
         setError(
-          `No pharmacies found within ${radius}km of your location. Try increasing the search radius.`
+          `No pharmacies found within ${radius}km of ${selectedLocation?.name || "your location"}. Try increasing the search radius.`
         );
       }
     } catch (err) {
@@ -78,13 +89,13 @@ export default function NearbyPharmacies() {
   };
 
   /**
-   * Auto-search when location becomes available
+   * Auto-search when location becomes available, radius changes, or selected location changes
+   * Uses selectedLocation from context or geolocation as fallback
    */
   useEffect(() => {
-    if (location && !loading) {
-      findNearbyPharmacies();
-    }
-  }, [location, radius]);
+    // Search when: selected location changes, radius changes, or geolocation detected
+    findNearbyPharmacies();
+  }, [selectedLocation, radius]);
 
   /**
    * Format price for Nepal
@@ -103,10 +114,11 @@ export default function NearbyPharmacies() {
   const getDirectionsUrl = (pharmacy) => {
     const { lat, lng } = pharmacy.location;
 
-    if (location) {
-      return `https://www.google.com/maps/dir/?api=1&origin=${location.latitude},${location.longitude}&destination=${lat},${lng}`;
-    }
-    return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    // Use selected location or geolocation for origin
+    const originLat = selectedLocation?.lat || location?.latitude || 27.7172;
+    const originLng = selectedLocation?.lng || location?.longitude || 85.324;
+
+    return `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${lat},${lng}`;
   };
 
   return (
@@ -216,7 +228,22 @@ export default function NearbyPharmacies() {
             <div>
               <p className="text-sm font-medium text-yellow-900">Location Access Disabled</p>
               <p className="text-sm text-yellow-700 mt-1">
-                {locationError} Showing results for Kathmandu.
+                {locationError} Results are shown for Kathmandu, Nepal (27.7172°N, 85.3240°E).
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Using Default Location Info */}
+      {!locationError && !location && !loading && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+            <MapPin className="text-blue-600 flex-shrink-0 mt-0.5" size={20} />
+            <div>
+              <p className="text-sm font-medium text-blue-900">Using Default Location</p>
+              <p className="text-sm text-blue-700 mt-1">
+                Showing pharmacies near Kathmandu, Nepal. Click "Use My Location" to search near your actual location.
               </p>
             </div>
           </div>
