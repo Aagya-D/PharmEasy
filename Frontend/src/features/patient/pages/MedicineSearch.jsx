@@ -30,6 +30,7 @@ export default function MedicineSearch() {
     nearbyOnly: false,
     inStock: true,
     priceRange: [0, 1000],
+    searchRadius: 50, // Default search radius in km
   });
 
   // Use custom geolocation hook
@@ -95,21 +96,30 @@ export default function MedicineSearch() {
         lng,
         {
           includeOutOfStock: !filters.inStock,
-          maxDistance: filters.nearbyOnly ? 10 : undefined,
+          maxDistance: filters.searchRadius,
           limit: 50,
         }
       );
 
-      // Safely extract data array
-      const results = response.data || response || [];
-      setMedicines(Array.isArray(results) ? results : []);
+      // Safely extract data array from response
+      const resultData = response.data || response || [];
+      const results = Array.isArray(resultData) ? resultData : [];
+      
+      console.log("[MEDICINE SEARCH] Results received:", {
+        count: results.length,
+        location: selectedLocation?.name,
+        nearestPharmacy: results.length > 0 ? results[0].pharmacy?.name : 'N/A',
+        failsafeApplied: results.length > 0 && results[0].failsafeNote ? true : false,
+      });
+      
+      setMedicines(results);
 
       if (results.length === 0) {
-        setError(`No pharmacies found with "${searchQuery}" in ${selectedLocation?.name || "your area"}. Try a different medicine name or location.`);
+        setError(`❌ No pharmacies found with "${searchQuery}" in ${selectedLocation?.name || "your area"}. Try a different medicine name or expand your search location.`);
       }
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || "Search failed";
-      setError(errorMsg);
+      setError(`⚠️ ${errorMsg}`);
       console.error("[MEDICINE SEARCH]", err);
       setMedicines([]);
     } finally {
@@ -189,18 +199,22 @@ export default function MedicineSearch() {
 
           {/* Filters */}
           <div className="mt-4 flex flex-wrap gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={filters.nearbyOnly}
-                onChange={(e) =>
-                  setFilters({ ...filters, nearbyOnly: e.target.checked })
-                }
-                className="w-4 h-4 rounded border-gray-300"
-              />
+            <div className="flex items-center gap-2">
               <MapPin size={16} className="text-gray-600" />
-              <span className="text-sm text-gray-700">Nearby only</span>
-            </label>
+              <label className="text-sm text-gray-700 mr-2">Search Radius:</label>
+              <select
+                value={filters.searchRadius}
+                onChange={(e) =>
+                  setFilters({ ...filters, searchRadius: parseInt(e.target.value) })
+                }
+                className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={10}>10 km</option>
+                <option value={25}>25 km</option>
+                <option value={50}>50 km</option>
+                <option value={100}>100 km</option>
+              </select>
+            </div>
 
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -213,6 +227,19 @@ export default function MedicineSearch() {
               />
               <CheckCircle size={16} className="text-green-600" />
               <span className="text-sm text-gray-700">In stock only</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={filters.nearbyOnly}
+                onChange={(e) =>
+                  setFilters({ ...filters, nearbyOnly: e.target.checked })
+                }
+                className="w-4 h-4 rounded border-gray-300"
+              />
+              <MapPin size={16} className="text-gray-600" />
+              <span className="text-sm text-gray-700">Strict radius only</span>
             </label>
           </div>
         </form>
@@ -243,10 +270,10 @@ export default function MedicineSearch() {
                 >
                   {/* Medicine Name */}
                   <h3 className="text-lg font-bold text-gray-900 mb-2">
-                    {medicine.brandName}
+                    {medicine.medicine || medicine.brandName}
                   </h3>
-                  <p className="text-sm text-gray-600 mb-4">
-                    {medicine.composition}
+                  <p className="text-sm text-gray-600 mb-1">
+                    {medicine.genericName && `Generic: ${medicine.genericName}`}
                   </p>
 
                   {/* Price & Availability */}
@@ -259,34 +286,39 @@ export default function MedicineSearch() {
                     </div>
 
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Available At</span>
-                      <span className="text-sm font-medium text-green-600">
-                        {medicine.pharmaciesCount} pharmacies
+                      <span className="text-sm text-gray-600">Stock</span>
+                      <span className={`text-sm font-medium ${medicine.inStock ? 'text-green-600' : 'text-red-600'}`}>
+                        {medicine.quantity > 0 ? `${medicine.quantity} available` : 'Out of stock'}
                       </span>
                     </div>
                   </div>
 
                   {/* Top Pharmacy */}
-                  {medicine.nearestPharmacy && (
+                  {medicine.pharmacy && (
                     <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                      <p className="text-xs text-gray-600 mb-1">Nearest</p>
+                      <p className="text-xs text-gray-600 mb-1">Available at</p>
                       <p className="text-sm font-medium text-gray-900">
-                        {medicine.nearestPharmacy.name}
+                        {medicine.pharmacy.name}
                       </p>
+                      <p className="text-xs text-gray-500 mt-1">{medicine.pharmacy.address}</p>
                       <div className="flex items-center justify-between mt-2">
                         <span className="text-xs text-gray-600">
-                          {medicine.nearestPharmacy.distance} km away
+                          {medicine.distanceFormatted || (medicine.distance ? `${parseFloat(medicine.distance).toFixed(1)} km` : 'Distance unavailable')} away
                         </span>
-                        <div className="flex items-center gap-1">
-                          <Star
-                            size={14}
-                            className="text-yellow-500 fill-yellow-500"
-                          />
-                          <span className="text-xs font-medium">
-                            {medicine.nearestPharmacy.rating}
-                          </span>
-                        </div>
+                        <span className="text-xs text-blue-600 font-medium">
+                          {medicine.pharmacy.contactNumber}
+                        </span>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Failsafe Warning */}
+                  {medicine.failsafeNote && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                      <p className="text-xs text-amber-700 flex items-start gap-2">
+                        <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                        <span>{medicine.failsafeNote}</span>
+                      </p>
                     </div>
                   )}
 
@@ -294,7 +326,7 @@ export default function MedicineSearch() {
                   <div className="space-y-2">
                     <button
                       onClick={() =>
-                        navigate(`/search?q=${encodeURIComponent(medicine.brandName)}`)
+                        navigate(`/search?q=${encodeURIComponent(medicine.medicine || medicine.brandName)}`)
                       }
                       className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
                     >
@@ -330,23 +362,37 @@ export default function MedicineSearch() {
 
         {/* Empty State */}
         {!loading && searchQuery && medicines.length === 0 && !error && (
-          <div className="text-center py-16">
+          <div className="text-center py-16 bg-white rounded-lg">
             <AlertCircle
               size={48}
               className="mx-auto text-gray-300 mb-4"
             />
-            <p className="text-gray-500 font-medium mb-4">
+            <p className="text-gray-700 font-semibold mb-2">
               No medicines found for "{searchQuery}"
             </p>
-            <p className="text-sm text-gray-400 mb-6">
-              Try searching with a different name or composition
+            <p className="text-sm text-gray-600 mb-6">
+              This medicine might not be available in {selectedLocation?.name || "your area"}. Try:
+              <br />
+              • Searching by generic name (e.g., "Paracetamol" instead of "Cetamol")
+              <br />
+              • Selecting a different location
+              <br />
+              • Checking nearby pharmacies for available medicines
             </p>
-            <button
-              onClick={() => setSearchQuery("")}
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-            >
-              Clear Search
-            </button>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => setSearchQuery("")}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Clear Search
+              </button>
+              <button
+                onClick={() => navigate("/nearby-pharmacies")}
+                className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 font-medium rounded-lg transition-colors"
+              >
+                View All Pharmacies
+              </button>
+            </div>
           </div>
         )}
 

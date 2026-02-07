@@ -94,7 +94,16 @@ class SearchController {
     logger.info("Medicine search query", {
       query: parsedParams.query,
       hasLocation: !!parsedParams.latitude,
+      coordinates: parsedParams.latitude ? { lat: parsedParams.latitude, lng: parsedParams.longitude } : null,
       userId: req.user?.id,
+    });
+
+    console.log('[SEARCH CONTROLLER] Medicine search request:', {
+      query: parsedParams.query,
+      latitude: parsedParams.latitude || 'NOT PROVIDED',
+      longitude: parsedParams.longitude || 'NOT PROVIDED',
+      maxDistance: parsedParams.maxDistance,
+      includeOutOfStock: parsedParams.includeOutOfStock,
     });
 
     // Perform search
@@ -177,8 +186,21 @@ class SearchController {
       userId: req.user?.id,
     });
 
+    console.log('[SEARCH CONTROLLER] Nearby pharmacies request:', {
+      latitude: parsedParams.latitude,
+      longitude: parsedParams.longitude,
+      radius: `${parsedParams.radius}km`,
+      limit: parsedParams.limit,
+    });
+
     // Perform search
     const results = await searchService.findNearbyPharmacies(parsedParams);
+
+    console.log('[SEARCH CONTROLLER] Nearby pharmacies result:', {
+      found: results.length,
+      radius: parsedParams.radius,
+      location: { lat: parsedParams.latitude.toFixed(4), lng: parsedParams.longitude.toFixed(4) },
+    });
 
     res.status(200).json({
       success: true,

@@ -185,6 +185,15 @@ export default function PharmacySettings() {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
+
+          // Validate location is within Nepal bounds
+          // Nepal boundaries: ~26°N to 30.5°N latitude, ~80°E to 88.2°E longitude
+          if (latitude < 26 || latitude > 30.5 || longitude < 80 || longitude > 88.2) {
+            showNotification(
+              "warning",
+              "Location detected outside Nepal. Please ensure your location is within Nepal's boundaries."
+            );
+          }
           
           // Update map position with high zoom level for detailed view
           setMapPosition([latitude, longitude]);

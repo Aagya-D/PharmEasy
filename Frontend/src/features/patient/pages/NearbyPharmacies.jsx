@@ -65,13 +65,17 @@ export default function NearbyPharmacies() {
       const resultData = response.data?.data || response.data || [];
       const safeResults = Array.isArray(resultData) ? resultData : [];
 
-      console.log("[NEARBY PHARMACIES] Results received:", safeResults);
+      console.log("[NEARBY PHARMACIES] Results received:", {
+        count: safeResults.length,
+        location: selectedLocation?.name,
+        closestPharmacy: safeResults.length > 0 ? { name: safeResults[0].name, distance: safeResults[0].distanceFormatted } : null,
+      });
 
       setPharmacies(safeResults);
 
       if (safeResults.length === 0) {
         setError(
-          `No pharmacies found within ${radius}km of ${selectedLocation?.name || "your location"}. Try increasing the search radius.`
+          `❌ No pharmacies found within ${radius}km of ${selectedLocation?.name || "your location"}. Try increasing the search radius or selecting a different area in Nepal.`
         );
       }
     } catch (err) {
@@ -80,7 +84,7 @@ export default function NearbyPharmacies() {
         err.response?.data?.message ||
         err.message ||
         "Search failed. Please try again.";
-      setError(errorMsg);
+      setError(`⚠️ ${errorMsg}`);
       console.error("[NEARBY PHARMACIES ERROR]", err);
       setPharmacies([]);
     } finally {
@@ -376,18 +380,26 @@ export default function NearbyPharmacies() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
           <MapPinned size={64} className="text-gray-300 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            No pharmacies found
+            No verified pharmacies yet in this area
           </h3>
           <p className="text-gray-600 mb-6">
-            Try increasing the search radius or enable location access
+            Try increasing the search radius from {radius}km to find pharmacies. You can also select a different location like Kathmandu, Pokhara, or other districts in Nepal.
           </p>
-          <button
-            onClick={getLocation}
-            disabled={locationLoading}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-          >
-            {locationLoading ? "Detecting location..." : "Try Again"}
-          </button>
+          <div className="flex gap-4 justify-center">
+            <button
+              onClick={() => setRadius(Math.min(radius + 5, 50))}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              Increase Radius to {Math.min(radius + 5, 50)}km
+            </button>
+            <button
+              onClick={getLocation}
+              disabled={locationLoading}
+              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50"
+            >
+              {locationLoading ? "Detecting location..." : "Auto-Detect Location"}
+            </button>
+          </div>
         </div>
       )}
     </div>
