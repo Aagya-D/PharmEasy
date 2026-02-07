@@ -17,6 +17,7 @@ import ResetPassword from "../features/auth/pages/ResetPassword";
 import PatientPortal from "../features/patient/pages/PatientPortal";
 import SearchResults from "../features/patient/pages/SearchResults";
 import MedicineSearch from "../features/patient/pages/MedicineSearch";
+import NearbyPharmacies from "../features/patient/pages/NearbyPharmacies";
 import EmergencySOS from "../features/patient/pages/EmergencySOS";
 import NotificationCenter from "../features/patient/pages/NotificationCenter";
 import PatientDashboard from "../features/patient/pages/Dashboard/PatientDashboard";
@@ -24,6 +25,7 @@ import OrdersPage from "../features/patient/pages/Orders/OrdersPage";
 import MedicationsPage from "../features/patient/pages/Medications/MedicationsPage";
 import ProfilePage from "../features/patient/pages/Profile/ProfilePage";
 import PrescriptionsPage from "../features/patient/pages/Prescriptions/PrescriptionsPage";
+import PatientSettings from "../features/patient/pages/PatientSettings";
 
 // Pharmacy Pages
 import PharmacyDashboard from "../features/pharmacy/pages/PharmacyDashboard";
@@ -314,6 +316,10 @@ export const routes = [
         path: "profile",
         element: <ProfilePage />,
       },
+      {
+        path: "settings",
+        element: <PatientSettings />,
+      },
     ],
   },
   {
@@ -333,6 +339,10 @@ export const routes = [
       {
         path: "medicine-search",
         element: <MedicineSearch />,
+      },
+      {
+        path: "nearby-pharmacies",
+        element: <NearbyPharmacies />,
       },
       {
         path: "map",

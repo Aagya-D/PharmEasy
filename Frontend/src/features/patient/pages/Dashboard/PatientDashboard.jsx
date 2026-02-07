@@ -156,7 +156,14 @@ export function PatientDashboard() {
                   className="w-full p-4 bg-gradient-to-br from-teal-50 to-teal-100 hover:from-teal-100 hover:to-teal-200 text-teal-700 font-semibold rounded-xl transition-all flex items-center gap-3 text-left shadow-sm hover:shadow-md"
                 >
                   <MapPin size={20} />
-                  <span>Find Pharmacies</span>
+                  <span>Search Medicine</span>
+                </button>
+                <button
+                  onClick={() => navigate("/nearby-pharmacies")}
+                  className="w-full p-4 bg-gradient-to-br from-orange-50 to-orange-100 hover:from-orange-100 hover:to-orange-200 text-orange-700 font-semibold rounded-xl transition-all flex items-center gap-3 text-left shadow-sm hover:shadow-md"
+                >
+                  <MapPin size={20} />
+                  <span>Nearby Pharmacies</span>
                 </button>
                 <button
                   onClick={() => navigate("/patient/prescriptions")}

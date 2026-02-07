@@ -11,7 +11,8 @@ import {
   Loader,
   CheckCircle,
 } from "lucide-react";
-import patientService from "../services/patient.service";
+import searchService from "../../../core/services/search.service";
+import useGeoLocation from "../../../shared/hooks/useGeoLocation";
 
 /**
  * Medicine Search & Discovery Page
@@ -23,61 +24,68 @@ export default function MedicineSearch() {
   const [medicines, setMedicines] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [locationError, setLocationError] = useState(null);
   const [filters, setFilters] = useState({
     nearbyOnly: false,
     inStock: true,
     priceRange: [0, 1000],
   });
 
-  const [userLocation, setUserLocation] = useState(null);
-  const [gettingLocation, setGettingLocation] = useState(false);
+  // Use custom geolocation hook
+  const { location, loading: locationLoading, error: geoError, getLocation } = useGeoLocation(false);
 
-  // Get user's location on mount
+  // Get user's location on mount (with fallback to Kathmandu)
   useEffect(() => {
-    getCurrentLocation();
+    getLocation();
   }, []);
 
-  const getCurrentLocation = () => {
-    setGettingLocation(true);
-    if (!navigator.geolocation) {
-      setError("Geolocation not supported");
-      setGettingLocation(false);
-      return;
+  // Handle geolocation errors with fallback
+  useEffect(() => {
+    if (geoError) {
+      setLocationError(geoError);
+      // Fallback location (Kathmandu, Nepal)
+      console.warn("Using default location: Kathmandu");
     }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setUserLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-        setGettingLocation(false);
-      },
-      (error) => {
-        console.error("Location error:", error);
-        setGettingLocation(false);
-      }
-    );
-  };
+  }, [geoError]);
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim()) {
+      setError("Please enter a medicine name");
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await patientService.searchMedicinesWithAvailability(
+      // Use location if available, otherwise default to Kathmandu
+      const lat = location?.latitude || 27.7172;
+      const lng = location?.longitude || 85.3240;
+
+      const response = await searchService.searchMedicines(
         searchQuery,
-        userLocation?.latitude,
-        userLocation?.longitude
+        lat,
+        lng,
+        {
+          includeOutOfStock: !filters.inStock,
+          maxDistance: filters.nearbyOnly ? 10 : undefined,
+          limit: 50,
+        }
       );
 
-      setMedicines(response.data?.medicines || []);
+      // Safely extract data array
+      const results = response.data || response || [];
+      setMedicines(Array.isArray(results) ? results : []);
+
+      if (results.length === 0) {
+        setError(`No pharmacies found with "${searchQuery}". Try a different medicine name.`);
+      }
     } catch (err) {
-      setError(err.response?.data?.message || "Search failed");
+      const errorMsg = err.response?.data?.message || err.message || "Search failed";
+      setError(errorMsg);
       console.error("[MEDICINE SEARCH]", err);
+      setMedicines([]);
     } finally {
       setLoading(false);
     }
@@ -95,6 +103,17 @@ export default function MedicineSearch() {
             Search for medicines and check availability at nearby pharmacies
           </p>
         </div>
+
+        {/* Location Alert */}
+        {locationError && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+            <AlertCircle className="text-blue-600 flex-shrink-0 mt-0.5" size={20} />
+            <div>
+              <p className="font-semibold text-blue-900">Using Default Location</p>
+              <p className="text-blue-700 text-sm">Showing results for Kathmandu, Nepal. Click "My Location" to use your current position.</p>
+            </div>
+          </div>
+        )}
 
         {/* Search Form */}
         <form onSubmit={handleSearch} className="mb-8 bg-white rounded-lg shadow-md p-6">
@@ -133,12 +152,12 @@ export default function MedicineSearch() {
 
             <button
               type="button"
-              onClick={getCurrentLocation}
-              disabled={gettingLocation}
+              onClick={getLocation}
+              disabled={locationLoading}
               className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <Navigation size={18} />
-              {gettingLocation ? "Locating..." : "My Location"}
+              {locationLoading ? "Locating..." : "My Location"}
             </button>
           </div>
 
@@ -264,6 +283,22 @@ export default function MedicineSearch() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <div className="text-center py-16">
+            <Loader
+              size={48}
+              className="mx-auto text-blue-500 mb-4 animate-spin"
+            />
+            <p className="text-gray-600 font-medium mb-2">
+              Searching for medicines near you...
+            </p>
+            <p className="text-sm text-gray-400">
+              This may take a few seconds
+            </p>
           </div>
         )}
 

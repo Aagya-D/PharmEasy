@@ -46,11 +46,11 @@ export default function SearchResults() {
     maxPrice: 1000,
   });
 
-  // Geolocation hook
-  const { location, loading: locationLoading, error: locationError, getLocation } = useGeoLocation(true);
+  // Geolocation hook - will fallback to Kathmandu if permission denied
+  const { location, loading: locationLoading, error: locationError, getLocation } = useGeoLocation(false);
 
   /**
-   * Perform search when query or location changes
+   * Auto-search when location becomes available or query changes
    */
   useEffect(() => {
     if (query) {
@@ -71,10 +71,14 @@ export default function SearchResults() {
     setError(null);
 
     try {
+      // Use location if available, otherwise default to Kathmandu
+      const lat = location?.latitude || 27.7172;
+      const lng = location?.longitude || 85.3240;
+
       const response = await searchService.searchMedicines(
         searchTerm,
-        location?.latitude,
-        location?.longitude,
+        lat,
+        lng,
         {
           includeOutOfStock: filters.includeOutOfStock,
           maxDistance: filters.maxDistance,
@@ -82,10 +86,20 @@ export default function SearchResults() {
         }
       );
 
-      setResults(response.data?.data || []);
+      // Safely extract data - handle both response.data.data and response.data
+      const resultData = response.data?.data || response.data || [];
+      const safeResults = Array.isArray(resultData) ? resultData : [];
+      
+      setResults(safeResults);
+      
+      if (safeResults.length === 0) {
+        setError(`No medicines found for "${searchTerm}". Try a different name or nearby pharmacies may not have this medicine in stock.`);
+      }
     } catch (err) {
-      setError(err.response?.data?.error?.message || "Search failed. Please try again.");
+      const errorMsg = err.response?.data?.error?.message || err.response?.data?.message || err.message || "Search failed. Please try again.";
+      setError(errorMsg);
       console.error("[SEARCH ERROR]", err);
+      setResults([]);
     } finally {
       setLoading(false);
     }
@@ -376,7 +390,7 @@ export default function SearchResults() {
         {loading ? (
           <div className="flex items-center gap-2 text-gray-600">
             <Loader size={20} className="animate-spin" />
-            <span>Searching...</span>
+            <span>Searching for medicines... (may take a few seconds)</span>
           </div>
         ) : error ? (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">

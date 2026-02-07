@@ -14,8 +14,9 @@ import {
   Phone,
   Building,
   Navigation,
+  Crosshair,
 } from "lucide-react";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useAuth } from "../../../context/AuthContext";
@@ -66,12 +67,25 @@ function MapClickHandler({ setPosition }) {
   return null;
 }
 
+// Map Controller component to handle map centering when coordinates change
+function MapController({ position, zoom }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    map.setView(position, zoom);
+  }, [position, zoom, map]);
+
+  return null;
+}
+
 export default function PharmacySettings() {
   const { user, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [loading, setLoading] = useState(false);
   const [notification, setNotification] = useState(null);
   const [pharmacy, setPharmacy] = useState(null);
+  const [geolocationLoading, setGeolocationLoading] = useState(false);
+  const [mapZoom, setMapZoom] = useState(13);
 
   // Map position state (default to Kathmandu, Nepal)
   const [mapPosition, setMapPosition] = useState([27.7172, 85.324]);
@@ -136,6 +150,96 @@ export default function PharmacySettings() {
   const showNotification = (type, message) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 5000);
+  };
+
+  // Reverse geocoding function to get address from coordinates
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+        {
+          headers: {
+            "Accept-Language": "en",
+            "User-Agent": "PharmEasy-App",
+          },
+        }
+      );
+      const data = await response.json();
+      return data.address?.road || data.address?.village || data.address?.town || data.address?.city || "Address not found";
+    } catch (error) {
+      console.error("Reverse geocoding error:", error);
+      return "";
+    }
+  };
+
+  // Handle location detection using browser's geolocation API
+  const handleDetectLocation = async () => {
+    if (!navigator.geolocation) {
+      showNotification("error", "Geolocation is not supported by your browser");
+      return;
+    }
+
+    setGeolocationLoading(true);
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          
+          // Update map position with high zoom level for detailed view
+          setMapPosition([latitude, longitude]);
+          setMapZoom(18);
+
+          // Get address via reverse geocoding
+          const address = await reverseGeocode(latitude, longitude);
+
+          // Update location data
+          setLocationData({
+            latitude: latitude.toFixed(6),
+            longitude: longitude.toFixed(6),
+            address: address,
+          });
+
+          showNotification("success", "Location detected successfully!");
+        } catch (error) {
+          showNotification("error", "Failed to process location data");
+        } finally {
+          setGeolocationLoading(false);
+        }
+      },
+      (error) => {
+        setGeolocationLoading(false);
+        
+        // Handle specific geolocation errors
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            showNotification(
+              "error",
+              "Location permission denied. Please enable location access in your browser settings."
+            );
+            break;
+          case error.POSITION_UNAVAILABLE:
+            showNotification(
+              "error",
+              "Location information is unavailable at the moment. Please try again."
+            );
+            break;
+          case error.TIMEOUT:
+            showNotification(
+              "error",
+              "Location request timed out. Please try again."
+            );
+            break;
+          default:
+            showNotification("error", "Failed to detect location");
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
   };
 
   // Handle location update
@@ -580,13 +684,14 @@ export default function PharmacySettings() {
                     <div className="h-96 rounded-lg overflow-hidden border border-gray-200">
                       <MapContainer
                         center={mapPosition}
-                        zoom={13}
+                        zoom={mapZoom}
                         style={{ height: "100%", width: "100%" }}
                       >
                         <TileLayer
                           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
+                        <MapController position={mapPosition} zoom={mapZoom} />
                         <DraggableMarker
                           position={mapPosition}
                           setPosition={setMapPosition}
@@ -600,62 +705,87 @@ export default function PharmacySettings() {
                   </div>
 
                   {/* Coordinates */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Latitude
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Coordinates
                       </label>
-                      <div className="relative">
-                        <Navigation
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                          size={20}
-                        />
-                        <input
-                          type="text"
-                          value={locationData.latitude}
-                          onChange={(e) => {
-                            setLocationData({
-                              ...locationData,
-                              latitude: e.target.value,
-                            });
-                            const lat = parseFloat(e.target.value);
-                            if (!isNaN(lat)) {
-                              setMapPosition([lat, mapPosition[1]]);
-                            }
-                          }}
-                          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="27.7172"
-                          required
-                        />
-                      </div>
+                      <button
+                        type="button"
+                        onClick={handleDetectLocation}
+                        disabled={geolocationLoading}
+                        className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:text-blue-700 border border-blue-200 hover:border-blue-300 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                      >
+                        {geolocationLoading ? (
+                          <>
+                            <Loader className="animate-spin" size={16} />
+                            Detecting...
+                          </>
+                        ) : (
+                          <>
+                            <Crosshair size={16} />
+                            Use Current Location
+                          </>
+                        )}
+                      </button>
                     </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Latitude
+                        </label>
+                        <div className="relative">
+                          <Navigation
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                            size={20}
+                          />
+                          <input
+                            type="text"
+                            value={locationData.latitude}
+                            onChange={(e) => {
+                              setLocationData({
+                                ...locationData,
+                                latitude: e.target.value,
+                              });
+                              const lat = parseFloat(e.target.value);
+                              if (!isNaN(lat)) {
+                                setMapPosition([lat, mapPosition[1]]);
+                              }
+                            }}
+                            className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="27.7172"
+                            required
+                          />
+                        </div>
+                      </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Longitude
-                      </label>
-                      <div className="relative">
-                        <Navigation
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                          size={20}
-                        />
-                        <input
-                          type="text"
-                          value={locationData.longitude}
-                          onChange={(e) => {
-                            setLocationData({
-                              ...locationData,
-                              longitude: e.target.value,
-                            });
-                            const lng = parseFloat(e.target.value);
-                            if (!isNaN(lng)) {
-                              setMapPosition([mapPosition[0], lng]);
-                            }
-                          }}
-                          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="85.324"
-                          required
-                        />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Longitude
+                        </label>
+                        <div className="relative">
+                          <Navigation
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                            size={20}
+                          />
+                          <input
+                            type="text"
+                            value={locationData.longitude}
+                            onChange={(e) => {
+                              setLocationData({
+                                ...locationData,
+                                longitude: e.target.value,
+                              });
+                              const lng = parseFloat(e.target.value);
+                              if (!isNaN(lng)) {
+                                setMapPosition([mapPosition[0], lng]);
+                              }
+                            }}
+                            className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="85.324"
+                            required
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
