@@ -85,8 +85,26 @@ export const canAccessRoute = (user, allowedRoles) => {
     3: "PATIENT",
   };
 
-  const userRole = roleMap[user.roleId];
-  return allowedRoles.includes(userRole);
+  const userRoleId = Number(user.roleId);
+  const userRole = roleMap[userRoleId];
+  
+  // ✅ Master Key: SYSTEM_ADMIN (Role 1) can access all non-pharmacy routes
+  const isSysAdmin = userRoleId === 1;
+  const isPharmacyRoute = allowedRoles.includes("PHARMACY");
+  
+  const hasAccess = allowedRoles.includes(userRole) || 
+                    (isSysAdmin && !isPharmacyRoute);
+  
+  console.log('[roleHelpers] canAccessRoute check:', {
+    userRoleId,
+    userRole,
+    isSysAdmin,
+    allowedRoles,
+    isPharmacyRoute,
+    hasAccess,
+  });
+  
+  return hasAccess;
 };
 
 /**

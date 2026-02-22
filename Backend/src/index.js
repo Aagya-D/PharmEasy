@@ -110,9 +110,6 @@ app.use((req, res, next) => {
 // Request/Response Logger (comprehensive)
 app.use(loggingMiddleware);
 
-// ============================================
-// HEALTH CHECK & STATUS
-// ============================================
 
 // Simple health check (no dependencies)
 app.get("/api/health", (req, res) => {
@@ -170,9 +167,6 @@ app.get("/api/status", asyncHandler(async (req, res) => {
   });
 }));
 
-// ============================================
-// DATABASE CHECK
-// ============================================
 
 app.get(
   "/api/db-check",
@@ -186,9 +180,7 @@ app.get(
   })
 );
 
-// ============================================
-// API ROUTES
-// ============================================
+
 
 // Authentication routes
 app.use("/api/auth", authRoutes);

@@ -60,6 +60,18 @@ import ErrorBoundary from "../shared/components/ErrorBoundary";
 
 // Unauthorized page component
 function UnauthorizedPage() {
+  const handleClearSession = () => {
+    console.log('🗑️ Clearing session data');
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("user");
+    localStorage.removeItem("pendingUserId");
+    localStorage.removeItem("pendingEmail");
+    
+    // Redirect to login
+    window.location.href = '/login';
+  };
+
   return (
     <Layout>
       <div className="p-6 text-center max-w-[600px] mx-auto">
@@ -68,12 +80,22 @@ function UnauthorizedPage() {
         <p className="text-[var(--color-text-secondary)] mb-6">
           You don't have permission to access this page.
         </p>
-        <button
-          onClick={() => window.location.href = "/dashboard"}
-          className="px-6 py-4 bg-[var(--color-primary)] text-white border-none rounded-lg cursor-pointer"
-        >
-          Go to Dashboard
-        </button>
+        <div className="flex gap-4 justify-center flex-wrap">
+          <button
+            onClick={() => window.location.href = "/dashboard"}
+            className="px-6 py-4 bg-[var(--color-primary)] text-white border-none rounded-lg cursor-pointer hover:opacity-80 transition"
+          >
+            Go to Dashboard
+          </button>
+          {/* ✅ TASK 4: Clear stale session button for debugging */}
+          <button
+            onClick={handleClearSession}
+            className="px-6 py-4 bg-red-600 text-white border-none rounded-lg cursor-pointer hover:opacity-80 transition"
+            title="Clear cached session and return to login"
+          >
+            Clear Session & Login
+          </button>
+        </div>
       </div>
     </Layout>
   );
@@ -160,32 +182,55 @@ function Profile() {
 }
 
 // Route guard for redirecting authenticated users away from auth pages
+// ✅ Route guard for redirecting authenticated users away from auth pages
+// Prevents authenticated users from accessing login/register pages
 function PublicRoute({ children }) {
-  const { isAuthenticated, isSessionRestoring } = useAuth();
+  const { isAuthenticated, isInitializing } = useAuth();
 
-  if (isSessionRestoring) {
+  // ✅ PHASE 1: Wait for initialization
+  // Don't redirect authenticated users until we know if they're actually logged in
+  if (isInitializing) {
+    console.log('[PublicRoute] 🔄 INITIALIZING - showing loading spinner');
     return <LoadingSpinner showText={false} />;
   }
 
-  // If already authenticated, redirect to dashboard
+  // ✅ PHASE 2: Check if user is authenticated
+  // If already authenticated, redirect away from login/register pages
   if (isAuthenticated) {
+    console.log('[PublicRoute] ✅ AUTHENTICATED - redirecting to dashboard');
     return <Navigate to="/dashboard" replace />;
   }
 
+  // ✅ Not authenticated, allow access to public pages (login, register, etc)
+  console.log('[PublicRoute] ✅ NOT AUTHENTICATED - allowing access to public page');
   return children;
 }
 
 // Pharmacy status gatekeeper (routes enforced by user.status)
+// Routes users to correct pharmacy page based on their approval status
 function PharmacyStatusGate() {
-  const { user } = useAuth();
+  const { user, isInitializing } = useAuth();
   const location = useLocation();
 
+  // ✅ Wait for initialization to complete
+  if (isInitializing) {
+    console.log('[PharmacyStatusGate] 🔄 INITIALIZING');
+    return <Outlet />;
+  }
+
+  // Only check status for pharmacy users
   if (!user || user?.roleId !== 2) {
     return <Outlet />;
   }
 
   const status = user?.status;
   const currentPath = location.pathname;
+
+  console.log('[PharmacyStatusGate] Checking pharmacy user status:', {
+    userId: user.id,
+    status,
+    currentPath,
+  });
 
   const statusRoutes = {
     ONBOARDING_REQUIRED: ["/pharmacy/onboarding"],

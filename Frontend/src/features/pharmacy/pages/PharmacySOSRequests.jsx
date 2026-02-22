@@ -10,11 +10,13 @@ import {
   Eye,
   User,
   FileText,
-  Navigation
+  Navigation,
+  Map as MapIcon
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import httpClient from "../../../core/services/httpClient";
 import { useSOSContext } from "../../../context/SOSContext";
+import SOSMapModal from "../components/SOSMapModal";
 
 export default function PharmacySOSRequests() {
   const { updateSOSCount } = useSOSContext();
@@ -23,15 +25,18 @@ export default function PharmacySOSRequests() {
   const [error, setError] = useState(null);
   const [respondingTo, setRespondingTo] = useState(null);
   const [selectedPrescription, setSelectedPrescription] = useState(null);
+  const [selectedSOSForMap, setSelectedSOSForMap] = useState(null);
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  const [pharmacyLocation, setPharmacyLocation] = useState(null);
 
-  // Fetch SOS requests on mount and set up polling
+  // Fetch SOS requests on mount and set up polling every 30 seconds
   useEffect(() => {
     fetchSOSRequests();
     
-    // Poll every 60 seconds for real-time updates
+    // Poll every 30 seconds for real-time updates
     const interval = setInterval(() => {
       fetchSOSRequests(true); // Silent refresh
-    }, 60000);
+    }, 30000);
 
     return () => clearInterval(interval);
   }, []);
@@ -47,12 +52,16 @@ export default function PharmacySOSRequests() {
 
     try {
       const response = await httpClient.get("/pharmacy/sos/nearby", {
-        params: { radius: 10 } // 10km radius
+        params: { radius: 50 } // 50km radius for broader visibility
       });
 
       if (response.data.success) {
         const sosData = response.data.data.sosRequests || [];
         setSosRequests(sosData);
+        // Store pharmacy location for map modal
+        if (response.data.data.pharmacy) {
+          setPharmacyLocation(response.data.data.pharmacy);
+        }
         // Update global SOS count
         updateSOSCount(sosData);
       }
@@ -228,8 +237,13 @@ export default function PharmacySOSRequests() {
                         </div>
                         <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                           <User size={18} />
-                          {request.patientName || request.patient?.name || 'Anonymous Patient'}
+                          {request.patient?.name || request.patientName || 'Anonymous Patient'}
                         </h3>
+                        {request.medicineName && (
+                          <p className="text-sm text-red-600 font-medium mt-1">
+                            💊 Needs: {request.medicineName}{request.genericName ? ` (${request.genericName})` : ''} × {request.quantity || 1}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -238,6 +252,19 @@ export default function PharmacySOSRequests() {
                         <Phone size={16} className="text-blue-600" />
                         <span className="text-sm">{request.contactNumber || request.patient?.phone || 'N/A'}</span>
                       </div>
+                      
+                      <button
+                        onClick={() => {
+                          setSelectedSOSForMap(request);
+                          setIsMapModalOpen(true);
+                        }}
+                        className="flex items-center gap-2 text-gray-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg px-2 py-1 -mx-2 -my-1 transition-colors group"
+                        title="Click to view on map"
+                      >
+                        <MapPin size={16} className="text-purple-600" />
+                        <span className="text-sm truncate">{request.address || 'Address not provided'}</span>
+                        <MapIcon size={14} className="text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                      </button>
                       
                       <div className="flex items-center gap-2 text-gray-600">
                         <MapPin size={16} className="text-green-600" />
@@ -343,6 +370,17 @@ export default function PharmacySOSRequests() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* SOS Map Modal */}
+      <SOSMapModal
+        isOpen={isMapModalOpen}
+        onClose={() => {
+          setIsMapModalOpen(false);
+          setSelectedSOSForMap(null);
+        }}
+        sosRequest={selectedSOSForMap}
+        pharmacyLocation={pharmacyLocation}
+      />
     </div>
   );
 }

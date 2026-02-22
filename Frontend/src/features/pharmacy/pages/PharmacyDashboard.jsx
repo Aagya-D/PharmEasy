@@ -24,96 +24,74 @@ import {
   Pill,
   Loader,
   Calendar,
+  ShoppingCart,
+  Siren,
+  DollarSign,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { AnnouncementBanner } from "../../../shared/components/AnnouncementBanner";
 import { getDashboardStats } from "../../../core/services/pharmacy.service";
-import { getMyInventory } from "../../../core/services/inventory.service";
+import PharmacyNotificationBell from "../components/PharmacyNotificationBell";
+
+// Skeleton Pulse component for loading state
+function SkeletonCard() {
+  return (
+    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 animate-pulse">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="h-4 bg-gray-200 rounded w-24 mb-3" />
+          <div className="h-8 bg-gray-200 rounded w-16 mb-2" />
+          <div className="h-3 bg-gray-100 rounded w-20" />
+        </div>
+        <div className="w-12 h-12 bg-gray-200 rounded-xl" />
+      </div>
+    </div>
+  );
+}
+
+function SkeletonTableRow() {
+  return (
+    <tr className="animate-pulse">
+      <td className="px-6 py-4"><div className="flex items-center gap-3"><div className="w-10 h-10 bg-gray-200 rounded-lg" /><div className="h-4 bg-gray-200 rounded w-28" /></div></td>
+      <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-24" /></td>
+      <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-16" /></td>
+      <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-16" /></td>
+      <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-20" /></td>
+      <td className="px-6 py-4"><div className="h-5 bg-gray-200 rounded-full w-20" /></td>
+    </tr>
+  );
+}
 
 /**
- * Pharmacy Admin Dashboard - Inventory Management
- * Real data integration - Fetches stats and inventory from backend API
+ * Pharmacy Admin Dashboard - Real-time data from backend
+ * No hardcoded demo data - all stats computed server-side
  */
 export default function PharmacyDashboard() {
-  // Auth context
   const { user } = useAuth();
 
-  // State variables
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
-  const [selectedMedicine, setSelectedMedicine] = useState(null);
-  const [filterCategory, setFilterCategory] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
-
-  // Data states
-  const [stats, setStats] = useState([]);
+  // Real stats from backend
+  const [stats, setStats] = useState(null);
   const [medicines, setMedicines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [page, setPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
 
-  // Medicine categories
-  const categories = [
-    "General",
-    "Antibiotics",
-    "Analgesics",
-    "Vitamins",
-    "Antiseptics",
-    "Cardiovascular",
-    "Respiratory",
-    "Gastrointestinal",
-    "Dermatology",
-    "Other"
-  ];
-
-  // Form state for add/edit
-  const [formData, setFormData] = useState({
-    name: "",
-    genericName: "",
-    category: "General",
-    manufacturer: "",
-    quantity: "",
-    price: "",
-    batchNumber: "",
-    expiryDate: "",
-  });
-
-  // Fetch dashboard data on component mount
   useEffect(() => {
     fetchDashboardData();
-  }, [page]);
+  }, []);
 
-  /**
-   * Fetch dashboard statistics and inventory data
-   */
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch stats (which includes inventory data)
-      const statsResponse = await getDashboardStats();
+      const response = await getDashboardStats();
       
-      if (statsResponse.success && statsResponse.data) {
-        setStats(statsResponse.data.stats || []);
-        
-        // If getDashboardStats includes inventory preview, use it
-        // Otherwise fetch full inventory
-        if (statsResponse.data.inventory && statsResponse.data.inventory.length > 0) {
-          setMedicines(statsResponse.data.inventory);
-        } else {
-          // Fetch full inventory
-          const inventoryResponse = await getMyInventory(page, 100);
-          if (inventoryResponse.data && Array.isArray(inventoryResponse.data)) {
-            setMedicines(inventoryResponse.data);
-          } else if (inventoryResponse.data && inventoryResponse.data.items) {
-            setMedicines(inventoryResponse.data.items);
-          }
-        }
+      if (response.success && response.data) {
+        setStats(response.data.stats);
+        setMedicines(response.data.inventory || []);
       }
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
@@ -122,20 +100,58 @@ export default function PharmacyDashboard() {
         err.message || 
         "Failed to load dashboard data. Please try again."
       );
-      // Set empty arrays on error
-      setStats([]);
+      setStats(null);
       setMedicines([]);
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * Determine stock status based on quantity
-   */
+  // Build stat cards from real backend data
+  const statCards = stats ? [
+    {
+      title: "Total Stock",
+      value: stats.totalItems.toLocaleString(),
+      subtitle: `${stats.totalMedicines} unique medicines`,
+      icon: Package,
+      color: "bg-blue-500",
+      iconBg: "bg-blue-50",
+      iconColor: "text-blue-600",
+    },
+    {
+      title: "Low Stock",
+      value: stats.lowStock.toString(),
+      subtitle: stats.outOfStock > 0 ? `${stats.outOfStock} out of stock` : "All items stocked",
+      icon: AlertTriangle,
+      color: "bg-yellow-500",
+      iconBg: stats.lowStock > 0 ? "bg-yellow-50" : "bg-green-50",
+      iconColor: stats.lowStock > 0 ? "text-yellow-600" : "text-green-600",
+      alert: stats.lowStock > 0,
+    },
+    {
+      title: "Pending SOS",
+      value: stats.pendingSOS.toString(),
+      subtitle: "Nearby emergencies",
+      icon: Siren,
+      color: "bg-red-500",
+      iconBg: stats.pendingSOS > 0 ? "bg-red-50" : "bg-gray-50",
+      iconColor: stats.pendingSOS > 0 ? "text-red-600" : "text-gray-400",
+      alert: stats.pendingSOS > 0,
+    },
+    {
+      title: "Total Orders",
+      value: stats.totalOrders.toString(),
+      subtitle: `${stats.pendingOrders} pending · ${stats.fulfilledOrders} fulfilled`,
+      icon: ShoppingCart,
+      color: "bg-green-500",
+      iconBg: "bg-green-50",
+      iconColor: "text-green-600",
+    },
+  ] : [];
+
   const getStockStatus = (quantity) => {
     if (quantity === 0) return "out-of-stock";
-    if (quantity < 50) return "low-stock";
+    if (quantity < 10) return "low-stock";
     return "in-stock";
   };
 
@@ -167,59 +183,6 @@ export default function PharmacyDashboard() {
     }
   };
 
-  const handleAddMedicine = () => {
-    // Add medicine will be handled by PharmacyInventory component
-    setShowAddModal(false);
-    resetForm();
-    // Refresh data
-    fetchDashboardData();
-  };
-
-  const handleEditMedicine = () => {
-    // Edit will be handled by PharmacyInventory component
-    setShowEditModal(false);
-    resetForm();
-    // Refresh data
-    fetchDashboardData();
-  };
-
-  const handleDeleteMedicine = () => {
-    // Delete will be handled by PharmacyInventory component
-    setShowDeleteModal(false);
-    setSelectedMedicine(null);
-    // Refresh data
-    fetchDashboardData();
-  };
-
-  const openEditModal = (medicine) => {
-    setSelectedMedicine(medicine);
-    setFormData({
-      name: medicine.name,
-      genericName: medicine.genericName || "",
-      category: medicine.category || "General",
-      manufacturer: medicine.manufacturer || "",
-      quantity: medicine.quantity.toString(),
-      price: medicine.price.toString(),
-      batchNumber: medicine.batchNumber || "",
-      expiryDate: medicine.expiryDate || "",
-    });
-    setShowEditModal(true);
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      genericName: "",
-      category: "General",
-      manufacturer: "",
-      quantity: "",
-      price: "",
-      batchNumber: "",
-      expiryDate: "",
-    });
-    setSelectedMedicine(null);
-  };
-
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white border-b border-gray-200 px-6 py-6">
@@ -239,12 +202,7 @@ export default function PharmacyDashboard() {
             >
               <Loader size={22} className={`text-gray-600 ${loading ? "animate-spin" : ""}`} />
             </button>
-            <Link
-              to="/notifications"
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              View Notifications
-            </Link>
+            <PharmacyNotificationBell />
           </div>
         </div>
       </header>
@@ -276,73 +234,79 @@ export default function PharmacyDashboard() {
           </motion.div>
         )}
 
-        {/* Loading State */}
-        {loading && stats.length === 0 ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="text-center">
-              <Loader className="animate-spin mx-auto mb-4 text-blue-600" size={40} />
-              <p className="text-gray-600 font-medium">Loading dashboard data...</p>
+        {/* Stats Cards - Skeleton or Real */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {loading ? (
+            <>
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </>
+          ) : statCards.length > 0 ? (
+            statCards.map((stat, index) => {
+              const Icon = stat.icon;
+              return (
+                <motion.div
+                  key={stat.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.08 }}
+                  className={`bg-white rounded-xl p-6 shadow-sm border ${stat.alert ? 'border-yellow-200' : 'border-gray-100'}`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm text-gray-500 mb-1">{stat.title}</p>
+                      <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                      <p className="text-xs text-gray-400 mt-1">{stat.subtitle}</p>
+                    </div>
+                    <div className={`p-3 rounded-xl ${stat.iconBg}`}>
+                      <Icon size={24} className={stat.iconColor} />
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })
+          ) : !error ? (
+            <div className="col-span-full text-center py-12">
+              <Package className="mx-auto mb-3 text-gray-300" size={40} />
+              <p className="text-gray-500 font-medium">No inventory data available yet</p>
+              <p className="text-sm text-gray-400 mt-1">Add medicines to your inventory to see live stats</p>
+              <Link
+                to="/pharmacy/inventory"
+                className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                <Plus size={18} />
+                Add Medicine
+              </Link>
             </div>
-          </div>
-        ) : (
-          <>
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {stats.length > 0 ? (
-                stats.map((stat, index) => {
-                  const IconComponent = stat.icon && typeof stat.icon === 'string' 
-                    ? eval(stat.icon)
-                    : stat.icon;
-                  
-                  return (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="bg-white rounded-xl p-6 shadow-sm border border-gray-100"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-sm text-gray-500 mb-1">{stat.title}</p>
-                          <p className="text-2xl font-bold text-gray-900">
-                            {stat.value}
-                          </p>
-                          <div
-                            className={`flex items-center gap-1 mt-2 text-sm ${
-                              stat.trend === "up" ? "text-green-600" : 
-                              stat.trend === "down" ? "text-red-600" :
-                              "text-yellow-600"
-                            }`}
-                          >
-                            {stat.trend === "up" ? (
-                              <TrendingUp size={16} />
-                            ) : stat.trend === "down" ? (
-                              <TrendingDown size={16} />
-                            ) : (
-                              <AlertTriangle size={16} />
-                            )}
-                            <span>{stat.change}</span>
-                          </div>
-                        </div>
-                        <div
-                          className={`p-3 rounded-xl ${stat.color}`}
-                        >
-                          {IconComponent && (
-                            <IconComponent size={24} className="text-white" />
-                          )}
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })
-              ) : (
-                <div className="col-span-full text-center py-12">
-                  <Package className="mx-auto mb-3 text-gray-300" size={40} />
-                  <p className="text-gray-500">No inventory data available yet</p>
-                </div>
-              )}
+          ) : null}
+        </div>
+
+        {/* Stock Value Banner */}
+        {stats && stats.totalValue > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <DollarSign size={20} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-blue-600 font-medium">Total Stock Value</p>
+                <p className="text-xl font-bold text-blue-900">Rs. {stats.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              </div>
             </div>
+            {stats.expiringSoon > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-100 rounded-lg">
+                <Calendar size={16} className="text-orange-600" />
+                <span className="text-sm text-orange-700 font-medium">{stats.expiringSoon} expiring soon</span>
+              </div>
+            )}
+          </motion.div>
+        )}
 
             {/* Table Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100">
@@ -394,17 +358,39 @@ export default function PharmacyDashboard() {
 
               {/* Table */}
               {loading ? (
-                <div className="p-12 text-center">
-                  <Loader className="animate-spin mx-auto mb-3 text-blue-600" size={32} />
-                  <p className="text-gray-600">Loading inventory data...</p>
-                </div>
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Medicine Name</th>
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Generic Name</th>
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Quantity</th>
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Price</th>
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Expiry Date</th>
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    <SkeletonTableRow />
+                    <SkeletonTableRow />
+                    <SkeletonTableRow />
+                    <SkeletonTableRow />
+                    <SkeletonTableRow />
+                  </tbody>
+                </table>
               ) : medicines.length === 0 ? (
                 <div className="p-12 text-center">
-                  <Package className="mx-auto mb-3 text-gray-300" size={40} />
-                  <p className="text-gray-600 font-medium">No medicines in inventory</p>
+                  <Package className="mx-auto mb-3 text-gray-300" size={48} />
+                  <p className="text-gray-700 font-semibold text-lg">No stock added yet</p>
                   <p className="text-gray-500 text-sm mt-1">
-                    Add your first medicine using the Manage Inventory button
+                    Your inventory is empty. Add your first medicine to start tracking stock.
                   </p>
+                  <Link
+                    to="/pharmacy/inventory"
+                    className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    <Plus size={18} />
+                    Add Medicine
+                  </Link>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -470,7 +456,7 @@ export default function PharmacyDashboard() {
                                 className={`font-medium ${
                                   medicine.quantity === 0
                                     ? "text-red-600"
-                                    : medicine.quantity < 50
+                                    : medicine.quantity < 10
                                     ? "text-yellow-600"
                                     : "text-gray-900"
                                 }`}
@@ -515,502 +501,7 @@ export default function PharmacyDashboard() {
                 </div>
               )}
             </div>
-          </>
-        )}
       </main>
-
-      {/* Add Medicine Modal */}
-      <AnimatePresence>
-        {showAddModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => {
-              setShowAddModal(false);
-              resetForm();
-            }}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between p-6 border-b border-gray-100">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Add New Medicine
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowAddModal(false);
-                    resetForm();
-                  }}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
-                >
-                  <X size={20} className="text-gray-500" />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Medicine Name
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., Paracetamol 500mg"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Category
-                    </label>
-                    <select
-                      value={formData.category}
-                      onChange={(e) =>
-                        setFormData({ ...formData, category: e.target.value })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {categories.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Manufacturer
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.manufacturer}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          manufacturer: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g., Cipla"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Quantity
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.quantity}
-                      onChange={(e) =>
-                        setFormData({ ...formData, quantity: e.target.value })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="0"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Price (₹)
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.price}
-                      onChange={(e) =>
-                        setFormData({ ...formData, price: e.target.value })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="0.00"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Batch Number
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.batchNumber}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          batchNumber: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g., BAT001"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Expiry Date
-                    </label>
-                    <input
-                      type="month"
-                      value={formData.expiryDate}
-                      onChange={(e) =>
-                        setFormData({ ...formData, expiryDate: e.target.value })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3 p-6 border-t border-gray-100">
-                <button
-                  onClick={() => {
-                    setShowAddModal(false);
-                    resetForm();
-                  }}
-                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddMedicine}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                >
-                  <Save size={18} />
-                  Add Medicine
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Edit Medicine Modal */}
-      <AnimatePresence>
-        {showEditModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => {
-              setShowEditModal(false);
-              resetForm();
-            }}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between p-6 border-b border-gray-100">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Edit Medicine
-                </h2>
-                <button
-                  onClick={() => {
-                    setShowEditModal(false);
-                    resetForm();
-                  }}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
-                >
-                  <X size={20} className="text-gray-500" />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Medicine Name
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Category
-                    </label>
-                    <select
-                      value={formData.category}
-                      onChange={(e) =>
-                        setFormData({ ...formData, category: e.target.value })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {categories.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Manufacturer
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.manufacturer}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          manufacturer: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Quantity
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.quantity}
-                      onChange={(e) =>
-                        setFormData({ ...formData, quantity: e.target.value })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Price (₹)
-                    </label>
-                    <input
-                      type="number"
-                      value={formData.price}
-                      onChange={(e) =>
-                        setFormData({ ...formData, price: e.target.value })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Batch Number
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.batchNumber}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          batchNumber: e.target.value,
-                        })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Expiry Date
-                    </label>
-                    <input
-                      type="month"
-                      value={formData.expiryDate}
-                      onChange={(e) =>
-                        setFormData({ ...formData, expiryDate: e.target.value })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3 p-6 border-t border-gray-100">
-                <button
-                  onClick={() => {
-                    setShowEditModal(false);
-                    resetForm();
-                  }}
-                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleEditMedicine}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                >
-                  <Save size={18} />
-                  Save Changes
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Delete Confirmation Modal */}
-      <AnimatePresence>
-        {showDeleteModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowDeleteModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl max-w-md w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="p-6 text-center">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Trash2 className="text-red-600" size={28} />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  Delete Medicine
-                </h3>
-                <p className="text-gray-600">
-                  Are you sure you want to delete "{selectedMedicine?.name}"?
-                  This action cannot be undone.
-                </p>
-              </div>
-
-              <div className="flex gap-3 p-6 border-t border-gray-100">
-                <button
-                  onClick={() => setShowDeleteModal(false)}
-                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeleteMedicine}
-                  className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
-                >
-                  Delete
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Bulk Upload Modal */}
-      <AnimatePresence>
-        {showBulkUploadModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-            onClick={() => setShowBulkUploadModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl max-w-lg w-full"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between p-6 border-b border-gray-100">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Bulk CSV Upload
-                </h2>
-                <button
-                  onClick={() => setShowBulkUploadModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
-                >
-                  <X size={20} className="text-gray-500" />
-                </button>
-              </div>
-
-              <div className="p-6">
-                <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center">
-                  <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Upload className="text-blue-600" size={28} />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    Upload CSV File
-                  </h3>
-                  <p className="text-gray-500 text-sm mb-4">
-                    Drag and drop your CSV file here, or click to browse
-                  </p>
-                  <input
-                    type="file"
-                    accept=".csv"
-                    className="hidden"
-                    id="csvUpload"
-                  />
-                  <label
-                    htmlFor="csvUpload"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors cursor-pointer"
-                  >
-                    Select File
-                  </label>
-                </div>
-
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm font-medium text-gray-700 mb-2">
-                    CSV Format Requirements:
-                  </p>
-                  <ul className="text-sm text-gray-500 space-y-1">
-                    <li>
-                      • Columns: Name, Category, Quantity, Price, Manufacturer,
-                      ExpiryDate, BatchNumber
-                    </li>
-                    <li>• First row should be header row</li>
-                    <li>• Maximum 500 records per upload</li>
-                  </ul>
-                  <button className="text-blue-600 text-sm font-medium mt-2 hover:text-blue-700">
-                    Download Sample Template
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex gap-3 p-6 border-t border-gray-100">
-                <button
-                  onClick={() => setShowBulkUploadModal(false)}
-                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
-                  <Upload size={18} />
-                  Upload
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

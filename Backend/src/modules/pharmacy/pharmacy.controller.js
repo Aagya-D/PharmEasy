@@ -292,7 +292,7 @@ export const resetOnboarding = async (req, res, next) => {
 export const getNearbySOS = async (req, res, next) => {
   try {
     const userId = req.user.userId;
-    const { radius = 10 } = req.query; // Default 10km radius
+    const { radius = 50 } = req.query; // Default 50km radius for broader visibility
 
     // Get pharmacy details including location
     const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
@@ -346,6 +346,14 @@ export const getNearbySOS = async (req, res, next) => {
             email: true,
             phone: true,
             createdAt: true
+          }
+        },
+        pharmacyResponses: {
+          select: {
+            id: true,
+            pharmacyId: true,
+            response: true,
+            respondedAt: true
           }
         }
       },
@@ -529,7 +537,18 @@ export const respondToSOS = async (req, res, next) => {
         console.log(`[PHARMACY] Notification sent to patient ${sosRequest.patientId}`);
       } catch (notificationError) {
         console.error('[PHARMACY] Failed to send SOS acceptance notification:', notificationError);
-        // Continue despite notification failure
+      }
+
+      // Notify OTHER pharmacies that this SOS has been claimed
+      try {
+        await notificationService.notifySosClaimedByOther(
+          sosId,
+          pharmacy.id,
+          pharmacy.pharmacyName,
+          sosRequest.medicineName
+        );
+      } catch (claimErr) {
+        console.error('[PHARMACY] Failed to send SOS claimed notification:', claimErr.message);
       }
 
       return res.status(200).json({
@@ -685,6 +704,229 @@ export const updateLocation = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/pharmacy/dashboard-stats
+ * Get real-time dashboard statistics for the logged-in pharmacy
+ * Requires: Authentication, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
+ */
+export const getDashboardStats = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    logger.operation('PHARMACY', 'getDashboardStats', 'START', { userId });
+
+    // Get pharmacy details
+    const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
+
+    if (!pharmacy) {
+      return res.status(404).json({
+        success: false,
+        message: "Pharmacy not found. Please complete onboarding first."
+      });
+    }
+
+    if (pharmacy.verificationStatus !== 'VERIFIED') {
+      return res.status(403).json({
+        success: false,
+        message: "Pharmacy must be verified to view dashboard stats"
+      });
+    }
+
+    const pharmacyId = pharmacy.id;
+
+    // --- Run all counts in parallel for speed ---
+    const [
+      inventoryAgg,
+      lowStockCount,
+      outOfStockCount,
+      expiringSoonCount,
+      totalMedicines,
+      totalOrdersCount,
+      pendingOrdersCount,
+      fulfilledOrdersCount,
+      pendingSOSCount,
+      recentInventory,
+      stockValueAgg,
+    ] = await Promise.all([
+      // 1. Total stock quantity (sum of all quantities)
+      prisma.inventory.aggregate({
+        where: { pharmacyId },
+        _sum: { quantity: true },
+      }),
+      // 2. Low stock items (quantity < 10)
+      prisma.inventory.count({
+        where: { pharmacyId, quantity: { gt: 0, lt: 10 } },
+      }),
+      // 3. Out of stock items (quantity === 0)
+      prisma.inventory.count({
+        where: { pharmacyId, quantity: 0 },
+      }),
+      // 4. Expiring within 30 days
+      prisma.inventory.count({
+        where: {
+          pharmacyId,
+          expiryDate: {
+            gte: new Date(),
+            lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          },
+        },
+      }),
+      // 5. Total unique medicines
+      prisma.inventory.count({
+        where: { pharmacyId },
+      }),
+      // 6. Total orders for this pharmacy
+      prisma.order.count({
+        where: { pharmacyId },
+      }),
+      // 7. Pending orders
+      prisma.order.count({
+        where: { pharmacyId, status: 'pending' },
+      }),
+      // 8. Fulfilled/delivered orders
+      prisma.order.count({
+        where: { pharmacyId, status: { in: ['delivered', 'fulfilled', 'confirmed'] } },
+      }),
+      // 9. Pending SOS requests (global pending, pharmacy can see nearby)
+      prisma.sOSRequest.count({
+        where: { status: 'pending' },
+      }),
+      // 10. Recent inventory items (top 10) for dashboard preview
+      prisma.inventory.findMany({
+        where: { pharmacyId },
+        orderBy: [{ expiryDate: 'asc' }, { name: 'asc' }],
+        take: 10,
+      }),
+      // 11. Total stock value
+      prisma.$queryRawUnsafe(
+        `SELECT COALESCE(SUM(quantity * price), 0) as "totalValue" FROM "Inventory" WHERE "pharmacyId" = $1`,
+        pharmacyId
+      ),
+    ]);
+
+    const totalItems = inventoryAgg._sum.quantity || 0;
+    const totalValue = stockValueAgg[0]?.totalValue || 0;
+
+    logger.operation('PHARMACY', 'getDashboardStats', 'SUCCESS', {
+      pharmacyId,
+      totalItems,
+      lowStockCount,
+      totalMedicines,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        stats: {
+          totalItems,
+          totalMedicines,
+          lowStock: lowStockCount,
+          outOfStock: outOfStockCount,
+          expiringSoon: expiringSoonCount,
+          totalOrders: totalOrdersCount,
+          pendingOrders: pendingOrdersCount,
+          fulfilledOrders: fulfilledOrdersCount,
+          pendingSOS: pendingSOSCount,
+          totalValue: Number(totalValue),
+        },
+        inventory: recentInventory,
+        pharmacy: {
+          id: pharmacy.id,
+          name: pharmacy.pharmacyName,
+          verificationStatus: pharmacy.verificationStatus,
+        },
+      },
+      message: "Dashboard stats retrieved successfully"
+    });
+  } catch (error) {
+    logger.error('[PHARMACY] getDashboardStats error', { error: error.message });
+    next(error);
+  }
+};
+
+/**
+ * GET /api/pharmacy/orders
+ * Get orders for the logged-in pharmacy
+ * Requires: Authentication, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
+ */
+export const getPharmacyOrders = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { page = 1, limit = 50, status } = req.query;
+
+    const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
+
+    if (!pharmacy) {
+      return res.status(404).json({
+        success: false,
+        message: "Pharmacy not found."
+      });
+    }
+
+    if (pharmacy.verificationStatus !== 'VERIFIED') {
+      return res.status(403).json({
+        success: false,
+        message: "Pharmacy must be verified to view orders"
+      });
+    }
+
+    const where = { pharmacyId: pharmacy.id };
+    if (status && status !== 'all') {
+      where.status = status;
+    }
+
+    const [orders, totalCount] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        include: {
+          patient: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (parseInt(page) - 1) * parseInt(limit),
+        take: parseInt(limit),
+      }),
+      prisma.order.count({ where }),
+    ]);
+
+    // Calculate revenue from completed orders
+    const revenueAgg = await prisma.order.aggregate({
+      where: {
+        pharmacyId: pharmacy.id,
+        status: { in: ['delivered', 'fulfilled', 'confirmed'] },
+      },
+      _sum: { totalAmount: true },
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        orders,
+        stats: {
+          total: totalCount,
+          pending: await prisma.order.count({ where: { pharmacyId: pharmacy.id, status: 'pending' } }),
+          fulfilled: await prisma.order.count({ where: { pharmacyId: pharmacy.id, status: { in: ['delivered', 'fulfilled', 'confirmed'] } } }),
+          revenue: revenueAgg._sum.totalAmount || 0,
+        },
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(totalCount / parseInt(limit)),
+          totalItems: totalCount,
+        },
+      },
+      message: `Found ${orders.length} orders`,
+    });
+  } catch (error) {
+    logger.error('[PHARMACY] getPharmacyOrders error', { error: error.message });
+    next(error);
+  }
+};
+
 export default {
   onboardPharmacy,
   getMyPharmacy,
@@ -698,4 +940,6 @@ export default {
   getNearbySOS,
   respondToSOS,
   updateLocation,
+  getDashboardStats,
+  getPharmacyOrders,
 };

@@ -31,7 +31,7 @@ const initialState = {
   isOTPVerified: false,
   isLoading: false,
   error: null,
-  isSessionRestoring: true,
+  isInitializing: true,
 };
 
 // Reducer function
@@ -128,7 +128,7 @@ function authReducer(state, action) {
         accessToken: action.payload.accessToken,
         isAuthenticated: action.payload.isAuthenticated,
         isOTPVerified: action.payload.isOTPVerified || false,
-        isSessionRestoring: false,
+        isInitializing: false,
       };
 
     default:
@@ -136,9 +136,59 @@ function authReducer(state, action) {
   }
 }
 
+// ✅ TASK: Robust Initializer - read from localStorage on first mount
+// This runs BEFORE the component renders, ensuring state is hydrated immediately
+function initAuthState(initial) {
+  console.log('[AUTH INIT] Starting initialization from localStorage...');
+  
+  try {
+    const storedUser = localStorage.getItem("user");
+    const storedAccessToken = localStorage.getItem("accessToken");
+    
+    if (storedUser && storedAccessToken) {
+      try {
+        const user = JSON.parse(storedUser);
+        
+        console.log('[AUTH INIT] ✅ Successfully loaded from localStorage:', {
+          userId: user.id,
+          roleId: user.roleId,
+          isAuthenticated: true,
+          isInitializing: true, // Still need to verify with server
+        });
+        
+        // Return state with localStorage data immediately available
+        return {
+          ...initial,
+          user,
+          accessToken: storedAccessToken,
+          isAuthenticated: true,
+          isOTPVerified: true,
+          isInitializing: true, // Still verifying with backend
+        };
+      } catch (parseError) {
+        console.error('[AUTH INIT] Failed to parse stored user:', parseError);
+        localStorage.removeItem("user");
+        localStorage.removeItem("accessToken");
+      }
+    } else {
+      console.log('[AUTH INIT] No stored session found - starting unauthenticated');
+    }
+  } catch (error) {
+    console.error('[AUTH INIT] Error reading localStorage:', error);
+  }
+  
+  // Return initial state (not initializing since no localStorage data to verify)
+  return {
+    ...initial,
+    isInitializing: false,
+  };
+}
+
 // AuthProvider component
 export function AuthProvider({ children }) {
-  const [state, dispatch] = useReducer(authReducer, initialState);
+  // ✅ TASK: Pass initializer function as 3rd argument to useReducer
+  // This ensures localStorage is read on mount, before first render
+  const [state, dispatch] = useReducer(authReducer, initialState, initAuthState);
 
   // Initialize logger and auditor on mount
   useEffect(() => {
@@ -149,8 +199,9 @@ export function AuthProvider({ children }) {
   }, [state.user]);
 
   // ✅ ENABLED: Auto-restore session from localStorage on page load
+  // WITH TOKEN VERIFICATION via /api/auth/me endpoint
   useEffect(() => {
-    const restoreSession = () => {
+    const restoreSession = async () => {
       try {
         const storedUser = localStorage.getItem("user");
         const storedAccessToken = localStorage.getItem("accessToken");
@@ -158,20 +209,75 @@ export function AuthProvider({ children }) {
         if (storedUser && storedAccessToken) {
           const user = JSON.parse(storedUser);
           
-          logger.info("Session restored from localStorage", { 
+          logger.info("Session found in localStorage, verifying token", { 
             userId: user.id,
             role: user.roleId
           });
-          
-          dispatch({
-            type: ACTIONS.RESTORE_SESSION,
-            payload: {
-              user,
-              accessToken: storedAccessToken,
-              isAuthenticated: true,
-              isOTPVerified: true,
-            },
-          });
+
+          // Set the token in the httpClient for the verification request
+          httpClient.defaults.headers.common["Authorization"] = `Bearer ${storedAccessToken}`;
+
+          try {
+            // ✅ VERIFICATION FETCH: Call GET /api/auth/me to verify token validity
+            const response = await authService.getProfile();
+            // authService.getProfile() already returns axios response.data
+            // Backend returns: { success, data: { user: {...}, pharmacy: {...} } }
+            const responseData = response.data || response;
+            // Extract nested user object — backend nests it inside data.user
+            const userData = responseData.user || responseData;
+            const pharmacyData = responseData.pharmacy || null;
+
+            // Extract verified user data from backend response
+            const verifiedUser = {
+              id: userData.userId || userData.id,
+              email: userData.email,
+              name: userData.name,
+              role: userData.role,
+              roleId: userData.roleId,
+              status: userData.status,
+              pharmacy: pharmacyData,
+              isOnboarded: userData.isOnboarded,
+              needsOnboarding: userData.needsOnboarding,
+            };
+
+            logger.authEvent("TOKEN_VERIFIED", { 
+              userId: verifiedUser.id,
+              role: verifiedUser.roleId 
+            });
+            
+            // ✅ HYDRATION: Restore session with verified user data
+            dispatch({
+              type: ACTIONS.RESTORE_SESSION,
+              payload: {
+                user: verifiedUser,
+                accessToken: storedAccessToken,
+                isAuthenticated: true,
+                isOTPVerified: true,
+              },
+            });
+          } catch (verificationError) {
+            // Token verification failed - token is invalid or expired
+            logger.warn("Token verification failed during hydration", {
+              error: verificationError.message,
+              userId: user.id,
+            });
+
+            // Clear invalid session from localStorage
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("refreshToken");
+            localStorage.removeItem("user");
+
+            // Start unauthenticated
+            dispatch({
+              type: ACTIONS.RESTORE_SESSION,
+              payload: {
+                user: null,
+                accessToken: null,
+                isAuthenticated: false,
+                isOTPVerified: false,
+              },
+            });
+          }
         } else {
           // No session - start unauthenticated
           logger.info("No stored session found");

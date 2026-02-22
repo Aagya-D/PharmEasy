@@ -465,7 +465,7 @@ const AdminCMS = () => {
                       >
                         <option value="">All Users</option>
                         <option value="PATIENT">Patients Only</option>
-                        <option value="PHARMACY_ADMIN">Pharmacies Only</option>
+                        <option value="PHARMACY">Pharmacies Only</option>
                       </select>
                     </div>
                   </>

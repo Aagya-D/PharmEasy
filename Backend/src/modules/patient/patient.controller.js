@@ -382,6 +382,15 @@ export const submitSOSRequest = async (req, res) => {
       hasPrescription: !!req.file
     });
 
+    // Notify nearby pharmacies about the new SOS request
+    try {
+      const { default: notificationService } = await import("../notifications/notification.service.js");
+      await notificationService.notifyNearbyPharmacies(sosRequest);
+    } catch (notifErr) {
+      console.error("[PATIENT] Failed to notify pharmacies:", notifErr.message);
+      // Non-blocking — SOS is already created
+    }
+
     return res.status(201).json({
       success: true,
       data: { sosRequest },

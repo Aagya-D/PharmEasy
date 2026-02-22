@@ -394,6 +394,8 @@ enum NotificationType {
   SOS_UPDATE
   MEDICINE_ALERT
   SYSTEM_MESSAGE
+  LOW_STOCK_WARNING
+  EXPIRY_WARNING
 }
 
 /// *
@@ -408,20 +410,23 @@ enum NotificationType {
 /// * Unread badges are calculated from isRead: false count
 /// * Supports bulk insert for broadcast notifications (Announcements to all users)
 model Notification {
-  id        String           @id @default(cuid())
-  userId    String
-  title     String
-  message   String           @db.Text
-  type      NotificationType
-  isRead    Boolean          @default(false)
-  metadata  Json?
-  createdAt DateTime         @default(now())
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String           @id @default(cuid())
+  userId     String
+  title      String
+  message    String           @db.Text
+  type       NotificationType
+  isRead     Boolean          @default(false)
+  metadata   Json?
+  targetRole String?          /// PHARMACY | PATIENT | ADMIN — used for role-based filtering
+  priority   String           @default("normal") /// normal | high
+  createdAt  DateTime         @default(now())
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([isRead])
   @@index([createdAt])
   @@index([type])
+  @@index([targetRole])
 }
 
 /// *

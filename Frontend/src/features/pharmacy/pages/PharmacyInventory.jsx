@@ -298,8 +298,24 @@ export default function PharmacyInventory() {
               <tbody>
                 {filteredInventory.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
-                      {searchTerm ? "No medicines found matching your search" : "No medicines in inventory. Add your first medicine to get started."}
+                    <td colSpan="7" className="px-6 py-16 text-center">
+                      <Package className="mx-auto mb-3 text-gray-300" size={48} />
+                      <p className="text-gray-700 font-semibold text-lg">
+                        {searchTerm ? "No matches found" : "No medicines in inventory"}
+                      </p>
+                      <p className="text-gray-500 text-sm mt-1">
+                        {searchTerm
+                          ? `No medicines match "${searchTerm}". Try a different search term.`
+                          : "Add your first medicine to start managing your inventory."}
+                      </p>
+                      {!searchTerm && (
+                        <button
+                          onClick={() => setIsAddModalOpen(true)}
+                          className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                        >
+                          <Plus size={16} /> Add Medicine
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ) : (

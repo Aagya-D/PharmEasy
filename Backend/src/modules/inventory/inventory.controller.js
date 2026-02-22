@@ -5,6 +5,7 @@
 
 import inventoryService from "./inventory.service.js";
 import logger from "../../utils/logger.js";
+import notificationService from "../notifications/notification.service.js";
 
 /**
  * POST /api/inventory
@@ -47,6 +48,17 @@ export const addMedicine = async (req, res, next) => {
       message: "Medicine added to inventory successfully",
       data: inventoryItem,
     });
+
+    // Fire-and-forget: check for low stock & expiry alerts
+    const ownerId = req.user.userId || req.user.id;
+    try {
+      if (inventoryItem.quantity > 0 && inventoryItem.quantity < 10) {
+        await notificationService.notifyLowStock(ownerId, inventoryItem);
+      }
+      await notificationService.notifyExpiringSoon(ownerId, inventoryItem);
+    } catch (e) {
+      console.error('[INVENTORY] Notification trigger error:', e.message);
+    }
   } catch (error) {
     const duration = Date.now() - startTime;
     logger.timing('INVENTORY', 'addMedicine', duration, 'ERROR');
@@ -148,6 +160,17 @@ export const updateInventoryItem = async (req, res, next) => {
       message: "Inventory item updated successfully",
       data: updatedItem,
     });
+
+    // Fire-and-forget: check for low stock & expiry alerts
+    const ownerId = req.user.userId || req.user.id;
+    try {
+      if (updatedItem.quantity > 0 && updatedItem.quantity < 10) {
+        await notificationService.notifyLowStock(ownerId, updatedItem);
+      }
+      await notificationService.notifyExpiringSoon(ownerId, updatedItem);
+    } catch (e) {
+      console.error('[INVENTORY] Notification trigger error:', e.message);
+    }
   } catch (error) {
     const duration = Date.now() - startTime;
     logger.timing('INVENTORY', 'updateInventoryItem', duration, 'ERROR');

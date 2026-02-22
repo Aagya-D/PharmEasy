@@ -39,7 +39,6 @@ const NAV_CONFIG = {
       { name: "Dashboard", path: "/pharmacy/dashboard", icon: LayoutDashboard },
       { name: "Inventory", path: "/pharmacy/inventory", icon: Package },
       { name: "SOS Requests", path: "/pharmacy/sos", icon: AlertTriangle, highlight: true },
-      { name: "Notifications", path: "/notifications", icon: Bell },
     ],
     pending: [
       { name: "Application Status", path: "/pharmacy/waiting-approval", icon: Shield },
@@ -65,7 +64,7 @@ const NAV_CONFIG = {
  * Conditionally displays navigation based on auth state and user role
  */
 export function Navbar() {
-  const { isAuthenticated, logout, user, isSessionRestoring } = useAuth();
+  const { isAuthenticated, logout, user, isInitializing } = useAuth();
   const { selectedLocation } = useLocation();
   const navigate = useNavigate();
   const location = useLocationRouter();
@@ -129,8 +128,8 @@ export function Navbar() {
 
   const navLinks = getNavLinks();
 
-  // Don't render navbar until session is restored
-  if (isSessionRestoring) {
+  // Don't render navbar until app initialization is complete
+  if (isInitializing) {
     return null;
   }
 

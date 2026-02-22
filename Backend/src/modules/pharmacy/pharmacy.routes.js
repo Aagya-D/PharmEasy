@@ -173,6 +173,32 @@ router.patch(
 );
 
 /**
+ * GET /api/pharmacy/dashboard-stats
+ * Get real-time dashboard statistics for the logged-in pharmacy
+ * Returns: totalItems, lowStock, pendingSOS, totalOrders, etc.
+ * Requires: JWT token, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
+ */
+router.get(
+  "/pharmacy/dashboard-stats",
+  authenticate(),
+  requirePharmacyAdmin,
+  pharmacyController.getDashboardStats
+);
+
+/**
+ * GET /api/pharmacy/orders
+ * Get orders for the logged-in pharmacy with pagination
+ * Query params: ?page=1&limit=50&status=pending
+ * Requires: JWT token, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
+ */
+router.get(
+  "/pharmacy/orders",
+  authenticate(),
+  requirePharmacyAdmin,
+  pharmacyController.getPharmacyOrders
+);
+
+/**
  * PATCH /api/pharmacy/update-location
  * Update pharmacy location (latitude, longitude, address)
  * Requires: JWT token, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
