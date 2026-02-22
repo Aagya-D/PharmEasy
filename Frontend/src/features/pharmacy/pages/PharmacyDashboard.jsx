@@ -151,7 +151,7 @@ export default function PharmacyDashboard() {
 
   const getStockStatus = (quantity) => {
     if (quantity === 0) return "out-of-stock";
-    if (quantity < 10) return "low-stock";
+    if (quantity < 20) return "low-stock";
     return "in-stock";
   };
 
