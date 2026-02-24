@@ -109,6 +109,8 @@ class SearchService {
             longitude: true,
             address: true,
             contactNumber: true,
+            averageRating: true,
+            totalReviews: true,
           },
         },
       },
@@ -145,6 +147,8 @@ class SearchService {
           lat: item.pharmacy.latitude,
           lng: item.pharmacy.longitude,
         },
+        averageRating: item.pharmacy.averageRating || 0,
+        totalReviews: item.pharmacy.totalReviews || 0,
       },
     }));
 
@@ -223,6 +227,8 @@ class SearchService {
                 lat: item.pharmacy.latitude,
                 lng: item.pharmacy.longitude,
               },
+              averageRating: item.pharmacy.averageRating || 0,
+              totalReviews: item.pharmacy.totalReviews || 0,
             },
           })).map((result) => {
             const distance = calculateDistance(
@@ -324,6 +330,8 @@ class SearchService {
         latitude: true,
         longitude: true,
         contactNumber: true,
+        averageRating: true,
+        totalReviews: true,
         _count: {
           select: {
             inventory: {
@@ -389,6 +397,8 @@ class SearchService {
           distance: distance,
           distanceFormatted: formatDistance(distance),
           medicinesInStock: pharmacy._count.inventory,
+          averageRating: pharmacy.averageRating || 0,
+          totalReviews: pharmacy.totalReviews || 0,
         };
       })
       .filter((pharmacy) => pharmacy.distance <= radius)

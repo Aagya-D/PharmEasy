@@ -21,6 +21,7 @@ import {
 import searchService from "../../../core/services/search.service";
 import useGeoLocation from "../../../shared/hooks/useGeoLocation";
 import MapContainer from "../../../shared/components/MapContainer";
+import StarRating from "../../../shared/components/StarRating";
 
 /**
  * Medicine Search Results Page
@@ -446,6 +447,15 @@ export default function SearchResults() {
                             <Navigation size={14} className="inline" />{" "}
                             {result.distanceFormatted || `${result.distance} km`} away
                           </p>
+                        )}
+                        {(result.pharmacy.averageRating > 0 || result.pharmacy.totalReviews > 0) && (
+                          <div className="mt-1">
+                            <StarRating
+                              rating={result.pharmacy.averageRating || 0}
+                              totalReviews={result.pharmacy.totalReviews}
+                              size={14}
+                            />
+                          </div>
                         )}
                       </div>
                     </div>

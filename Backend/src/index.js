@@ -24,6 +24,7 @@ import notificationRoutes from "./modules/notifications/notification.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import contentRoutes from "./routes/content.routes.js";
 import chatRoutes from "./modules/chat/chat.routes.js";
+import reviewRoutes from "./modules/review/review.routes.js";
 import chatHandler from "./sockets/chatHandler.js";
 // Note: adminExtendedRoutes uses CommonJS, will need conversion or dynamic import
 
@@ -220,6 +221,10 @@ app.use("/api/content", contentRoutes);
 // Chat routes (real-time messaging between Patient and Pharmacy per SOS)
 // Routes include: /chat/:sosRequestId
 app.use("/api/chat", chatRoutes);
+
+// Review routes (patient-to-pharmacy ratings and reviews)
+// Routes include: POST /reviews, GET /reviews/:pharmacyId
+app.use("/api/reviews", reviewRoutes);
 
 // Admin extended routes will be loaded dynamically
 // Dynamic import for CommonJS module compatibility

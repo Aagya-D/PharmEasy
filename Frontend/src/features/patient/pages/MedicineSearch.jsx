@@ -14,6 +14,7 @@ import {
 import searchService from "../../../core/services/search.service";
 import useGeoLocation from "../../../shared/hooks/useGeoLocation";
 import { useLocation } from "../../../context/LocationContext";
+import StarRating from "../../../shared/components/StarRating";
 
 /**
  * Medicine Search & Discovery Page
@@ -309,6 +310,15 @@ export default function MedicineSearch() {
                           {medicine.pharmacy.contactNumber}
                         </span>
                       </div>
+                      {(medicine.pharmacy.averageRating > 0 || medicine.pharmacy.totalReviews > 0) && (
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <StarRating
+                            rating={medicine.pharmacy.averageRating || 0}
+                            totalReviews={medicine.pharmacy.totalReviews}
+                            size={12}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
 

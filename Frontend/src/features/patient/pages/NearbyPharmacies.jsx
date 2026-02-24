@@ -16,6 +16,7 @@ import searchService from "../../../core/services/search.service";
 import useGeoLocation from "../../../shared/hooks/useGeoLocation";
 import { useLocation } from "../../../context/LocationContext";
 import MapContainer from "../../../shared/components/MapContainer";
+import StarRating from "../../../shared/components/StarRating";
 
 /**
  * Nearby Pharmacies Page
@@ -315,6 +316,15 @@ export default function NearbyPharmacies() {
                             {pharmacy.distanceFormatted || `${pharmacy.distance.toFixed(2)} km`}{" "}
                             away
                           </p>
+                        )}
+                        {(pharmacy.averageRating > 0 || pharmacy.totalReviews > 0) && (
+                          <div className="mt-1">
+                            <StarRating
+                              rating={pharmacy.averageRating || 0}
+                              totalReviews={pharmacy.totalReviews}
+                              size={14}
+                            />
+                          </div>
                         )}
                       </div>
                     </div>

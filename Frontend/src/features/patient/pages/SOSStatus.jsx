@@ -12,9 +12,11 @@ import {
   MapPin,
   Pill,
   Phone,
+  Star,
 } from "lucide-react";
 import patientService from "../services/patient.service";
 import ChatWindow from "../../chat/components/ChatWindow";
+import RatePharmacyModal from "../../reviews/components/RatePharmacyModal";
 
 /**
  * SOS Status Page
@@ -28,6 +30,8 @@ export default function SOSStatus() {
   const [error, setError] = useState("");
   const [showChat, setShowChat] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [hasReviewed, setHasReviewed] = useState(false);
 
   // Retrieve current user info from localStorage
   useEffect(() => {
@@ -248,6 +252,25 @@ export default function SOSStatus() {
               Open Chat with Pharmacy
             </motion.button>
           )}
+
+          {/* Mark as Completed + Rate Pharmacy */}
+          {sosRequest.status === "accepted" && !hasReviewed && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              onClick={() => setShowRatingModal(true)}
+              className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium"
+            >
+              <Star size={20} />
+              Mark as Completed &amp; Rate Pharmacy
+            </motion.button>
+          )}
+          {hasReviewed && (
+            <div className="flex items-center gap-2 justify-center py-3 text-green-700 bg-green-50 rounded-xl border border-green-200">
+              <CheckCircle size={18} />
+              <span className="font-medium">Review submitted — Thank you!</span>
+            </div>
+          )}
         </div>
 
         {/* Right: Chat Panel (only when accepted) */}
@@ -278,6 +301,18 @@ export default function SOSStatus() {
           </div>
         )}
       </div>
+
+      {/* Rating Modal */}
+      <RatePharmacyModal
+        isOpen={showRatingModal}
+        onClose={() => setShowRatingModal(false)}
+        pharmacyId={sosRequest.acceptedBy?.id || sosRequest.pharmacyId || ""}
+        pharmacyName={sosRequest.acceptedBy?.pharmacyName || sosRequest.pharmacyName || "Pharmacy"}
+        onSuccess={() => {
+          setHasReviewed(true);
+          setShowRatingModal(false);
+        }}
+      />
     </div>
   );
 }

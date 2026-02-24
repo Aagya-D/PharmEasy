@@ -87,6 +87,7 @@ model User {
   sosRequests    SOSRequest[]         @relation("PatientSOSRequests")
   notifications  Notification[]
   messages       Message[]            @relation("UserMessages")
+  reviews        Review[]             @relation("PatientReviews")
 
   @@index([email])
   @@index([roleId])
@@ -178,10 +179,13 @@ model Pharmacy {
   verifiedBy         String?
   rejectionReason    String?
   rejectedAt         DateTime?
+  averageRating      Float          @default(0)
+  totalReviews       Int            @default(0)
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
   user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   inventory          Inventory[]
+  reviews            Review[]       @relation("PharmacyReviews")
 
   @@index([userId])
   @@index([verificationStatus])
@@ -516,4 +520,26 @@ model Message {
   @@index([sosRequestId])
   @@index([senderId])
   @@index([createdAt])
+}
+
+/// *
+/// * Review Model - Patient ratings and reviews for pharmacies
+/// * 
+/// * Builds a trust score system. Each patient can leave one review
+/// * per pharmacy. Rating 1-5 with optional text comment.
+model Review {
+  id          String    @id @default(cuid())
+  rating      Int
+  comment     String?
+  pharmacyId  String
+  patientId   String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  pharmacy    Pharmacy  @relation("PharmacyReviews", fields: [pharmacyId], references: [id], onDelete: Cascade)
+  patient     User      @relation("PatientReviews", fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([pharmacyId, patientId])
+  @@index([pharmacyId])
+  @@index([patientId])
+  @@index([rating])
 }
