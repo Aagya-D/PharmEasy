@@ -7,7 +7,9 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
+import http from "http";
 import { fileURLToPath } from "url";
+import { Server as SocketIOServer } from "socket.io";
 import { prisma } from "./database/prisma.js";
 import { errorHandler, asyncHandler } from "./middlewares/errorHandler.js";
 import loggingMiddleware from "./middlewares/logger.middleware.js";
@@ -21,6 +23,8 @@ import searchRoutes from "./modules/search/search.routes.js";
 import notificationRoutes from "./modules/notifications/notification.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import contentRoutes from "./routes/content.routes.js";
+import chatRoutes from "./modules/chat/chat.routes.js";
+import chatHandler from "./sockets/chatHandler.js";
 // Note: adminExtendedRoutes uses CommonJS, will need conversion or dynamic import
 
 // ES Module __dirname workaround
@@ -213,6 +217,10 @@ app.use("/api/admin", adminRoutes);
 // Routes include: /content/health-tips, /content/announcements, etc.
 app.use("/api/content", contentRoutes);
 
+// Chat routes (real-time messaging between Patient and Pharmacy per SOS)
+// Routes include: /chat/:sosRequestId
+app.use("/api/chat", chatRoutes);
+
 // Admin extended routes will be loaded dynamically
 // Dynamic import for CommonJS module compatibility
 import("./modules/admin/admin-extended.routes.js")
@@ -295,7 +303,32 @@ const startServer = async () => {
     await prisma.$queryRaw`SELECT 1`;
     console.log("✓ Database connection successful");
 
-    const server = app.listen(PORT, HOST, () => {
+    // Create HTTP server and attach Socket.IO
+    const server = http.createServer(app);
+
+    const io = new SocketIOServer(server, {
+      cors: {
+        origin: (origin, callback) => {
+          if (!origin || allowedOrigins.has(origin)) {
+            callback(null, true);
+          } else if (NODE_ENV === "development" && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
+            callback(null, true);
+          } else {
+            callback(new Error("Not allowed by CORS"));
+          }
+        },
+        methods: ["GET", "POST"],
+        credentials: true,
+      },
+      pingTimeout: 60000,
+      pingInterval: 25000,
+    });
+
+    // Register chat socket handler
+    chatHandler(io);
+    console.log("✓ Socket.IO initialized with chat handler");
+
+    server.listen(PORT, HOST, () => {
       console.log(`
 ╭────────────────────────────────────────────╮
 │  🚀 PharmEasy Backend Server Started       │

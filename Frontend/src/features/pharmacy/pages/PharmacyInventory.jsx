@@ -60,7 +60,7 @@ export default function PharmacyInventory() {
   // Statistics calculated from inventory
   const stats = React.useMemo(() => {
     const totalItems = inventory.length;
-    const lowStockItems = inventory.filter(item => item.quantity < 10).length;
+    const lowStockItems = inventory.filter(item => item.quantity > 0 && item.quantity < 20).length;
     const outOfStockItems = inventory.filter(item => item.quantity === 0).length;
     const expiringItems = inventory.filter(item => {
       const daysUntilExpiry = Math.floor(
@@ -186,7 +186,7 @@ export default function PharmacyInventory() {
   const getStatusBadge = (quantity) => {
     if (quantity === 0) {
       return <span className="px-2.5 py-1 rounded-full text-xs bg-red-50 text-red-600">Out of Stock</span>;
-    } else if (quantity < 10) {
+    } else if (quantity < 20) {
       return <span className="px-2.5 py-1 rounded-full text-xs bg-orange-50 text-orange-600">Low Stock</span>;
     } else {
       return <span className="px-2.5 py-1 rounded-full text-xs bg-green-50 text-green-600">In Stock</span>;

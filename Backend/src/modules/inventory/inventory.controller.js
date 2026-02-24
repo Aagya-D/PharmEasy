@@ -52,7 +52,7 @@ export const addMedicine = async (req, res, next) => {
     // Fire-and-forget: check for low stock & expiry alerts
     const ownerId = req.user.userId || req.user.id;
     try {
-      if (inventoryItem.quantity > 0 && inventoryItem.quantity < 10) {
+      if (inventoryItem.quantity > 0 && inventoryItem.quantity < 20) {
         await notificationService.notifyLowStock(ownerId, inventoryItem);
       }
       await notificationService.notifyExpiringSoon(ownerId, inventoryItem);
@@ -164,7 +164,7 @@ export const updateInventoryItem = async (req, res, next) => {
     // Fire-and-forget: check for low stock & expiry alerts
     const ownerId = req.user.userId || req.user.id;
     try {
-      if (updatedItem.quantity > 0 && updatedItem.quantity < 10) {
+      if (updatedItem.quantity > 0 && updatedItem.quantity < 20) {
         await notificationService.notifyLowStock(ownerId, updatedItem);
       }
       await notificationService.notifyExpiringSoon(ownerId, updatedItem);

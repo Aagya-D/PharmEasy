@@ -18,13 +18,13 @@ import {
 } from "lucide-react";
 import notificationService from "../../../core/services/notification.service";
 
-// ── Sound assets (CDN, royalty-free) ─────────────────────
+// ── Sound assets (CDN, royalty-free) 
 const SOUND_URGENT =
   "https://cdn.pixabay.com/audio/2022/03/24/audio_4160e2e206.mp3"; // alarm tone for SOS
 const SOUND_SUBTLE =
   "https://cdn.pixabay.com/audio/2024/11/27/audio_8aab2b3781.mp3"; // gentle ping for stock/system
 
-// ── Type → visual config ─────────────────────────────────
+// ── Type visual config
 const TYPE_CONFIG = {
   SOS_UPDATE: {
     icon: Siren,
@@ -115,7 +115,7 @@ export default function PharmacyNotificationBell() {
   const panelRef = useRef(null);
   const bellRef = useRef(null);
 
-  // ── Audio setup ──────────────────────────────────────
+  // Audio setup 
   useEffect(() => {
     const urgent = new Audio(SOUND_URGENT);
     urgent.volume = 0.5;

@@ -11,12 +11,14 @@ import {
   User,
   FileText,
   Navigation,
-  Map as MapIcon
+  Map as MapIcon,
+  MessageCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import httpClient from "../../../core/services/httpClient";
 import { useSOSContext } from "../../../context/SOSContext";
 import SOSMapModal from "../components/SOSMapModal";
+import ChatWindow from "../../chat/components/ChatWindow";
 
 export default function PharmacySOSRequests() {
   const { updateSOSCount } = useSOSContext();
@@ -28,6 +30,24 @@ export default function PharmacySOSRequests() {
   const [selectedSOSForMap, setSelectedSOSForMap] = useState(null);
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [pharmacyLocation, setPharmacyLocation] = useState(null);
+  const [activeChatSOS, setActiveChatSOS] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  // Retrieve current user info for chat
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setCurrentUser({
+          id: parsed.userId || parsed.id,
+          name: parsed.name || parsed.pharmacyName || "Pharmacy",
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Fetch SOS requests on mount and set up polling every 30 seconds
   useEffect(() => {
@@ -327,6 +347,19 @@ export default function PharmacySOSRequests() {
                     </button>
                   </div>
                 </div>
+
+                {/* Chat button for accepted requests */}
+                {request.status === 'accepted' && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <button
+                      onClick={() => setActiveChatSOS(request.id)}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium"
+                    >
+                      <MessageCircle size={16} />
+                      Chat with Patient
+                    </button>
+                  </div>
+                )}
               </motion.div>
             ))
           )}
@@ -381,6 +414,33 @@ export default function PharmacySOSRequests() {
         sosRequest={selectedSOSForMap}
         pharmacyLocation={pharmacyLocation}
       />
+
+      {/* Chat Modal */}
+      <AnimatePresence>
+        {activeChatSOS && currentUser && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={() => setActiveChatSOS(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-lg h-[600px]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ChatWindow
+                sosRequestId={activeChatSOS}
+                currentUser={currentUser}
+                onClose={() => setActiveChatSOS(null)}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

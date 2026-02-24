@@ -19,6 +19,7 @@ import SearchResults from "../features/patient/pages/SearchResults";
 import MedicineSearch from "../features/patient/pages/MedicineSearch";
 import NearbyPharmacies from "../features/patient/pages/NearbyPharmacies";
 import EmergencySOS from "../features/patient/pages/EmergencySOS";
+import SOSStatus from "../features/patient/pages/SOSStatus";
 import NotificationCenter from "../features/patient/pages/NotificationCenter";
 import PatientDashboard from "../features/patient/pages/Dashboard/PatientDashboard";
 import OrdersPage from "../features/patient/pages/Orders/OrdersPage";
@@ -396,6 +397,10 @@ export const routes = [
       {
         path: "sos",
         element: <EmergencySOS />,
+      },
+      {
+        path: "sos/:sosId",
+        element: <SOSStatus />,
       },
       {
         path: "notifications",

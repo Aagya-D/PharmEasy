@@ -86,6 +86,7 @@ model User {
   medications    Medication[]         @relation("PatientMedications")
   sosRequests    SOSRequest[]         @relation("PatientSOSRequests")
   notifications  Notification[]
+  messages       Message[]            @relation("UserMessages")
 
   @@index([email])
   @@index([roleId])
@@ -325,6 +326,7 @@ model SOSRequest {
   updatedAt            DateTime            @updatedAt
   patient              User                @relation("PatientSOSRequests", fields: [patientId], references: [id], onDelete: Cascade)
   pharmacyResponses    PharmacyResponse[]
+  messages             Message[]           @relation("SOSMessages")
 
   @@index([patientId])
   @@index([status])
@@ -495,4 +497,23 @@ model TwoFactorAuth {
 
   @@index([userId])
   @@index([isEnabled])
+}
+
+/// *
+/// * Message Model - Real-time chat messages between Patient and Pharmacy
+/// * 
+/// * Links to a specific SOS request so chat is scoped per emergency transaction.
+/// * senderId can be either the Patient's userId or the Pharmacy's userId.
+model Message {
+  id            String     @id @default(cuid())
+  content       String
+  senderId      String
+  sosRequestId  String
+  createdAt     DateTime   @default(now())
+  sender        User       @relation("UserMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  sosRequest    SOSRequest @relation("SOSMessages", fields: [sosRequestId], references: [id], onDelete: Cascade)
+
+  @@index([sosRequestId])
+  @@index([senderId])
+  @@index([createdAt])
 }

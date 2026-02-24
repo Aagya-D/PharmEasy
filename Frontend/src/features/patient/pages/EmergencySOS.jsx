@@ -30,6 +30,7 @@ export default function EmergencySOS()
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submittedSOSId, setSubmittedSOSId] = useState(null);
   const [showDisclaimer, setShowDisclaimer] = useState(true);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -121,6 +122,7 @@ export default function EmergencySOS()
       const response = await patientService.submitSOSRequest(sosData);
       
       console.log("[SOS] Request submitted successfully:", response);
+      setSubmittedSOSId(response.data?.sosRequest?.id || null);
       setIsSubmitting(false);
       setIsSubmitted(true);
     } catch (err) {
@@ -166,8 +168,8 @@ export default function EmergencySOS()
           <div className="bg-gray-50 rounded-xl p-4 mb-6">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm text-gray-500">Request ID</span>
-              <span className="font-mono font-semibold text-gray-900">
-                SOS-{Date.now().toString(36).toUpperCase()}
+              <span className="font-mono font-semibold text-gray-900 text-xs">
+                {submittedSOSId || `SOS-${Date.now().toString(36).toUpperCase()}`}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -180,9 +182,17 @@ export default function EmergencySOS()
           </div>
 
           <div className="flex gap-3">
+            {submittedSOSId && (
+              <Link
+                to={`/sos/${submittedSOSId}`}
+                className="flex-1 px-4 py-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 transition-colors text-center"
+              >
+                Track Status
+              </Link>
+            )}
             <Link
               to="/"
-              className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+              className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-colors text-center"
             >
               Go Home
             </Link>

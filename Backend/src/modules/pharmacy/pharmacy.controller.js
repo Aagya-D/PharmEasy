@@ -752,9 +752,9 @@ export const getDashboardStats = async (req, res, next) => {
         where: { pharmacyId },
         _sum: { quantity: true },
       }),
-      // 2. Low stock items (quantity < 10)
+      // 2. Low stock items (quantity < 20)
       prisma.inventory.count({
-        where: { pharmacyId, quantity: { gt: 0, lt: 10 } },
+        where: { pharmacyId, quantity: { gt: 0, lt: 20 } },
       }),
       // 3. Out of stock items (quantity === 0)
       prisma.inventory.count({
