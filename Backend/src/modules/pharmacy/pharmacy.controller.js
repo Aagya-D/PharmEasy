@@ -5,7 +5,7 @@
 
 import pharmacyService from "./pharmacy.service.js";
 import logger from "../../utils/logger.js";
-import { createLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
+import { createLog, createAuditLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
 import prisma from "../../database/prisma.js";
 import notificationService from "../notifications/notification.service.js";
 
@@ -190,7 +190,32 @@ export const verifyPharmacy = async (req, res, next) => {
     const { id } = req.params;
     const adminUserId = req.user.userId;
 
+    // ── Capture BEFORE state for audit delta ──
+    const beforePharmacy = await prisma.pharmacy.findUnique({
+      where: { id },
+      select: { id: true, pharmacyName: true, verificationStatus: true, verifiedBy: true, verifiedAt: true },
+    });
+
     const pharmacy = await pharmacyService.verifyPharmacy(id, adminUserId);
+
+    // ── Audit: full delta + client metadata ──
+    await createAuditLog({
+      actorId: adminUserId,
+      action: LOG_ACTIONS.PHARMACY_APPROVED,
+      message: `Admin approved pharmacy "${pharmacy.pharmacyName}" (was ${beforePharmacy?.verificationStatus || "UNKNOWN"})`,
+      category: "PHARMACY",
+      resourceType: "Pharmacy",
+      resourceId: id,
+      oldValue: beforePharmacy,
+      newValue: {
+        id: pharmacy.id,
+        pharmacyName: pharmacy.pharmacyName,
+        verificationStatus: pharmacy.verificationStatus,
+        verifiedBy: pharmacy.verifiedBy,
+        verifiedAt: pharmacy.verifiedAt,
+      },
+      req,
+    });
 
     res.status(200).json({
       success: true,
@@ -214,11 +239,36 @@ export const rejectPharmacy = async (req, res, next) => {
     const { reason } = req.body;
     const adminUserId = req.user.userId;
 
+    // ── Capture BEFORE state for audit delta ──
+    const beforePharmacy = await prisma.pharmacy.findUnique({
+      where: { id },
+      select: { id: true, pharmacyName: true, verificationStatus: true, rejectionReason: true },
+    });
+
     const pharmacy = await pharmacyService.rejectPharmacy(
       id,
       adminUserId,
       reason
     );
+
+    // ── Audit: full delta + client metadata ──
+    await createAuditLog({
+      actorId: adminUserId,
+      action: LOG_ACTIONS.PHARMACY_REJECTED,
+      message: `Admin rejected pharmacy "${pharmacy.pharmacyName}" (was ${beforePharmacy?.verificationStatus || "UNKNOWN"}). Reason: ${reason}`,
+      category: "PHARMACY",
+      resourceType: "Pharmacy",
+      resourceId: id,
+      oldValue: beforePharmacy,
+      newValue: {
+        id: pharmacy.id,
+        pharmacyName: pharmacy.pharmacyName,
+        verificationStatus: pharmacy.verificationStatus,
+        rejectionReason: pharmacy.rejectionReason,
+        rejectedAt: pharmacy.rejectedAt,
+      },
+      req,
+    });
 
     res.status(200).json({
       success: true,
@@ -228,7 +278,6 @@ export const rejectPharmacy = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
-
 };
 
 /**
@@ -243,12 +292,37 @@ export const updatePharmacyStatus = async (req, res, next) => {
     const { status, reason } = req.body;
     const adminUserId = req.user.userId;
 
+    // ── Capture BEFORE state for audit delta ──
+    const beforePharmacy = await prisma.pharmacy.findUnique({
+      where: { id },
+      select: { id: true, pharmacyName: true, verificationStatus: true, rejectionReason: true, verifiedBy: true },
+    });
+
     const pharmacy = await pharmacyService.updatePharmacyStatus(
       id,
       adminUserId,
       status,
       reason
     );
+
+    // ── Audit: full delta + client metadata ──
+    await createAuditLog({
+      actorId: adminUserId,
+      action: `PHARMACY_STATUS_${status}`,
+      message: `Admin changed pharmacy "${pharmacy.pharmacyName}" status from ${beforePharmacy?.verificationStatus || "UNKNOWN"} → ${status}` + (reason ? `. Reason: ${reason}` : ""),
+      category: "PHARMACY",
+      resourceType: "Pharmacy",
+      resourceId: id,
+      oldValue: beforePharmacy,
+      newValue: {
+        id: pharmacy.id,
+        pharmacyName: pharmacy.pharmacyName,
+        verificationStatus: pharmacy.verificationStatus,
+        rejectionReason: pharmacy.rejectionReason,
+        verifiedBy: pharmacy.verifiedBy,
+      },
+      req,
+    });
 
     res.status(200).json({
       success: true,

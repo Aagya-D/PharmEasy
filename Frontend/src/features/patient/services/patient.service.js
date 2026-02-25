@@ -73,7 +73,7 @@ const patientService = {
   },
 
   // Get nearby pharmacies
-  getNearbyPharmacies: async (latitude, longitude, radius = 5) => {
+  getNearbyPharmacies: async (latitude, longitude, radius = 50) => {
     const response = await httpClient.get("/patient/pharmacies/nearby", {
       params: { latitude, longitude, radius },
     });

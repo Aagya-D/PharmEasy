@@ -301,7 +301,7 @@ class SearchService {
    * @param {number} [params.limit=50] - Maximum results to return
    * @returns {Promise<Array>} Array of nearby pharmacies with their inventory
    */
-  async findNearbyPharmacies({ latitude, longitude, radius = 10, limit = 50 }) {
+  async findNearbyPharmacies({ latitude, longitude, radius = 50, limit = 50 }) {
     // Validate coordinates
     if (!latitude || !longitude) {
       throw new BadRequestError("Latitude and longitude are required");
@@ -345,8 +345,8 @@ class SearchService {
     });
 
     // DEBUG: Log pharmacy data for diagnostics
-    console.log(`[SEARCH SERVICE] Found ${pharmacies.length} verified pharmacies`);
-    console.log(`[SEARCH SERVICE] User location: ${latitude}, ${longitude} | Radius: ${radius}km`);
+    console.log(`[SEARCH SERVICE] Total Verified Pharmacies found in DB: ${pharmacies.length}`);
+    console.log(`[SEARCH SERVICE] User location: ${latitude}, ${longitude} | Search radius: ${radius}km`);
     
     // AUDIT: Count valid coordinate sets
     const pharmaciesWithCoords = pharmacies.filter(p => p.latitude && p.longitude);
@@ -405,7 +405,7 @@ class SearchService {
       .sort((a, b) => a.distance - b.distance);
 
     // DEBUG: Log results
-    console.log(`[SEARCH SERVICE] After radius filter (${radius}km): ${results.length} pharmacies`);
+    console.log(`[SEARCH SERVICE] Pharmacies within ${radius}km: ${results.length}`);
     if (results.length > 0) {
       console.log(`[SEARCH SERVICE] Closest pharmacy:`, {
         name: results[0].name,

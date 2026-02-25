@@ -365,25 +365,33 @@ model PharmacyResponse {
 /// * Captures all critical system events for transparency and debugging
 /// * Categories: AUTH (login/logout), PHARMACY (approvals/rejections), SYSTEM (errors/alerts)
 /// * 
-/// * Usage:
-/// * - Admin approves pharmacy: category=PHARMACY, action=PHARMACY_APPROVED
-/// * - User logs in: category=AUTH, action=USER_LOGIN
-/// * - Profile updated: category=SYSTEM, action=PROFILE_UPDATED
+/// * Enterprise Audit Fields:
+/// * - Data Delta: oldValue / newValue capture before→after state for every mutation
+/// * - Metadata: ipAddress / userAgent track client fingerprint for threat detection
+/// * - Resource targeting: resourceType / resourceId link the log to the exact entity
 /// * 
-/// * Provides complete audit trail for compliance and security monitoring
+/// * Provides complete audit trail for compliance, forensics and security monitoring
 model Log {
-  id        String      @id @default(cuid())
-  action    String
-  message   String
-  userId    String?
-  category  LogCategory
-  metadata  Json?
-  createdAt DateTime    @default(now())
+  id           String      @id @default(cuid())
+  action       String
+  message      String
+  userId       String?
+  category     LogCategory
+  metadata     Json?
+  // ── Enterprise Audit Fields ──────────────────────
+  resourceType String?     // e.g. "Pharmacy", "Inventory", "User"
+  resourceId   String?     // ID of the target entity
+  oldValue     Json?       // Snapshot of the entity BEFORE the change
+  newValue     Json?       // Snapshot of the entity AFTER the change
+  ipAddress    String?     // Extracted from req for geo/threat analysis
+  userAgent    String?     // Browser/device fingerprint
+  createdAt    DateTime    @default(now())
 
   @@index([category])
   @@index([userId])
   @@index([createdAt])
   @@index([action])
+  @@index([resourceType, resourceId])
 }
 
 enum LogCategory {

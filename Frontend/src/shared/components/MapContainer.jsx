@@ -107,18 +107,29 @@ export default function MapContainer({
     : defaultCenter;
 
   /**
+   * Normalize pharmacy data - handles both:
+   * - Medicine search results: { pharmacy: { location, name, ... }, medicine, price, ... }
+   * - Nearby pharmacy results: { location, name, address, ... }
+   */
+  const getPharmacyInfo = (result) => {
+    if (result.pharmacy && result.pharmacy.location) {
+      return result.pharmacy; // medicine search shape
+    }
+    return result; // nearby pharmacy shape (location is directly on the object)
+  };
+
+  /**
    * Generate Google Maps directions URL
    */
-  const getDirectionsUrl = (pharmacy) => {
-    if (!pharmacy.pharmacy || !pharmacy.pharmacy.location) return "#";
+  const getDirectionsUrl = (result) => {
+    const info = getPharmacyInfo(result);
+    if (!info || !info.location) return "#";
     
-    const { lat, lng } = pharmacy.pharmacy.location;
+    const { lat, lng } = info.location;
     
     if (userLocation) {
-      // Directions from user location to pharmacy
       return `https://www.google.com/maps/dir/?api=1&origin=${userLocation.latitude},${userLocation.longitude}&destination=${lat},${lng}`;
     } else {
-      // Just show pharmacy location
       return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
     }
   };
@@ -151,7 +162,12 @@ export default function MapContainer({
         {/* Auto-center controller */}
         <MapViewController
           center={center}
-          markers={pharmacies.map((p) => p.pharmacy.location)}
+          markers={pharmacies
+            .map((p) => {
+              const info = getPharmacyInfo(p);
+              return info?.location ? { latitude: info.location.lat, longitude: info.location.lng } : null;
+            })
+            .filter(Boolean)}
         />
 
         {/* User Location Marker (Blue Pin) */}
@@ -173,9 +189,10 @@ export default function MapContainer({
 
         {/* Pharmacy Markers (Red Pins) */}
         {pharmacies.map((result) => {
-          if (!result.pharmacy || !result.pharmacy.location) return null;
+          const info = getPharmacyInfo(result);
+          if (!info || !info.location) return null;
 
-          const { lat, lng } = result.pharmacy.location;
+          const { lat, lng } = info.location;
 
           return (
             <Marker
@@ -194,10 +211,11 @@ export default function MapContainer({
                 <div className="p-2">
                   {/* Pharmacy Name */}
                   <h3 className="font-bold text-lg text-gray-900 mb-2">
-                    {result.pharmacy.name}
+                    {info.name}
                   </h3>
 
-                  {/* Medicine Info */}
+                  {/* Medicine Info (only for medicine search results) */}
+                  {result.medicine && (
                   <div className="bg-blue-50 rounded p-2 mb-3">
                     <p className="font-semibold text-blue-900">{result.medicine}</p>
                     <div className="flex items-center justify-between mt-1">
@@ -215,11 +233,21 @@ export default function MapContainer({
                       </span>
                     </div>
                   </div>
+                  )}
+
+                  {/* Medicines in stock count (only for nearby pharmacy results) */}
+                  {result.medicinesInStock !== undefined && (
+                    <div className="bg-green-50 rounded p-2 mb-3">
+                      <p className="text-sm text-green-800 font-medium">
+                        {result.medicinesInStock} medicines in stock
+                      </p>
+                    </div>
+                  )}
 
                   {/* Address */}
                   <div className="flex items-start gap-2 mb-2">
                     <MapPinIcon size={14} className="text-gray-500 mt-1 flex-shrink-0" />
-                    <p className="text-sm text-gray-600">{result.pharmacy.address}</p>
+                    <p className="text-sm text-gray-600">{info.address}</p>
                   </div>
 
                   {/* Distance */}
@@ -233,14 +261,14 @@ export default function MapContainer({
                   )}
 
                   {/* Contact */}
-                  {result.pharmacy.contactNumber && (
+                  {info.contactNumber && (
                     <div className="flex items-center gap-2 mb-3">
                       <Phone size={14} className="text-gray-500" />
                       <a
-                        href={`tel:${result.pharmacy.contactNumber}`}
+                        href={`tel:${info.contactNumber}`}
                         className="text-sm text-blue-600 hover:underline"
                       >
-                        {result.pharmacy.contactNumber}
+                        {info.contactNumber}
                       </a>
                     </div>
                   )}

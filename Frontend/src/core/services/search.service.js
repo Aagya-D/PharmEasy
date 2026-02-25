@@ -53,7 +53,7 @@ export const searchMedicines = async (query, latitude, longitude, options = {}) 
  * @param {number} limit - Max results (default: 50)
  * @returns {Promise} Nearby pharmacies sorted by distance
  */
-export const findNearbyPharmacies = async (latitude, longitude, radius = 10, limit = 50) => {
+export const findNearbyPharmacies = async (latitude, longitude, radius = 50, limit = 50) => {
   const params = new URLSearchParams({
     latitude: latitude.toString(),
     longitude: longitude.toString(),

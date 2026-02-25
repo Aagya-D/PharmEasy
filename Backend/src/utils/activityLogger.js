@@ -1,62 +1,150 @@
 import prisma from "../database/prisma.js";
 
 /**
- * Activity Logger Utility
- * 
- * Creates audit logs for critical system events
- * Usage: await createLog(userId, action, message, category, metadata)
- * 
- * Categories:
- * - AUTH: Login, logout, registration
- * - PHARMACY: Approvals, rejections, onboarding
- * - SYSTEM: Profile updates, password changes
- * - USER: User management actions
- * - INVENTORY: Stock updates
- * - ORDER: Order processing
+ * ============================================================
+ *  Enterprise Audit-Log Utility
+ * ============================================================
+ *
+ * Two APIs coexist:
+ *
+ * 1. Legacy  – createLog / logActivity
+ *    Kept for backward-compat with every call-site that already exists.
+ *    Internally now delegates to createAuditLog so ALL writes gain the
+ *    new columns (they'll just be null when callers don't supply them).
+ *
+ * 2. New     – createAuditLog
+ *    Full-fidelity audit entry with: data-delta (oldValue/newValue),
+ *    client metadata (IP + User-Agent), and resource targeting
+ *    (resourceType + resourceId).
+ *
+ * RULE: Logging must NEVER crash the main request.
+ *       Every public function wraps its body in try/catch.
+ * ============================================================
  */
+
+// ─── Helpers ─────────────────────────────────────────────────
 
 /**
- * Create a new activity log entry
- * @param {string|null} userId - ID of the user performing the action (null for system events)
- * @param {string} action - Action identifier (e.g., 'PHARMACY_APPROVED', 'USER_LOGIN')
- * @param {string} message - Human-readable description of the action
- * @param {string} category - Log category (AUTH, PHARMACY, SYSTEM, USER, INVENTORY, ORDER)
- * @param {object} metadata - Optional additional data to store with the log
- * @returns {Promise<object>} Created log entry
+ * Safely serialise any value to plain JSON (strips Prisma objects,
+ * Dates, Buffers, etc.).  Returns null for falsy input.
  */
-export const createLog = async (userId, action, message, category, metadata = null) => {
+const safeJson = (value) => {
+  if (value === undefined || value === null) return null;
   try {
-    const log = await prisma.log.create({
-      data: {
-        userId,
-        action,
-        message,
-        category,
-        metadata: metadata ? JSON.parse(JSON.stringify(metadata)) : null,
-      },
-    });
-
-    console.log(`[ACTIVITY LOG] ${category}:${action} - ${message}`);
-    return log;
-  } catch (error) {
-    // Logging should never break the application flow
-    console.error("Failed to create activity log:", error);
+    return JSON.parse(JSON.stringify(value));
+  } catch {
     return null;
   }
 };
 
 /**
- * Create activity log using object parameters (alternative API)
- * @param {object} options - Log options
- * @param {string|null} options.userId - ID of the user performing the action
- * @param {string} options.action - Action identifier
- * @param {string} options.message - Human-readable description
- * @param {string} options.category - Log category
- * @param {object} options.metadata - Optional additional data
- * @returns {Promise<object>} Created log entry
+ * Extract the real client IP from a request, respecting proxies.
+ */
+const extractIp = (req) => {
+  if (!req) return null;
+  const forwarded = req.headers?.["x-forwarded-for"];
+  if (forwarded) {
+    // "x-forwarded-for" can be a comma-separated list; take the first
+    return String(forwarded).split(",")[0].trim();
+  }
+  return req.ip || req.socket?.remoteAddress || null;
+};
+
+/**
+ * Extract the User-Agent string from a request.
+ */
+const extractUserAgent = (req) => {
+  if (!req) return null;
+  return req.headers?.["user-agent"] || null;
+};
+
+// ─── Core writer ─────────────────────────────────────────────
+
+/**
+ * Create a full-fidelity audit log entry.
+ *
+ * @param {Object}  opts
+ * @param {string}  opts.actorId       – userId of whoever triggered the action (null = system)
+ * @param {string}  opts.action        – action constant e.g. "PHARMACY_APPROVED"
+ * @param {string}  opts.message       – human-readable description
+ * @param {string}  opts.category      – LogCategory enum value
+ * @param {string}  [opts.resourceType]– entity type  e.g. "Pharmacy"
+ * @param {string}  [opts.resourceId]  – entity primary key
+ * @param {Object}  [opts.oldValue]    – snapshot BEFORE mutation
+ * @param {Object}  [opts.newValue]    – snapshot AFTER mutation
+ * @param {Object}  [opts.metadata]    – any extra context
+ * @param {import('express').Request} [opts.req] – Express request (extracts IP + UA)
+ * @returns {Promise<Object|null>}     – the created Log row, or null on failure
+ */
+export const createAuditLog = async ({
+  actorId = null,
+  action,
+  message,
+  category,
+  resourceType = null,
+  resourceId = null,
+  oldValue = null,
+  newValue = null,
+  metadata = null,
+  req = null,
+} = {}) => {
+  try {
+    const log = await prisma.log.create({
+      data: {
+        userId: actorId,
+        action,
+        message,
+        category,
+        resourceType,
+        resourceId,
+        oldValue: safeJson(oldValue),
+        newValue: safeJson(newValue),
+        metadata: safeJson(metadata),
+        ipAddress: extractIp(req),
+        userAgent: extractUserAgent(req),
+      },
+    });
+
+    console.log(
+      `[AUDIT] ${category}:${action} | actor=${actorId || "SYSTEM"} ` +
+      `| resource=${resourceType || "-"}/${resourceId || "-"} ` +
+      `| delta=${oldValue ? "yes" : "no"}`
+    );
+    return log;
+  } catch (error) {
+    // NEVER let logging break the app
+    console.error("[AUDIT] Failed to write audit log:", error.message);
+    return null;
+  }
+};
+
+// ─── Legacy API (backward-compatible) ────────────────────────
+
+/**
+ * Create a new activity log entry (legacy signature).
+ * Delegates to createAuditLog internally.
+ */
+export const createLog = async (userId, action, message, category, metadata = null) => {
+  return createAuditLog({
+    actorId: userId,
+    action,
+    message,
+    category,
+    metadata,
+  });
+};
+
+/**
+ * Create activity log using object parameters (legacy signature).
  */
 export const logActivity = async ({ userId, action, message, category, metadata = null }) => {
-  return createLog(userId, action, message, category, metadata);
+  return createAuditLog({
+    actorId: userId,
+    action,
+    message,
+    category,
+    metadata,
+  });
 };
 
 /**
@@ -157,6 +245,7 @@ export const LOG_ACTIONS = {
 };
 
 export default {
+  createAuditLog,
   createLog,
   logActivity,
   getLogs,

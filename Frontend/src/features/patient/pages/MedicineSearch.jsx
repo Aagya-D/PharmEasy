@@ -102,8 +102,8 @@ export default function MedicineSearch() {
         }
       );
 
-      // Safely extract data array from response
-      const resultData = response.data || response || [];
+      // Safely extract data array from response (Axios response → { data: { success, data, meta } })
+      const resultData = response.data?.data || response.data || [];
       const results = Array.isArray(resultData) ? resultData : [];
       
       console.log("[MEDICINE SEARCH] Results received:", {

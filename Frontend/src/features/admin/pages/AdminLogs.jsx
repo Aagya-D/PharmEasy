@@ -16,6 +16,12 @@ import {
   RefreshCw,
   Calendar,
   Search,
+  Eye,
+  X,
+  Package,
+  Globe,
+  Monitor,
+  ArrowRight,
 } from "lucide-react";
 import AdminLayout from "../components/AdminLayout";
 import adminService from "../../../core/services/admin.service";
@@ -30,6 +36,7 @@ const AdminLogs = () => {
   const [timeFilter, setTimeFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedLog, setSelectedLog] = useState(null);
 
   useEffect(() => {
     if (user && user.roleId !== 1) {
@@ -85,6 +92,7 @@ const AdminLogs = () => {
     if (action?.includes("LOGIN")) return <Key {...iconProps} />;
     if (action?.includes("PHARMACY")) return <Building {...iconProps} />;
     if (action?.includes("REGISTERED")) return <User {...iconProps} />;
+    if (action?.includes("INVENTORY")) return <Package {...iconProps} />;
     
     switch (category) {
       case "AUTH":
@@ -95,6 +103,8 @@ const AdminLogs = () => {
         return <AlertTriangle {...iconProps} />;
       case "USER":
         return <User {...iconProps} />;
+      case "INVENTORY":
+        return <Package {...iconProps} />;
       default:
         return <Activity {...iconProps} />;
     }
@@ -105,6 +115,7 @@ const AdminLogs = () => {
     if (action?.includes("REJECTED")) return { bg: "#FEE2E2", border: "#EF4444", text: "#991B1B", icon: "#EF4444" };
     if (action?.includes("LOGIN")) return { bg: "#EFF6FF", border: "#3B82F6", text: "#1E40AF", icon: "#3B82F6" };
     if (action?.includes("REGISTERED")) return { bg: "#F0FDF4", border: "#22C55E", text: "#166534", icon: "#22C55E" };
+    if (action?.includes("INVENTORY")) return { bg: "#FFF7ED", border: "#F97316", text: "#9A3412", icon: "#F97316" };
     
     switch (category) {
       case "AUTH":
@@ -115,6 +126,8 @@ const AdminLogs = () => {
         return { bg: "#FEF3C7", border: "#F59E0B", text: "#92400E", icon: "#F59E0B" };
       case "USER":
         return { bg: "#F3E8FF", border: "#A855F7", text: "#6B21A8", icon: "#A855F7" };
+      case "INVENTORY":
+        return { bg: "#FFF7ED", border: "#F97316", text: "#9A3412", icon: "#F97316" };
       default:
         return { bg: "#F3F4F6", border: "#9CA3AF", text: "#374151", icon: "#6B7280" };
     }
@@ -171,7 +184,7 @@ const AdminLogs = () => {
 
   const filteredLogs = filterLogsBySearch(filterLogsByTime(logs));
 
-  const categories = ["ALL", "AUTH", "PHARMACY", "SYSTEM", "USER"];
+  const categories = ["ALL", "AUTH", "PHARMACY", "SYSTEM", "USER", "INVENTORY"];
   const timeFilters = [
     { value: "ALL", label: "All Time" },
     { value: "TODAY", label: "Today" },
@@ -453,6 +466,42 @@ const AdminLogs = () => {
                           <p style={{ fontSize: "14px", color: "#374151", lineHeight: "1.6", margin: 0 }}>
                             {log.message}
                           </p>
+                          {/* Metadata badges + View Details */}
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
+                            {log.resourceType && (
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: "600", backgroundColor: "#F3F4F6", color: "#6B7280" }}>
+                                {log.resourceType}{log.resourceId ? `: ${log.resourceId.slice(0, 8)}…` : ""}
+                              </span>
+                            )}
+                            {log.ipAddress && (
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: "600", backgroundColor: "#EFF6FF", color: "#1E40AF" }}>
+                                <Globe size={10} /> {log.ipAddress}
+                              </span>
+                            )}
+                            {(log.oldValue || log.newValue) && (
+                              <button
+                                onClick={() => setSelectedLog(log)}
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  padding: "2px 10px",
+                                  borderRadius: "4px",
+                                  fontSize: "11px",
+                                  fontWeight: "700",
+                                  backgroundColor: "#DBEAFE",
+                                  color: "#1D4ED8",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  transition: "all 0.15s",
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#BFDBFE"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "#DBEAFE"; }}
+                              >
+                                <Eye size={12} /> View Delta
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "#9CA3AF", marginLeft: "16px" }}>
                           <Clock size={14} />
@@ -492,6 +541,199 @@ const AdminLogs = () => {
           </p>
         </div>
       )}
+
+      {/* ── Audit Detail Modal ── */}
+      <AnimatePresence>
+        {selectedLog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedLog(null)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 50,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(0,0,0,0.5)",
+              backdropFilter: "blur(4px)",
+              padding: "16px",
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: "white",
+                borderRadius: "16px",
+                width: "100%",
+                maxWidth: "720px",
+                maxHeight: "85vh",
+                overflow: "auto",
+                boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+              }}
+            >
+              {/* Modal Header */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px", borderBottom: "1px solid #E5E7EB" }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: "18px", fontWeight: "700", color: "#111827" }}>Audit Log Details</h2>
+                  <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#6B7280" }}>
+                    {selectedLog.action.replace(/_/g, " ")} &middot; {new Date(selectedLog.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <button onClick={() => setSelectedLog(null)} style={{ padding: "8px", border: "none", background: "transparent", cursor: "pointer", borderRadius: "8px", color: "#6B7280" }}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div style={{ padding: "24px" }}>
+                {/* Meta Info Grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "24px" }}>
+                  {selectedLog.userId && (
+                    <div style={{ padding: "12px", backgroundColor: "#F9FAFB", borderRadius: "8px" }}>
+                      <p style={{ margin: 0, fontSize: "11px", fontWeight: "700", color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.5px" }}>Actor ID</p>
+                      <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#374151", fontFamily: "monospace", wordBreak: "break-all" }}>{selectedLog.userId}</p>
+                    </div>
+                  )}
+                  {selectedLog.resourceType && (
+                    <div style={{ padding: "12px", backgroundColor: "#F9FAFB", borderRadius: "8px" }}>
+                      <p style={{ margin: 0, fontSize: "11px", fontWeight: "700", color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.5px" }}>Resource</p>
+                      <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#374151" }}>
+                        {selectedLog.resourceType} <span style={{ fontFamily: "monospace", color: "#6B7280" }}>{selectedLog.resourceId}</span>
+                      </p>
+                    </div>
+                  )}
+                  {selectedLog.ipAddress && (
+                    <div style={{ padding: "12px", backgroundColor: "#F9FAFB", borderRadius: "8px" }}>
+                      <p style={{ margin: 0, fontSize: "11px", fontWeight: "700", color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.5px" }}>IP Address</p>
+                      <p style={{ margin: "4px 0 0", fontSize: "13px", color: "#374151", display: "flex", alignItems: "center", gap: "6px" }}>
+                        <Globe size={14} /> {selectedLog.ipAddress}
+                      </p>
+                    </div>
+                  )}
+                  {selectedLog.userAgent && (
+                    <div style={{ padding: "12px", backgroundColor: "#F9FAFB", borderRadius: "8px" }}>
+                      <p style={{ margin: 0, fontSize: "11px", fontWeight: "700", color: "#9CA3AF", textTransform: "uppercase", letterSpacing: "0.5px" }}>User Agent</p>
+                      <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#374151", lineHeight: "1.5", wordBreak: "break-all" }}>
+                        <Monitor size={14} style={{ verticalAlign: "middle", marginRight: "4px" }} />
+                        {selectedLog.userAgent.length > 120 ? selectedLog.userAgent.slice(0, 120) + "…" : selectedLog.userAgent}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Data Delta Section */}
+                {(selectedLog.oldValue || selectedLog.newValue) && (
+                  <div>
+                    <h3 style={{ margin: "0 0 12px", fontSize: "14px", fontWeight: "700", color: "#374151", display: "flex", alignItems: "center", gap: "8px" }}>
+                      <ArrowRight size={16} /> Data Delta (Before → After)
+                    </h3>
+
+                    {/* Side-by-side diff */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                      {/* Old Value */}
+                      <div>
+                        <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: "700", color: "#DC2626", textTransform: "uppercase", letterSpacing: "0.5px" }}>Before</p>
+                        <pre style={{
+                          margin: 0,
+                          padding: "12px",
+                          backgroundColor: "#FEF2F2",
+                          border: "1px solid #FECACA",
+                          borderRadius: "8px",
+                          fontSize: "12px",
+                          lineHeight: "1.6",
+                          overflow: "auto",
+                          maxHeight: "300px",
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          color: "#991B1B",
+                        }}>
+                          {selectedLog.oldValue ? JSON.stringify(selectedLog.oldValue, null, 2) : "— (no prior state)"}
+                        </pre>
+                      </div>
+
+                      {/* New Value */}
+                      <div>
+                        <p style={{ margin: "0 0 6px", fontSize: "11px", fontWeight: "700", color: "#16A34A", textTransform: "uppercase", letterSpacing: "0.5px" }}>After</p>
+                        <pre style={{
+                          margin: 0,
+                          padding: "12px",
+                          backgroundColor: "#F0FDF4",
+                          border: "1px solid #BBF7D0",
+                          borderRadius: "8px",
+                          fontSize: "12px",
+                          lineHeight: "1.6",
+                          overflow: "auto",
+                          maxHeight: "300px",
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          color: "#166534",
+                        }}>
+                          {selectedLog.newValue ? JSON.stringify(selectedLog.newValue, null, 2) : "— (no new state)"}
+                        </pre>
+                      </div>
+                    </div>
+
+                    {/* Inline diff highlight: changed fields */}
+                    {selectedLog.oldValue && selectedLog.newValue && (() => {
+                      const old = selectedLog.oldValue;
+                      const nw = selectedLog.newValue;
+                      const allKeys = [...new Set([...Object.keys(old), ...Object.keys(nw)])];
+                      const changed = allKeys.filter(k => JSON.stringify(old[k]) !== JSON.stringify(nw[k]));
+                      if (changed.length === 0) return null;
+                      return (
+                        <div style={{ marginTop: "16px", padding: "12px", backgroundColor: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: "8px" }}>
+                          <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: "700", color: "#92400E" }}>Changed Fields:</p>
+                          {changed.map(key => (
+                            <div key={key} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", fontSize: "13px" }}>
+                              <span style={{ fontWeight: "600", color: "#374151", minWidth: "140px" }}>{key}</span>
+                              <span style={{ color: "#DC2626", textDecoration: "line-through", fontFamily: "monospace", fontSize: "12px" }}>
+                                {JSON.stringify(old[key]) ?? "null"}
+                              </span>
+                              <ArrowRight size={14} style={{ color: "#9CA3AF", flexShrink: 0 }} />
+                              <span style={{ color: "#16A34A", fontWeight: "600", fontFamily: "monospace", fontSize: "12px" }}>
+                                {JSON.stringify(nw[key]) ?? "null"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* Raw metadata */}
+                {selectedLog.metadata && (
+                  <div style={{ marginTop: "20px" }}>
+                    <h3 style={{ margin: "0 0 8px", fontSize: "14px", fontWeight: "700", color: "#374151" }}>Extra Metadata</h3>
+                    <pre style={{
+                      margin: 0,
+                      padding: "12px",
+                      backgroundColor: "#F9FAFB",
+                      border: "1px solid #E5E7EB",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                      lineHeight: "1.5",
+                      overflow: "auto",
+                      maxHeight: "200px",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      color: "#374151",
+                    }}>
+                      {JSON.stringify(selectedLog.metadata, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </AdminLayout>
   );
 };

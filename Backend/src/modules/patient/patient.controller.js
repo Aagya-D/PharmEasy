@@ -44,7 +44,7 @@ export const getDashboard = async (req, res) => {
     });
 
     const responseTime = Date.now() - startTime;
-    logger.success(`[PATIENT] Dashboard loaded for patient ${patientId}`, {
+    logger.info(`[PATIENT] Dashboard loaded for patient ${patientId}`, {
       userId: patientId,
       responseTime: `${responseTime}ms`,
     });

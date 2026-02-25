@@ -6,6 +6,8 @@
 import inventoryService from "./inventory.service.js";
 import logger from "../../utils/logger.js";
 import notificationService from "../notifications/notification.service.js";
+import { createAuditLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
+import prisma from "../../database/prisma.js";
 
 /**
  * POST /api/inventory
@@ -129,6 +131,12 @@ export const updateInventoryItem = async (req, res, next) => {
       pharmacyId 
     });
 
+    // ── Capture BEFORE state for audit delta ──
+    const beforeItem = await prisma.inventory.findUnique({
+      where: { id: inventoryId },
+      select: { id: true, name: true, genericName: true, quantity: true, price: true, expiryDate: true },
+    });
+
     const updateData = {
       name: req.body.name,
       genericName: req.body.genericName,
@@ -153,6 +161,35 @@ export const updateInventoryItem = async (req, res, next) => {
     logger.operation('INVENTORY', 'updateInventoryItem', 'SUCCESS', { 
       inventoryId, 
       pharmacyId 
+    });
+
+    // ── Audit: full delta + client metadata ──
+    const actorId = req.user.userId || req.user.id;
+    const changedFields = Object.keys(updateData);
+    const deltaDesc = changedFields.map(f => {
+      const oldVal = beforeItem?.[f];
+      const newVal = updatedItem[f] ?? updateData[f];
+      return `${f}: ${oldVal} → ${newVal}`;
+    }).join(", ");
+
+    await createAuditLog({
+      actorId,
+      action: LOG_ACTIONS.INVENTORY_UPDATED,
+      message: `Inventory "${updatedItem.name}" updated (${deltaDesc})`,
+      category: "INVENTORY",
+      resourceType: "Inventory",
+      resourceId: inventoryId,
+      oldValue: beforeItem,
+      newValue: {
+        id: updatedItem.id,
+        name: updatedItem.name,
+        genericName: updatedItem.genericName,
+        quantity: updatedItem.quantity,
+        price: updatedItem.price,
+        expiryDate: updatedItem.expiryDate,
+      },
+      metadata: { pharmacyId, changedFields },
+      req,
     });
 
     res.status(200).json({

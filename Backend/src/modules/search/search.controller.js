@@ -167,7 +167,7 @@ class SearchController {
     const parsedParams = {
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
-      radius: radius ? Math.min(parseFloat(radius), 50) : 10,
+      radius: radius ? Math.min(parseFloat(radius), 100) : 50,
       limit: limit ? Math.min(parseInt(limit), 100) : 50,
     };
 

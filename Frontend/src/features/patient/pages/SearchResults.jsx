@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import searchService from "../../../core/services/search.service";
 import useGeoLocation from "../../../shared/hooks/useGeoLocation";
+import { useLocation } from "../../../context/LocationContext";
 import MapContainer from "../../../shared/components/MapContainer";
 import StarRating from "../../../shared/components/StarRating";
 
@@ -43,21 +44,24 @@ export default function SearchResults() {
   const [selectedPharmacy, setSelectedPharmacy] = useState(null);
   const [filters, setFilters] = useState({
     includeOutOfStock: false,
-    maxDistance: 10,
+    maxDistance: 50,
     maxPrice: 1000,
   });
 
   // Geolocation hook - will fallback to Kathmandu if permission denied
   const { location, loading: locationLoading, error: locationError, getLocation } = useGeoLocation(false);
 
+  // Location context - user's selected search location
+  const { selectedLocation } = useLocation();
+
   /**
-   * Auto-search when location becomes available or query changes
+   * Auto-search when location becomes available, query changes, or selected location changes
    */
   useEffect(() => {
     if (query) {
       performSearch(query);
     }
-  }, [query, location]);
+  }, [query, location, selectedLocation]);
 
   /**
    * Search for medicines
@@ -72,9 +76,9 @@ export default function SearchResults() {
     setError(null);
 
     try {
-      // Use location if available, otherwise default to Kathmandu
-      const lat = location?.latitude || 27.7172;
-      const lng = location?.longitude || 85.3240;
+      // Use selected location from context, geolocation, or default to Kathmandu
+      const lat = selectedLocation?.lat || location?.latitude || 27.7172;
+      const lng = selectedLocation?.lng || location?.longitude || 85.3240;
 
       const response = await searchService.searchMedicines(
         searchTerm,
@@ -321,7 +325,7 @@ export default function SearchResults() {
                       <input
                         type="range"
                         min="1"
-                        max="50"
+                        max="100"
                         value={filters.maxDistance}
                         onChange={(e) =>
                           setFilters({

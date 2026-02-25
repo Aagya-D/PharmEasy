@@ -63,7 +63,7 @@ export function PatientLayout({ children, searchEnabled = true }) {
   const navLinks = [
     { label: "Home", href: "/patient", icon: Home },
     { label: "Find Medicines", href: "/medicine-search", icon: Pill },
-    { label: "Nearby Pharmacies", href: "/search", icon: MapPin },
+    { label: "Nearby Pharmacies", href: "/nearby-pharmacies", icon: MapPin },
     { label: "My Health", href: "/patient/medications", icon: ActivitySquare },
     { label: "Orders", href: "/patient/orders", icon: Package },
   ];

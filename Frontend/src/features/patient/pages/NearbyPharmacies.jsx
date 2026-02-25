@@ -153,7 +153,7 @@ export default function NearbyPharmacies() {
                 <input
                   type="range"
                   min="1"
-                  max="50"
+                  max="100"
                   value={radius}
                   onChange={(e) => setRadius(parseInt(e.target.value))}
                   disabled={loading || locationLoading}
