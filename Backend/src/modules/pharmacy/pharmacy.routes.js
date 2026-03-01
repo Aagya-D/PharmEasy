@@ -210,4 +210,53 @@ router.patch(
   pharmacyController.updateLocation
 );
 
+/**
+ * GET /api/pharmacy/customers
+ * Get unique customers who ordered from this pharmacy
+ * Query params: ?search=name_or_phone
+ * Requires: JWT token, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
+ */
+router.get(
+  "/pharmacy/customers",
+  authenticate(),
+  requirePharmacyAdmin,
+  pharmacyController.getPharmacyCustomers
+);
+
+/**
+ * GET /api/pharmacy/analytics
+ * Get sales analytics: daily revenue chart, monthly stats, top medicine, SOS response rate
+ * Requires: JWT token, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
+ */
+router.get(
+  "/pharmacy/analytics",
+  authenticate(),
+  requirePharmacyAdmin,
+  pharmacyController.getAnalyticsData
+);
+
+/**
+ * GET /api/pharmacy/reports/export-inventory
+ * Download inventory as CSV file
+ * Requires: JWT token, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
+ */
+router.get(
+  "/pharmacy/reports/export-inventory",
+  authenticate(),
+  requirePharmacyAdmin,
+  pharmacyController.exportInventoryCSV
+);
+
+/**
+ * GET /api/pharmacy/reports/export-sales
+ * Download sales/orders as CSV file
+ * Requires: JWT token, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
+ */
+router.get(
+  "/pharmacy/reports/export-sales",
+  authenticate(),
+  requirePharmacyAdmin,
+  pharmacyController.exportSalesCSV
+);
+
 export default router;

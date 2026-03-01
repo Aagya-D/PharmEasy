@@ -1001,6 +1001,333 @@ export const getPharmacyOrders = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/pharmacy/customers
+ * Get unique customers (patients who ordered from this pharmacy)
+ * Analyzes Order table to return patient list with total orders & last purchase date
+ * Requires: Authentication, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
+ */
+export const getPharmacyCustomers = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { search } = req.query;
+
+    const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
+
+    if (!pharmacy) {
+      return res.status(404).json({ success: false, message: "Pharmacy not found." });
+    }
+
+    if (pharmacy.verificationStatus !== 'VERIFIED') {
+      return res.status(403).json({ success: false, message: "Pharmacy must be verified." });
+    }
+
+    // Get all orders for this pharmacy, grouped by patient
+    const orders = await prisma.order.findMany({
+      where: { pharmacyId: pharmacy.id },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            createdAt: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Aggregate: unique patients → total orders, total spent, last purchase
+    const customerMap = new Map();
+    orders.forEach((order) => {
+      const pid = order.patientId;
+      if (!customerMap.has(pid)) {
+        customerMap.set(pid, {
+          id: order.patient.id,
+          name: order.patient.name,
+          email: order.patient.email,
+          phone: order.patient.phone || "N/A",
+          memberSince: order.patient.createdAt,
+          totalOrders: 0,
+          totalSpent: 0,
+          lastPurchase: order.createdAt,
+        });
+      }
+      const c = customerMap.get(pid);
+      c.totalOrders += 1;
+      c.totalSpent += order.totalAmount || 0;
+      if (order.createdAt > c.lastPurchase) {
+        c.lastPurchase = order.createdAt;
+      }
+    });
+
+    let customers = Array.from(customerMap.values())
+      .sort((a, b) => b.totalOrders - a.totalOrders);
+
+    // Server-side search filter
+    if (search && search.trim()) {
+      const q = search.toLowerCase();
+      customers = customers.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.email.toLowerCase().includes(q) ||
+          (c.phone && c.phone.toLowerCase().includes(q))
+      );
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        customers,
+        stats: {
+          totalCustomers: customerMap.size,
+          totalOrders: orders.length,
+          totalRevenue: orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0),
+        },
+      },
+      message: `Found ${customers.length} customers`,
+    });
+  } catch (error) {
+    logger.error('[PHARMACY] getPharmacyCustomers error', { error: error.message });
+    next(error);
+  }
+};
+
+/**
+ * GET /api/pharmacy/analytics
+ * Get sales analytics: daily revenue (last 30 days), monthly revenue, top medicine, SOS stats
+ * Requires: Authentication, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
+ */
+export const getAnalyticsData = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+
+    const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
+
+    if (!pharmacy) {
+      return res.status(404).json({ success: false, message: "Pharmacy not found." });
+    }
+
+    if (pharmacy.verificationStatus !== 'VERIFIED') {
+      return res.status(403).json({ success: false, message: "Pharmacy must be verified." });
+    }
+
+    const pharmacyId = pharmacy.id;
+    const now = new Date();
+
+    // ── Date boundaries ──
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+    // ── Parallel queries ──
+    const [
+      recentOrders,
+      currentMonthOrders,
+      prevMonthOrders,
+      totalOrdersCount,
+      inventoryItems,
+      sosAcceptedCount,
+      sosNearbyTotalCount,
+    ] = await Promise.all([
+      // 1. Orders in last 30 days (for daily chart)
+      prisma.order.findMany({
+        where: {
+          pharmacyId,
+          createdAt: { gte: thirtyDaysAgo },
+          status: { in: ['delivered', 'fulfilled', 'confirmed', 'pending'] },
+        },
+        select: { totalAmount: true, createdAt: true, status: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+      // 2. Current month completed orders
+      prisma.order.findMany({
+        where: {
+          pharmacyId,
+          createdAt: { gte: currentMonthStart },
+          status: { in: ['delivered', 'fulfilled', 'confirmed'] },
+        },
+        select: { totalAmount: true },
+      }),
+      // 3. Previous month completed orders (for comparison)
+      prisma.order.findMany({
+        where: {
+          pharmacyId,
+          createdAt: { gte: prevMonthStart, lte: prevMonthEnd },
+          status: { in: ['delivered', 'fulfilled', 'confirmed'] },
+        },
+        select: { totalAmount: true },
+      }),
+      // 4. Total lifetime orders
+      prisma.order.count({ where: { pharmacyId } }),
+      // 5. All inventory (to find top medicine by quantity sold — proxy: lowest stock + highest usage)
+      prisma.inventory.findMany({
+        where: { pharmacyId },
+        orderBy: { quantity: 'asc' },
+        take: 10,
+        select: { name: true, genericName: true, quantity: true, price: true },
+      }),
+      // 6. SOS requests accepted by this pharmacy
+      prisma.pharmacyResponse.count({
+        where: { pharmacyId, response: 'accepted' },
+      }),
+      // 7. Total SOS requests this pharmacy has been shown (accepted + rejected)
+      prisma.pharmacyResponse.count({
+        where: { pharmacyId },
+      }),
+    ]);
+
+    // ── Build daily revenue chart data (last 30 days) ──
+    const dailyMap = new Map();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().split('T')[0]; // YYYY-MM-DD
+      dailyMap.set(key, { date: key, revenue: 0, orders: 0 });
+    }
+    recentOrders.forEach((order) => {
+      const key = order.createdAt.toISOString().split('T')[0];
+      if (dailyMap.has(key)) {
+        dailyMap.get(key).revenue += order.totalAmount || 0;
+        dailyMap.get(key).orders += 1;
+      }
+    });
+    const dailyRevenue = Array.from(dailyMap.values()).map((d) => ({
+      date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      revenue: Math.round(d.revenue * 100) / 100,
+      orders: d.orders,
+    }));
+
+    // ── Monthly revenue ──
+    const currentMonthRevenue = currentMonthOrders.reduce((s, o) => s + (o.totalAmount || 0), 0);
+    const prevMonthRevenue = prevMonthOrders.reduce((s, o) => s + (o.totalAmount || 0), 0);
+    const revenueGrowth = prevMonthRevenue > 0
+      ? Math.round(((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100)
+      : currentMonthRevenue > 0 ? 100 : 0;
+
+    // ── Top medicine (best guess: lowest stock = most sold) ──
+    const topMedicine = inventoryItems.length > 0
+      ? { name: inventoryItems[0].name, genericName: inventoryItems[0].genericName }
+      : { name: "N/A", genericName: "N/A" };
+
+    // ── SOS response rate ──
+    const sosResponseRate = sosNearbyTotalCount > 0
+      ? Math.round((sosAcceptedCount / sosNearbyTotalCount) * 100)
+      : 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        dailyRevenue,
+        stats: {
+          monthlyRevenue: Math.round(currentMonthRevenue * 100) / 100,
+          prevMonthRevenue: Math.round(prevMonthRevenue * 100) / 100,
+          revenueGrowth,
+          totalOrders: totalOrdersCount,
+          currentMonthOrders: currentMonthOrders.length,
+          topMedicine,
+          sosResponseRate,
+          sosAccepted: sosAcceptedCount,
+          sosTotal: sosNearbyTotalCount,
+        },
+      },
+      message: "Analytics data retrieved successfully",
+    });
+  } catch (error) {
+    logger.error('[PHARMACY] getAnalyticsData error', { error: error.message });
+    next(error);
+  }
+};
+
+/**
+ * GET /api/pharmacy/reports/export-inventory
+ * Export current pharmacy inventory as CSV
+ * Requires: Authentication, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
+ */
+export const exportInventoryCSV = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+
+    const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
+    if (!pharmacy) return res.status(404).json({ success: false, message: "Pharmacy not found." });
+    if (pharmacy.verificationStatus !== 'VERIFIED') return res.status(403).json({ success: false, message: "Not verified." });
+
+    const inventory = await prisma.inventory.findMany({
+      where: { pharmacyId: pharmacy.id },
+      orderBy: { name: 'asc' },
+    });
+
+    // Build CSV
+    const headers = ['Name', 'Generic Name', 'Quantity', 'Price (NPR)', 'Expiry Date', 'Added On'];
+    const rows = inventory.map((item) => [
+      `"${item.name.replace(/"/g, '""')}"`,
+      `"${item.genericName.replace(/"/g, '""')}"`,
+      item.quantity,
+      item.price,
+      item.expiryDate.toISOString().split('T')[0],
+      item.createdAt.toISOString().split('T')[0],
+    ]);
+
+    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="inventory_${pharmacy.pharmacyName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv"`);
+    return res.status(200).send(csv);
+  } catch (error) {
+    logger.error('[PHARMACY] exportInventoryCSV error', { error: error.message });
+    next(error);
+  }
+};
+
+/**
+ * GET /api/pharmacy/reports/export-sales
+ * Export completed orders as CSV
+ * Requires: Authentication, roleId=2 (PHARMACY_ADMIN), VERIFIED pharmacy
+ */
+export const exportSalesCSV = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+
+    const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
+    if (!pharmacy) return res.status(404).json({ success: false, message: "Pharmacy not found." });
+    if (pharmacy.verificationStatus !== 'VERIFIED') return res.status(403).json({ success: false, message: "Not verified." });
+
+    const orders = await prisma.order.findMany({
+      where: { pharmacyId: pharmacy.id },
+      include: {
+        patient: { select: { name: true, email: true, phone: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const headers = ['Order ID', 'Patient Name', 'Patient Email', 'Patient Phone', 'Status', 'Amount (NPR)', 'Notes', 'Order Date'];
+    const rows = orders.map((o) => [
+      o.id,
+      `"${(o.patient?.name || 'N/A').replace(/"/g, '""')}"`,
+      o.patient?.email || 'N/A',
+      o.patient?.phone || 'N/A',
+      o.status,
+      o.totalAmount || 0,
+      `"${(o.notes || '').replace(/"/g, '""')}"`,
+      o.createdAt.toISOString().split('T')[0],
+    ]);
+
+    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="sales_${pharmacy.pharmacyName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv"`);
+    return res.status(200).send(csv);
+  } catch (error) {
+    logger.error('[PHARMACY] exportSalesCSV error', { error: error.message });
+    next(error);
+  }
+};
+
 export default {
   onboardPharmacy,
   getMyPharmacy,
@@ -1016,4 +1343,8 @@ export default {
   updateLocation,
   getDashboardStats,
   getPharmacyOrders,
+  getPharmacyCustomers,
+  getAnalyticsData,
+  exportInventoryCSV,
+  exportSalesCSV,
 };

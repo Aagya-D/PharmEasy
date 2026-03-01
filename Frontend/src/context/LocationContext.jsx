@@ -6,6 +6,7 @@ import { nepalLocations, findLocationByCoordinates } from "../data/nepalLocation
  * 
  * Manages user's selected location globally across the app
  * Stores user's search location (separate from geolocation)
+ * Supports exact GPS coordinates for precise distance calculations
  */
 const LocationContext = createContext();
 
@@ -22,6 +23,7 @@ export const LocationProvider = ({ children }) => {
   };
 
   const [selectedLocation, setSelectedLocation] = useState(defaultLocation);
+  const [rawDetectedCoords, setRawDetectedCoords] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
   /**
@@ -36,7 +38,29 @@ export const LocationProvider = ({ children }) => {
   };
 
   /**
+   * Confirm exact coordinates (from map pin drag or GPS)
+   * Saves the exact lat/lng the user confirmed, preserving the nearest city name
+   */
+  const confirmExactLocation = (lat, lng, nearestLocation = null) => {
+    const base = nearestLocation || findLocationByCoordinates(lat, lng) || {};
+    const exactLocation = {
+      ...base,
+      name: base.name || "Custom Location",
+      district: base.district || "Unknown",
+      province: base.province || "Unknown",
+      lat,
+      lng,
+      isExactCoords: true,
+    };
+    updateLocation(exactLocation);
+    setRawDetectedCoords(null);
+    return exactLocation;
+  };
+
+  /**
    * Detect location using geolocation API
+   * Returns both the raw GPS coords and the nearest matched location
+   * so the modal can show a map for visual confirmation
    */
   const detectLocation = async () => {
     setIsLoading(true);
@@ -50,13 +74,22 @@ export const LocationProvider = ({ children }) => {
 
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const { latitude, longitude } = position.coords;
+          const { latitude, longitude, accuracy } = position.coords;
+
+          // Store raw GPS coordinates for map preview
+          setRawDetectedCoords({ latitude, longitude, accuracy });
+
           const nearestLocation = findLocationByCoordinates(latitude, longitude);
           
           if (nearestLocation) {
-            updateLocation(nearestLocation);
             setIsLoading(false);
-            resolve(nearestLocation);
+            // Return both raw coords and nearest location for confirmation
+            resolve({
+              ...nearestLocation,
+              _rawLat: latitude,
+              _rawLng: longitude,
+              _accuracy: accuracy,
+            });
           } else {
             setIsLoading(false);
             resolve(null);
@@ -81,6 +114,7 @@ export const LocationProvider = ({ children }) => {
    */
   const resetLocation = () => {
     updateLocation(defaultLocation);
+    setRawDetectedCoords(null);
   };
 
   /**
@@ -102,7 +136,9 @@ export const LocationProvider = ({ children }) => {
     <LocationContext.Provider
       value={{
         selectedLocation,
+        rawDetectedCoords,
         updateLocation,
+        confirmExactLocation,
         detectLocation,
         resetLocation,
         isLoading,

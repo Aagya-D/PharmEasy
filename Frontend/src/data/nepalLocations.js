@@ -11,12 +11,12 @@
  */
 
 export const nepalLocations = [
-  // PROVINCE 1 (Eastern Region)
+  // PROVINCE 1 / KOSHI (Eastern Region)
   {
     id: 1,
     name: "Ilam",
     district: "Ilam",
-    province: "Province 1",
+    province: "Province 1 / Koshi",
     lat: 26.9124,
     lng: 87.9263,
   },
@@ -24,7 +24,7 @@ export const nepalLocations = [
     id: 2,
     name: "Jhapa",
     district: "Jhapa",
-    province: "Province 1",
+    province: "Province 1 / Koshi",
     lat: 26.6843,
     lng: 87.7597,
   },
@@ -32,7 +32,7 @@ export const nepalLocations = [
     id: 3,
     name: "Panchthar",
     district: "Panchthar",
-    province: "Province 1",
+    province: "Province 1 / Koshi",
     lat: 27.1568,
     lng: 87.7121,
   },
@@ -40,7 +40,7 @@ export const nepalLocations = [
     id: 4,
     name: "Taplejung",
     district: "Taplejung",
-    province: "Province 1",
+    province: "Province 1 / Koshi",
     lat: 27.3526,
     lng: 87.6756,
   },
@@ -48,7 +48,7 @@ export const nepalLocations = [
     id: 5,
     name: "Morang",
     district: "Morang",
-    province: "Province 1",
+    province: "Province 1 / Koshi",
     lat: 26.8159,
     lng: 87.6597,
   },
@@ -56,7 +56,7 @@ export const nepalLocations = [
     id: 6,
     name: "Sunsari",
     district: "Sunsari",
-    province: "Province 1",
+    province: "Province 1 / Koshi",
     lat: 26.5074,
     lng: 87.2046,
   },
@@ -502,25 +502,25 @@ export const nepalLocations = [
     id: 60,
     name: "Biratnagar",
     district: "Morang",
-    province: "Province 1",
-    lat: 26.45,
-    lng: 87.27,
+    province: "Province 1 / Koshi",
+    lat: 26.4525,
+    lng: 87.2718,
   },
   {
     id: 61,
     name: "Itahari",
     district: "Sunsari",
-    province: "Province 1",
-    lat: 26.4234,
-    lng: 87.5345,
+    province: "Province 1 / Koshi",
+    lat: 26.6646,
+    lng: 87.2718,
   },
   {
     id: 62,
     name: "Dharan",
     district: "Sunsari",
-    province: "Province 1",
-    lat: 26.8134,
-    lng: 87.2845,
+    province: "Province 1 / Koshi",
+    lat: 26.8123,
+    lng: 87.2846,
   },
   {
     id: 63,
@@ -574,7 +574,7 @@ export const nepalLocations = [
     id: 69,
     name: "Birtamod",
     district: "Jhapa",
-    province: "Province 1",
+    province: "Province 1 / Koshi",
     lat: 26.6026,
     lng: 87.9563,
   },
@@ -582,7 +582,7 @@ export const nepalLocations = [
     id: 70,
     name: "Damak",
     district: "Jhapa",
-    province: "Province 1",
+    province: "Province 1 / Koshi",
     lat: 26.6734,
     lng: 87.7234,
   },
@@ -590,7 +590,7 @@ export const nepalLocations = [
     id: 71,
     name: "Jale",
     district: "Ilam",
-    province: "Province 1",
+    province: "Province 1 / Koshi",
     lat: 26.4934,
     lng: 87.6234,
   },
@@ -651,15 +651,17 @@ export const nepalLocations = [
 export const popularCities = [
   { name: "Kathmandu", lat: 27.7172, lng: 85.324 },
   { name: "Pokhara", lat: 28.2096, lng: 83.9856 },
+  { name: "Itahari", lat: 26.6646, lng: 87.2718 },
+  { name: "Biratnagar", lat: 26.4525, lng: 87.2718 },
+  { name: "Dharan", lat: 26.8123, lng: 87.2846 },
   { name: "Butwal", lat: 27.8118, lng: 83.4568 },
-  { name: "Biratnagar", lat: 26.45, lng: 87.27 },
 ];
 
 /**
  * Provinces for hierarchical filtering
  */
 export const nepaliProvinces = [
-  "Province 1",
+  "Province 1 / Koshi",
   "Province 2",
   "Bagmati",
   "Gandaki",
@@ -684,19 +686,35 @@ export const searchLocations = (query = "", locations = nepalLocations) => {
 };
 
 /**
- * Get location by coordinates (find close match)
+ * Calculate Haversine distance between two coordinates in km
+ */
+export const haversineDistance = (lat1, lng1, lat2, lng2) => {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+/**
+ * Get location by coordinates (find closest match using Haversine formula)
+ * Returns the nearest known location within maxDistance km
  */
 export const findLocationByCoordinates = (lat, lng, maxDistance = 50) => {
   let closest = null;
   let minDistance = maxDistance;
 
   nepalLocations.forEach((location) => {
-    const distance = Math.sqrt(
-      Math.pow(location.lat - lat, 2) + Math.pow(location.lng - lng, 2)
-    );
+    const distance = haversineDistance(lat, lng, location.lat, location.lng);
     if (distance < minDistance) {
       minDistance = distance;
-      closest = location;
+      closest = { ...location, _matchDistance: distance };
     }
   });
 

@@ -185,6 +185,72 @@ export const getPharmacyOrders = async (page = 1, limit = 50, status = 'all') =>
 };
 
 /**
+ * Get pharmacy customers (unique patients who ordered)
+ * Backend: GET /api/pharmacy/customers
+ */
+export const getPharmacyCustomers = async (search = '') => {
+  try {
+    const response = await httpClient.get("/pharmacy/customers", {
+      params: search ? { search } : {},
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching pharmacy customers:", error);
+    throw {
+      success: false,
+      error: {
+        message: error.response?.data?.message ||
+                 error.message ||
+                 "Failed to fetch customers"
+      }
+    };
+  }
+};
+
+/**
+ * Get pharmacy analytics (daily revenue, stats, SOS rate)
+ * Backend: GET /api/pharmacy/analytics
+ */
+export const getAnalyticsData = async () => {
+  try {
+    const response = await httpClient.get("/pharmacy/analytics");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching analytics:", error);
+    throw {
+      success: false,
+      error: {
+        message: error.response?.data?.message ||
+                 error.message ||
+                 "Failed to fetch analytics"
+      }
+    };
+  }
+};
+
+/**
+ * Export inventory CSV — returns blob URL for download
+ * Backend: GET /api/pharmacy/reports/export-inventory
+ */
+export const exportInventoryCSV = async () => {
+  const response = await httpClient.get("/pharmacy/reports/export-inventory", {
+    responseType: 'blob',
+  });
+  return response;
+};
+
+/**
+ * Export sales CSV — returns blob URL for download
+ * Backend: GET /api/pharmacy/reports/export-sales
+ */
+export const exportSalesCSV = async () => {
+  const response = await httpClient.get("/pharmacy/reports/export-sales", {
+    responseType: 'blob',
+  });
+  return response;
+};
+
+/**
  * Get pharmacy by user ID (Not implemented in backend)
  * TODO: Add backend endpoint if needed
  */
@@ -210,6 +276,10 @@ const pharmacyService = {
   getPharmacyByUserId,
   getDashboardStats,
   getPharmacyOrders,
+  getPharmacyCustomers,
+  getAnalyticsData,
+  exportInventoryCSV,
+  exportSalesCSV,
 };
 
 export default pharmacyService;
