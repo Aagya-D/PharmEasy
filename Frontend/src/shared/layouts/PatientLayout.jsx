@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useLocation as useLocationContext } from "../../context/LocationContext";
 import LocationModal from "../components/LocationModal";
+import notificationService from "../../core/services/notification.service";
 import {
   Search,
   ShoppingCart,
@@ -43,7 +44,23 @@ export function PatientLayout({ children, searchEnabled = true }) {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [cartCount] = useState(0); // TODO: Connect to actual cart state
-  const [notificationCount] = useState(0); // TODO: Connect to notifications
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  // Poll unread notification count every 30 seconds
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const response = await notificationService.getUnreadCount();
+      setNotificationCount(response.data?.unreadCount || 0);
+    } catch (err) {
+      // Silently fail — badge just stays at previous value
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -131,14 +148,18 @@ export function PatientLayout({ children, searchEnabled = true }) {
 
               {/* Notifications Button */}
               <button
-                onClick={() => navigate("/notifications")}
+                onClick={() => {
+                  navigate("/notifications");
+                  // Reset count optimistically when navigating to notifications
+                  setNotificationCount(0);
+                }}
                 className="relative p-2 hover:bg-blue-50 rounded-lg transition-colors"
                 title="Notifications"
               >
-                <Bell size={20} className="text-slate-700" />
+                <Bell size={20} className={notificationCount > 0 ? "text-blue-600" : "text-slate-700"} />
                 {notificationCount > 0 && (
-                  <span className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                    {notificationCount}
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center animate-pulse shadow-sm">
+                    {notificationCount > 99 ? "99+" : notificationCount}
                   </span>
                 )}
               </button>
@@ -292,6 +313,23 @@ export function PatientLayout({ children, searchEnabled = true }) {
               })}
 
               <div className="border-t border-slate-200 my-2" />
+
+              <button
+                onClick={() => {
+                  navigate("/notifications");
+                  setIsMobileMenuOpen(false);
+                  setNotificationCount(0);
+                }}
+                className="w-full text-left px-4 py-2 rounded-lg flex items-center gap-3 text-slate-700 hover:bg-blue-50 transition-colors"
+              >
+                <Bell size={18} />
+                <span className="flex-1">Notifications</span>
+                {notificationCount > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center">
+                    {notificationCount > 99 ? "99+" : notificationCount}
+                  </span>
+                )}
+              </button>
 
               <button
                 onClick={() => {
