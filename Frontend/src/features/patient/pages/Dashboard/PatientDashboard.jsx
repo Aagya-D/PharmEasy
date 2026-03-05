@@ -16,8 +16,90 @@ import {
   Activity,
   TrendingUp,
   ShoppingBag,
-  Sparkles
+  Sparkles,
+  AlertCircle,
+  Timer,
 } from "lucide-react";
+
+export function ActiveSOSCard({ sos, ttlMinutes, navigate }) {
+  const [remaining, setRemaining] = useState(0);
+
+  useEffect(() => {
+    const ttlMs = ttlMinutes * 60 * 1000;
+    const created = new Date(sos.createdAt).getTime();
+    const tick = () => setRemaining(Math.max(0, created + ttlMs - Date.now()));
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [sos.createdAt, ttlMinutes]);
+
+  if (remaining <= 0) return null; // already expired, hide card
+
+  const mins = Math.floor(remaining / 60000);
+  const secs = Math.floor((remaining % 60000) / 1000);
+  const pct = Math.max(0, (remaining / (ttlMinutes * 60 * 1000)) * 100);
+  const isLow = mins < 5;
+
+  return (
+    <div
+      onClick={() => navigate(`/sos/${sos.id}`)}
+      className={`mb-6 rounded-2xl p-5 border-2 cursor-pointer transition-all hover:shadow-lg ${
+        isLow
+          ? "bg-gradient-to-r from-red-50 to-orange-50 border-red-200"
+          : "bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200"
+      }`}
+    >
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-3">
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isLow ? "bg-red-100" : "bg-orange-100"}`}>
+            <AlertCircle size={24} className={isLow ? "text-red-600 animate-pulse" : "text-orange-600"} />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-900 text-base">Active SOS Request</h3>
+            <p className="text-sm text-slate-600">{sos.medicineName} &middot; Qty: {sos.quantity}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          {/* Timer */}
+          <div className="text-right">
+            <p className={`text-xs font-semibold uppercase tracking-wide ${isLow ? "text-red-600" : "text-orange-600"}`}>
+              Expires in
+            </p>
+            <p className={`text-3xl font-mono font-bold tabular-nums ${isLow ? "text-red-600 animate-pulse" : "text-orange-700"}`}>
+              {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+            </p>
+          </div>
+
+          {/* Circular progress */}
+          <div className="relative w-14 h-14">
+            <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
+              <circle cx="28" cy="28" r="24" fill="none" stroke="#e5e7eb" strokeWidth="4" />
+              <circle
+                cx="28" cy="28" r="24" fill="none"
+                stroke={isLow ? "#ef4444" : "#f97316"}
+                strokeWidth="4"
+                strokeLinecap="round"
+                strokeDasharray={`${(pct / 100) * 150.8} 150.8`}
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Timer size={18} className={isLow ? "text-red-500" : "text-orange-500"} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="mt-3 w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-1000 ${isLow ? "bg-red-500" : "bg-orange-500"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
 
 export function PatientDashboard() {
   const navigate = useNavigate();
@@ -31,12 +113,25 @@ export function PatientDashboard() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [tipLoading, setTipLoading] = useState(true);
+  const [activeSOS, setActiveSOS] = useState(null);
+  const [sosTTL, setSosTTL] = useState(30);
 
   useEffect(() => {
     loadDashboardData();
     loadOrders();
     loadHealthTip();
+    loadActiveSOS();
   }, []);
+
+  const loadActiveSOS = async () => {
+    try {
+      const res = await patientService.getActiveSOS();
+      setActiveSOS(res?.data?.activeSOS || null);
+      setSosTTL(res?.data?.ttlMinutes || 30);
+    } catch {
+      setActiveSOS(null);
+    }
+  };
 
   const loadDashboardData = async () => {
     try {
@@ -122,6 +217,11 @@ export function PatientDashboard() {
 
         {/* Announcement Banner */}
         <AnnouncementBanner targetRole="PATIENT" className="mb-6" />
+
+        {/* Active SOS Countdown Card */}
+        {activeSOS && (
+          <ActiveSOSCard sos={activeSOS} ttlMinutes={sosTTL} navigate={navigate} />
+        )}
 
         {/* Classy Stats Cards - Soft UI with Gradients */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -309,13 +409,13 @@ export function PatientDashboard() {
                 </button>
                 
                 <button
-                  onClick={() => navigate("/patient/medications")}
+                  onClick={() => navigate("/patient/history")}
                   className="group w-full p-5 bg-gradient-to-br from-emerald-50 via-emerald-50 to-emerald-100 hover:from-emerald-100 hover:to-emerald-200 text-emerald-700 font-semibold rounded-2xl transition-all flex items-center gap-4 text-left shadow-sm hover:shadow-md hover:-translate-y-0.5"
                 >
                   <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all">
                     <Package size={24} className="text-emerald-600" />
                   </div>
-                  <span className="text-base">Medication History</span>
+                  <span className="text-base">History</span>
                 </button>
               </div>
             </div>

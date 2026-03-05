@@ -24,6 +24,7 @@ import NotificationCenter from "../features/patient/pages/NotificationCenter";
 import PatientDashboard from "../features/patient/pages/Dashboard/PatientDashboard";
 import OrdersPage from "../features/patient/pages/Orders/OrdersPage";
 import MedicationsPage from "../features/patient/pages/Medications/MedicationsPage";
+import PatientHistory from "../features/patient/pages/PatientHistory";
 import ProfilePage from "../features/patient/pages/Profile/ProfilePage";
 import PrescriptionsPage from "../features/patient/pages/Prescriptions/PrescriptionsPage";
 import PatientSettings from "../features/patient/pages/PatientSettings";
@@ -353,6 +354,10 @@ export const routes = [
       {
         path: "medications",
         element: <MedicationsPage />,
+      },
+      {
+        path: "history",
+        element: <PatientHistory />,
       },
       {
         path: "prescriptions",

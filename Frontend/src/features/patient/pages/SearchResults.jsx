@@ -17,8 +17,10 @@ import {
   AlertCircle,
   Loader,
   MapPinned,
+  Heart,
 } from "lucide-react";
 import searchService from "../../../core/services/search.service";
+import patientService from "../services/patient.service";
 import useGeoLocation from "../../../shared/hooks/useGeoLocation";
 import { useLocation } from "../../../context/LocationContext";
 import MapContainer from "../../../shared/components/MapContainer";
@@ -38,6 +40,39 @@ export default function SearchResults() {
   const [searchQuery, setSearchQuery] = useState(query);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Favorites
+  const [favoritedNames, setFavoritedNames] = useState(new Set());
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await patientService.getFavorites();
+        const names = new Set((res?.data?.favorites || []).map((f) => f.medicineName));
+        setFavoritedNames(names);
+      } catch { /* ignore */ }
+    })();
+  }, []);
+
+  const toggleFavoriteSearch = async (result) => {
+    const name = result.medicine || result.brandName;
+    try {
+      if (favoritedNames.has(name)) {
+        const res = await patientService.getFavorites();
+        const fav = (res?.data?.favorites || []).find((f) => f.medicineName === name);
+        if (fav) await patientService.removeFromFavorites(fav.id);
+        setFavoritedNames((prev) => { const n = new Set(prev); n.delete(name); return n; });
+      } else {
+        await patientService.addToFavorites({
+          medicineName: name,
+          genericName: result.genericName || null,
+          lastPrice: result.price || null,
+          lastPharmacy: result.pharmacy?.name || null,
+        });
+        setFavoritedNames((prev) => new Set(prev).add(name));
+      }
+    } catch { /* ignore */ }
+  };
   const [error, setError] = useState(null);
   const [sortBy, setSortBy] = useState("distance");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -479,7 +514,23 @@ export default function SearchResults() {
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFavoriteSearch(result);
+                            }}
+                            className="p-1.5 rounded-full hover:bg-pink-50 transition-colors"
+                            title={favoritedNames.has(result.medicine || result.brandName) ? "Remove from favorites" : "Add to favorites"}
+                          >
+                            <Heart
+                              size={18}
+                              className={favoritedNames.has(result.medicine || result.brandName)
+                                ? "text-pink-500 fill-pink-500"
+                                : "text-gray-300 hover:text-pink-400"
+                              }
+                            />
+                          </button>
                           <p className="text-xl font-bold text-gray-900">
                             {formatPrice(result.price)}
                           </p>

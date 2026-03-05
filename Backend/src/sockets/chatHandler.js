@@ -138,6 +138,15 @@ export default function chatHandler(io) {
           createdAt: message.createdAt,
         });
 
+        // Also emit a global event so the pharmacy header badge updates
+        io.emit("NEW_CHAT_MESSAGE", {
+          sosRequestId: message.sosRequestId,
+          senderId: message.senderId,
+          senderName: message.sender?.name || "Unknown",
+          preview: trimmedContent.substring(0, 80),
+          createdAt: message.createdAt,
+        });
+
         logger.info(
           `[SOCKET] Message in ${roomName} by ${senderId}: ${trimmedContent.substring(0, 50)}`
         );

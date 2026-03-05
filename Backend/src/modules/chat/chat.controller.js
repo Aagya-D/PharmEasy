@@ -1,11 +1,82 @@
 /**
  * Chat Controller
+ * GET /api/chat/conversations - List active chat conversations
  * GET /api/chat/:sosRequestId - Retrieve chat history for an SOS request
  * Security: Only the patient or the pharmacy involved can access.
  */
 
 import { prisma } from "../../database/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
+
+/**
+ * GET /api/chat/conversations
+ * Returns SOS requests that have been accepted by this pharmacy user's pharmacy,
+ * along with the latest message and unread indicator.
+ */
+export const getConversations = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return next(new AppError("Authentication required", 401));
+
+    // Find the pharmacy owned by this user
+    const pharmacy = await prisma.pharmacy.findFirst({
+      where: { userId },
+      select: { id: true, name: true },
+    });
+
+    if (!pharmacy) {
+      return res.status(200).json({ success: true, data: { conversations: [] } });
+    }
+
+    // Find all accepted SOS requests for this pharmacy
+    const sosRequests = await prisma.sOSRequest.findMany({
+      where: { acceptedBy: pharmacy.id, status: "accepted" },
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        patientName: true,
+        medicineName: true,
+        urgencyLevel: true,
+        createdAt: true,
+        updatedAt: true,
+        messages: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            id: true,
+            content: true,
+            senderId: true,
+            createdAt: true,
+            sender: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    const conversations = sosRequests.map((sos) => {
+      const lastMsg = sos.messages[0] || null;
+      return {
+        sosRequestId: sos.id,
+        patientName: sos.patientName,
+        medicineName: sos.medicineName,
+        urgencyLevel: sos.urgencyLevel,
+        lastMessage: lastMsg
+          ? {
+              content: lastMsg.content,
+              senderName: lastMsg.sender?.name || "Unknown",
+              senderId: lastMsg.senderId,
+              createdAt: lastMsg.createdAt,
+            }
+          : null,
+        updatedAt: sos.updatedAt,
+      };
+    });
+
+    return res.status(200).json({ success: true, data: { conversations } });
+  } catch (error) {
+    next(error);
+  }
+};
 
 /**
  * GET /api/chat/:sosRequestId

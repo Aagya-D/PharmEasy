@@ -7,6 +7,32 @@ import { prisma } from "../../database/prisma.js";
 import logger from "../../utils/logger.js";
 import { createLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
 
+// ─── SOS Expiration Config ────────────────────────────
+const SOS_TTL_MINUTES = 30;
+
+/**
+ * Automatically expire stale SOS requests.
+ * Marks any "pending" SOS older than 30 minutes as "expired".
+ * Called lazily on every SOS read to keep data fresh without a cron job.
+ */
+async function expireStaleSOSRequests() {
+  const cutoff = new Date(Date.now() - SOS_TTL_MINUTES * 60 * 1000);
+  try {
+    const result = await prisma.sOSRequest.updateMany({
+      where: {
+        status: "pending",
+        createdAt: { lt: cutoff },
+      },
+      data: { status: "expired" },
+    });
+    if (result.count > 0) {
+      logger.info(`[SOS] Auto-expired ${result.count} stale SOS request(s)`);
+    }
+  } catch (err) {
+    logger.error("[SOS] Failed to expire stale requests", { error: err.message });
+  }
+}
+
 /**
  * Get patient dashboard data
  */
@@ -348,6 +374,16 @@ export const submitSOSRequest = async (req, res) => {
       });
     }
 
+    // GPS coordinates are mandatory for SOS requests
+    const parsedLat = latitude ? parseFloat(latitude) : null;
+    const parsedLng = longitude ? parseFloat(longitude) : null;
+    if (!parsedLat || !parsedLng || parsedLat === 0 || parsedLng === 0 || isNaN(parsedLat) || isNaN(parsedLng)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid GPS coordinates are required for SOS requests."
+      });
+    }
+
     // Prepare SOS request data
     const sosData = {
       patientId,
@@ -358,8 +394,8 @@ export const submitSOSRequest = async (req, res) => {
       patientName,
       contactNumber,
       address,
-      latitude: latitude ? parseFloat(latitude) : null,
-      longitude: longitude ? parseFloat(longitude) : null,
+      latitude: parsedLat,
+      longitude: parsedLng,
       additionalNotes: additionalNotes || null,
       prescriptionRequired: prescriptionRequired === 'true' || prescriptionRequired === true,
       status: 'pending',
@@ -385,7 +421,60 @@ export const submitSOSRequest = async (req, res) => {
     // Notify nearby pharmacies about the new SOS request
     try {
       const { default: notificationService } = await import("../notifications/notification.service.js");
-      await notificationService.notifyNearbyPharmacies(sosRequest);
+      const notifiedCount = await notificationService.notifyNearbyPharmacies(sosRequest);
+      logger.info("[SOS] Pharmacy notifications created", {
+        sosId: sosRequest.id,
+        notifiedPharmacies: notifiedCount,
+      });
+
+      // Safety net: if notifyNearbyPharmacies created 0 records, create at least
+      // one broadcast so the SOS is never silently lost
+      if (notifiedCount === 0) {
+        logger.warn("[SOS] No pharmacies notified — broadcasting to all approved pharmacies");
+        const allPharmacies = await prisma.pharmacy.findMany({
+          where: { verificationStatus: "APPROVED" },
+          select: { userId: true },
+        });
+        const allUserIds = allPharmacies.map((p) => p.userId);
+        if (allUserIds.length > 0) {
+          await notificationService.broadcastNotification(
+            allUserIds,
+            `🚨 URGENT: New SOS Request`,
+            `${sosRequest.patientName} needs ${sosRequest.medicineName} nearby. Location: ${sosRequest.address}.`,
+            "SOS_UPDATE",
+            {
+              sosId: sosRequest.id,
+              medicineName: sosRequest.medicineName,
+              patientName: sosRequest.patientName,
+              address: sosRequest.address,
+              link: "/pharmacy/sos-requests",
+            },
+            "PHARMACY",
+            "high"
+          );
+          logger.info("[SOS] Fallback broadcast sent", { count: allUserIds.length });
+        }
+      }
+
+      // Real-time Socket.IO push to pharmacy clients
+      const io = req.app.get("io");
+      if (io) {
+        const alertPayload = {
+          type: "NEW_SOS_ALERT",
+          sosId: sosRequest.id,
+          medicineName: sosRequest.medicineName,
+          patientName: sosRequest.patientName,
+          urgencyLevel: sosRequest.urgencyLevel,
+          address: sosRequest.address,
+          latitude: sosRequest.latitude,
+          longitude: sosRequest.longitude,
+          message: `🚨 URGENT: New SOS from ${sosRequest.patientName} for ${sosRequest.medicineName}.`,
+          createdAt: sosRequest.createdAt,
+        };
+        // Emit to a pharmacy-wide channel so every connected pharmacy client gets it
+        io.emit("NEW_SOS_ALERT", alertPayload);
+        logger.info("[SOS] Real-time alert emitted to pharmacy clients", { sosId: sosRequest.id });
+      }
     } catch (notifErr) {
       console.error("[PATIENT] Failed to notify pharmacies:", notifErr.message);
       // Non-blocking — SOS is already created
@@ -408,40 +497,261 @@ export const submitSOSRequest = async (req, res) => {
 };
 
 /**
- * Get SOS history
+ * Get SOS history (with auto-expiration)
  */
 export const getSOSHistory = async (req, res) => {
   const patientId = req.user?.userId;
 
-  // Validate user identity
   if (!patientId) {
-    return res.status(401).json({
-      success: false,
-      message: "Authentication required"
-    });
+    return res.status(401).json({ success: false, message: "Authentication required" });
   }
 
   try {
+    // Auto-expire stale SOS before reading
+    await expireStaleSOSRequests();
+
+    const { filter } = req.query; // "7days" or "all" (default: all)
+    const where = { patientId };
+
+    if (filter === "7days") {
+      where.createdAt = { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+    }
+
     const sosRequests = await prisma.sOSRequest.findMany({
-      where: { patientId },
-      orderBy: { createdAt: 'desc' }
+      where,
+      orderBy: { createdAt: "desc" },
+      include: {
+        pharmacyResponses: {
+          where: { response: "accepted" },
+          take: 1,
+          select: {
+            pharmacyId: true,
+            note: true,
+            respondedAt: true,
+          },
+        },
+      },
     });
 
-    logger.info("[PATIENT] SOS history retrieved", { userId: patientId, count: sosRequests.length });
+    // Enrich with pharmacy name for accepted requests
+    const enriched = await Promise.all(
+      sosRequests.map(async (sos) => {
+        let pharmacyName = null;
+        if (sos.acceptedBy) {
+          const pharmacy = await prisma.pharmacy.findFirst({
+            where: { userId: sos.acceptedBy },
+            select: { pharmacyName: true },
+          });
+          pharmacyName = pharmacy?.pharmacyName || null;
+        }
+        return { ...sos, pharmacyName };
+      })
+    );
+
+    logger.info("[PATIENT] SOS history retrieved", { userId: patientId, count: enriched.length });
 
     return res.status(200).json({
       success: true,
-      data: { sosRequests: sosRequests || [] },
-      message: "SOS history retrieved successfully"
+      data: { sosRequests: enriched },
+      message: "SOS history retrieved successfully",
     });
   } catch (error) {
-    console.error('[PATIENT] Get SOS history error:', error.message, error.stack);
+    console.error("[PATIENT] Get SOS history error:", error.message, error.stack);
     logger.error("[PATIENT] Get SOS history error", { error: error.message, userId: patientId });
     return res.status(500).json({
       success: false,
       message: "Failed to get SOS history",
       data: { sosRequests: [] },
-      error: process.env.NODE_ENV === "development" ? error.message : undefined
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
+  }
+};
+
+/**
+ * Get single SOS request details (with auto-expiration)
+ */
+export const getSOSDetails = async (req, res) => {
+  const patientId = req.user?.userId;
+  const { sosId } = req.params;
+
+  if (!patientId) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  try {
+    await expireStaleSOSRequests();
+
+    const sosRequest = await prisma.sOSRequest.findFirst({
+      where: { id: sosId, patientId },
+      include: {
+        pharmacyResponses: {
+          select: {
+            pharmacyId: true,
+            response: true,
+            note: true,
+            respondedAt: true,
+          },
+        },
+      },
+    });
+
+    if (!sosRequest) {
+      return res.status(404).json({ success: false, message: "SOS request not found" });
+    }
+
+    // Enrich with pharmacy name
+    let pharmacyName = null;
+    if (sosRequest.acceptedBy) {
+      const pharmacy = await prisma.pharmacy.findFirst({
+        where: { userId: sosRequest.acceptedBy },
+        select: { pharmacyName: true },
+      });
+      pharmacyName = pharmacy?.pharmacyName || null;
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: { sosRequest: { ...sosRequest, pharmacyName } },
+    });
+  } catch (error) {
+    console.error("[PATIENT] Get SOS details error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get SOS details",
+    });
+  }
+};
+
+/**
+ * Get active (pending) SOS for the current patient
+ * Used by dashboard to show countdown timer
+ */
+export const getActiveSOS = async (req, res) => {
+  const patientId = req.user?.userId;
+
+  if (!patientId) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  try {
+    await expireStaleSOSRequests();
+
+    const activeSOS = await prisma.sOSRequest.findFirst({
+      where: { patientId, status: "pending" },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: { activeSOS: activeSOS || null, ttlMinutes: SOS_TTL_MINUTES },
+    });
+  } catch (error) {
+    console.error("[PATIENT] Get active SOS error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to get active SOS" });
+  }
+};
+
+// ─── Favorite Medicines ──────────────────────────────
+
+/**
+ * GET /api/patient/favorites
+ * List patient's favorite medicines
+ */
+export const getFavorites = async (req, res) => {
+  const userId = req.user?.userId;
+
+  if (!userId) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  try {
+    const favorites = await prisma.favoriteMedicine.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: { favorites },
+    });
+  } catch (error) {
+    console.error("[PATIENT] Get favorites error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to get favorites" });
+  }
+};
+
+/**
+ * POST /api/patient/favorites
+ * Add a medicine to favorites
+ * Body: { medicineName, genericName?, imageUrl?, lastPrice?, lastPharmacy? }
+ */
+export const addFavorite = async (req, res) => {
+  const userId = req.user?.userId;
+
+  if (!userId) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  const { medicineName, genericName, imageUrl, lastPrice, lastPharmacy } = req.body;
+
+  if (!medicineName) {
+    return res.status(400).json({ success: false, message: "medicineName is required" });
+  }
+
+  try {
+    // Upsert: if already favorited, update metadata
+    const favorite = await prisma.favoriteMedicine.upsert({
+      where: { userId_medicineName: { userId, medicineName } },
+      update: {
+        genericName: genericName || undefined,
+        imageUrl: imageUrl || undefined,
+        lastPrice: lastPrice ? parseFloat(lastPrice) : undefined,
+        lastPharmacy: lastPharmacy || undefined,
+      },
+      create: {
+        userId,
+        medicineName,
+        genericName: genericName || null,
+        imageUrl: imageUrl || null,
+        lastPrice: lastPrice ? parseFloat(lastPrice) : null,
+        lastPharmacy: lastPharmacy || null,
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: { favorite },
+      message: "Medicine added to favorites",
+    });
+  } catch (error) {
+    console.error("[PATIENT] Add favorite error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to add favorite" });
+  }
+};
+
+/**
+ * DELETE /api/patient/favorites/:id
+ * Remove a medicine from favorites
+ */
+export const removeFavorite = async (req, res) => {
+  const userId = req.user?.userId;
+  const { id } = req.params;
+
+  if (!userId) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  try {
+    await prisma.favoriteMedicine.deleteMany({
+      where: { id, userId },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Medicine removed from favorites",
+    });
+  } catch (error) {
+    console.error("[PATIENT] Remove favorite error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to remove favorite" });
   }
 };

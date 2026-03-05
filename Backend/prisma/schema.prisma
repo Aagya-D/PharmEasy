@@ -84,10 +84,11 @@ model User {
   orders         Order[]              @relation("PatientOrders")
   prescriptions  Prescription[]       @relation("PatientPrescriptions")
   medications    Medication[]         @relation("PatientMedications")
-  sosRequests    SOSRequest[]         @relation("PatientSOSRequests")
-  notifications  Notification[]
-  messages       Message[]            @relation("UserMessages")
-  reviews        Review[]             @relation("PatientReviews")
+  sosRequests         SOSRequest[]         @relation("PatientSOSRequests")
+  notifications       Notification[]
+  messages            Message[]            @relation("UserMessages")
+  reviews             Review[]             @relation("PatientReviews")
+  favoriteMedicines   FavoriteMedicine[]   @relation("PatientFavorites")
 
   @@index([email])
   @@index([roleId])
@@ -550,4 +551,25 @@ model Review {
   @@index([pharmacyId])
   @@index([patientId])
   @@index([rating])
+}
+
+/// *
+/// * FavoriteMedicine Model - Patient's starred/favorite medicines
+/// * 
+/// * Allows patients to save medicines for quick re-ordering.
+/// * Each entry stores the medicine name and optional metadata
+/// * from the last time the patient saw it in search results.
+model FavoriteMedicine {
+  id          String   @id @default(cuid())
+  userId      String
+  medicineName String
+  genericName  String?
+  imageUrl     String?
+  lastPrice    Float?
+  lastPharmacy String?
+  createdAt    DateTime @default(now())
+  user         User     @relation("PatientFavorites", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, medicineName])
+  @@index([userId])
 }

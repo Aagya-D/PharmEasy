@@ -1,7 +1,7 @@
 import axios from "axios";
 import logger from "../../utils/logger";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5050/api";
 
 /**
  * Centralized HTTP Client
@@ -117,8 +117,6 @@ httpClient.interceptors.response.use(
       console.error('[HTTP] Logger error:', logError.message);
     }
 
-    // ✅ FIX: Handle 401 Unauthorized - Auto logout ONLY for authenticated routes
-    // DO NOT auto-logout for auth endpoints (login, register, verify-otp)
     // These endpoints can legitimately return 401 for failed credentials
     if (status === 401) {
       const authEndpoints = ['/auth/login', '/auth/register', '/auth/verify-otp', '/auth/forgot-password'];

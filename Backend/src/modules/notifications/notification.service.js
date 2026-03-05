@@ -413,7 +413,7 @@ class NotificationService {
             medicineName: sosRequest.medicineName,
             patientName: sosRequest.patientName,
             address: sosRequest.address,
-            link: "/pharmacy/sos",
+            link: "/pharmacy/sos-requests",
           },
           "PHARMACY",
           "high"
@@ -447,16 +447,20 @@ class NotificationService {
         })
         .map((p) => p.userId);
 
-      if (nearbyUserIds.length === 0) {
-        console.log("[NOTIFICATION SERVICE] No pharmacies within radius for SOS", {
+      // Fallback: if no pharmacies within radius, notify ALL approved pharmacies
+      let targetUserIds = nearbyUserIds;
+      if (targetUserIds.length === 0) {
+        console.log("[NOTIFICATION SERVICE] No pharmacies within radius — falling back to ALL approved pharmacies", {
           sosId: sosRequest.id,
           radius: SOS_RADIUS_KM,
         });
-        return 0;
+        targetUserIds = pharmacies.map((p) => p.userId);
       }
 
+      if (targetUserIds.length === 0) return 0;
+
       return this.broadcastNotification(
-        nearbyUserIds,
+        targetUserIds,
         `🚨 Urgent: New SOS for ${sosRequest.medicineName}`,
         `${sosRequest.patientName} urgently needs ${sosRequest.medicineName}. Location: ${sosRequest.address}. Check SOS requests to respond.`,
         "SOS_UPDATE",
@@ -465,7 +469,7 @@ class NotificationService {
           medicineName: sosRequest.medicineName,
           patientName: sosRequest.patientName,
           address: sosRequest.address,
-          link: "/pharmacy/sos",
+          link: "/pharmacy/sos-requests",
         },
         "PHARMACY",
         "high"

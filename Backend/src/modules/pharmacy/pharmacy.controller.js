@@ -362,9 +362,21 @@ export const resetOnboarding = async (req, res, next) => {
  * GET /api/pharmacy/sos/nearby
  * Get nearby pending SOS requests based on pharmacy location
  * Requires: Authentication, roleId=2 (PHARMACY_ADMIN), Verified pharmacy
+ * 
+ * Automatically expires SOS requests older than 30 minutes before querying.
  */
 export const getNearbySOS = async (req, res, next) => {
   try {
+    // ── Auto-expire stale SOS requests (30 min TTL) ──
+    const SOS_TTL_MINUTES = 30;
+    const cutoff = new Date(Date.now() - SOS_TTL_MINUTES * 60 * 1000);
+    try {
+      await prisma.sOSRequest.updateMany({
+        where: { status: "pending", createdAt: { lt: cutoff } },
+        data: { status: "expired" },
+      });
+    } catch (_) { /* non-blocking */ }
+
     const userId = req.user.userId;
     const { radius = 50 } = req.query; // Default 50km radius for broader visibility
 

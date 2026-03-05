@@ -73,9 +73,13 @@ export default function EmergencySOS()
     },
   ];
 
+  const [gpsLocked, setGpsLocked] = useState(false);
+  const [gpsError, setGpsError] = useState("");
+
   const getCurrentLocation = () => {
     setLocationLoading(true);
     setLocationError("");
+    setGpsError("");
 
     if (!navigator.geolocation) {
       setLocationError("Geolocation is not supported by your browser");
@@ -85,27 +89,56 @@ export default function EmergencySOS()
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setFormData({
-          ...formData,
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+
+        // The "0,0" trap — reject invalid coordinates (0,0 is in the ocean, not Nepal)
+        if (!lat || !lng || lat === 0 || lng === 0) {
+          setLocationError("GPS returned invalid coordinates. Please try again or move to an open area.");
+          setLocationLoading(false);
+          return;
+        }
+
+        setFormData((prev) => ({
+          ...prev,
+          latitude: lat,
+          longitude: lng,
+        }));
+        setGpsLocked(true);
         setLocationLoading(false);
       },
       (error) => {
-        setLocationError(
-          "Unable to get location. Please enter address manually."
-        );
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationError(
+            "Location permission denied. To re-enable: open your browser settings \u2192 Privacy & Security \u2192 Site Settings \u2192 Location, and allow this site. Then refresh and try again."
+          );
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          setLocationError("Location unavailable. Please ensure GPS is enabled on your device and try again.");
+        } else if (error.code === error.TIMEOUT) {
+          setLocationError("Location request timed out. Please move to an open area and try again.");
+        } else {
+          setLocationError("Unable to get location. Please try again.");
+        }
         setLocationLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
 
+  const isLocationValid = gpsLocked && formData.latitude && formData.longitude && formData.latitude !== 0 && formData.longitude !== 0;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    setGpsError("");
     setSubmitError("");
+
+    // Hard block: GPS is mandatory
+    if (!isLocationValid) {
+      setGpsError("Error: You must enable GPS to find nearby pharmacies for your emergency.");
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       // Validate required fields
@@ -608,31 +641,69 @@ export default function EmergencySOS()
                 />
               </div>
 
-              {/* GPS Location */}
-              <div className="flex items-center gap-4">
-                <button
-                  type="button"
-                  onClick={getCurrentLocation}
-                  disabled={locationLoading}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium text-gray-700 transition-colors disabled:opacity-50"
-                >
-                  {locationLoading ? (
-                    <Loader2 className="animate-spin" size={18} />
-                  ) : (
-                    <Navigation size={18} />
-                  )}
-                  {locationLoading ? "Getting location..." : "Use Current GPS"}
-                </button>
+              {/* GPS Location — MANDATORY */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  GPS Location <span className="text-red-500">*</span>
+                </label>
 
-                {formData.latitude && formData.longitude && (
-                  <span className="flex items-center gap-1 text-sm text-green-600">
-                    <CheckCircle size={16} />
-                    Location captured
-                  </span>
-                )}
+                <div className="flex flex-wrap items-center gap-3">
+                  {gpsLocked ? (
+                    <div className="flex items-center gap-2 px-4 py-2.5 bg-green-50 border-2 border-green-500 rounded-xl text-sm font-semibold text-green-700">
+                      <CheckCircle size={18} className="text-green-600" />
+                      Location Verified
+                      <span className="text-xs font-normal text-green-600 ml-1">
+                        ({formData.latitude?.toFixed(4)}, {formData.longitude?.toFixed(4)})
+                      </span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={getCurrentLocation}
+                      disabled={locationLoading}
+                      className="flex items-center gap-2 px-5 py-2.5 border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50 rounded-xl text-sm font-medium text-gray-700 transition-all disabled:opacity-50"
+                    >
+                      {locationLoading ? (
+                        <Loader2 className="animate-spin text-blue-600" size={18} />
+                      ) : (
+                        <Navigation size={18} />
+                      )}
+                      {locationLoading ? "Locating..." : "Use Current GPS"}
+                    </button>
+                  )}
+
+                  {gpsLocked && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGpsLocked(false);
+                        setFormData((prev) => ({ ...prev, latitude: null, longitude: null }));
+                      }}
+                      className="text-xs text-gray-400 hover:text-red-500 underline transition-colors"
+                    >
+                      Re-detect
+                    </button>
+                  )}
+                </div>
 
                 {locationError && (
-                  <span className="text-sm text-red-500">{locationError}</span>
+                  <p className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    {locationError}
+                  </p>
+                )}
+
+                {gpsError && (
+                  <p className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-2">
+                    <AlertTriangle size={16} className="flex-shrink-0" />
+                    {gpsError}
+                  </p>
+                )}
+
+                {!gpsLocked && !locationError && !locationLoading && (
+                  <p className="mt-1.5 text-xs text-amber-600 flex items-center gap-1">
+                    <Info size={14} />
+                    GPS location is required to find nearby pharmacies for your emergency
+                  </p>
                 )}
               </div>
             </div>
@@ -704,15 +775,24 @@ export default function EmergencySOS()
           {/* Submit Button */}
           <motion.button
             type="submit"
-            disabled={isSubmitting}
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-red-600 to-red-700 text-white py-4 px-6 rounded-2xl font-semibold text-lg shadow-lg hover:from-red-700 hover:to-red-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isSubmitting || !isLocationValid}
+            whileHover={isLocationValid ? { scale: 1.01 } : {}}
+            whileTap={isLocationValid ? { scale: 0.99 } : {}}
+            className={`w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-semibold text-lg shadow-lg transition-all ${
+              isLocationValid
+                ? "bg-gradient-to-r from-red-600 to-red-700 text-white hover:from-red-700 hover:to-red-800 cursor-pointer"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="animate-spin" size={24} />
                 Submitting Request...
+              </>
+            ) : !isLocationValid ? (
+              <>
+                <MapPin size={24} />
+                Enable GPS to Submit
               </>
             ) : (
               <>
@@ -721,6 +801,12 @@ export default function EmergencySOS()
               </>
             )}
           </motion.button>
+
+          {!isLocationValid && (
+            <p className="text-center text-sm text-amber-600 font-medium">
+              You must verify your GPS location before submitting an SOS request
+            </p>
+          )}
 
           <p className="text-center text-sm text-gray-500">
             By submitting, you agree to share your contact and location details

@@ -32,7 +32,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { AnnouncementBanner } from "../../../shared/components/AnnouncementBanner";
 import { getDashboardStats } from "../../../core/services/pharmacy.service";
-import PharmacyNotificationBell from "../components/PharmacyNotificationBell";
+
 
 // Skeleton Pulse component for loading state
 function SkeletonCard() {
@@ -202,7 +202,6 @@ export default function PharmacyDashboard() {
             >
               <Loader size={22} className={`text-gray-600 ${loading ? "animate-spin" : ""}`} />
             </button>
-            <PharmacyNotificationBell />
           </div>
         </div>
       </header>

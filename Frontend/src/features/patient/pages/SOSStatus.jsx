@@ -13,10 +13,69 @@ import {
   Pill,
   Phone,
   Star,
+  Timer,
 } from "lucide-react";
 import patientService from "../services/patient.service";
 import ChatWindow from "../../chat/components/ChatWindow";
 import RatePharmacyModal from "../../reviews/components/RatePharmacyModal";
+
+/**
+ * Countdown timer that shows minutes:seconds remaining until SOS expires.
+ * Re-renders every second. When time runs out, shows "Expired" text.
+ */
+function CountdownTimer({ createdAt, ttlMinutes = 30 }) {
+  const [remaining, setRemaining] = useState(0);
+
+  useEffect(() => {
+    const ttlMs = ttlMinutes * 60 * 1000;
+    const created = new Date(createdAt).getTime();
+
+    const tick = () => {
+      const left = Math.max(0, created + ttlMs - Date.now());
+      setRemaining(left);
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [createdAt, ttlMinutes]);
+
+  const mins = Math.floor(remaining / 60000);
+  const secs = Math.floor((remaining % 60000) / 1000);
+  const pct = Math.max(0, (remaining / (ttlMinutes * 60 * 1000)) * 100);
+  const isLow = mins < 5;
+
+  if (remaining <= 0) {
+    return (
+      <div className="bg-gray-100 rounded-lg p-3 text-center">
+        <p className="text-sm font-semibold text-gray-500">Request time expired</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`rounded-lg p-4 ${isLow ? "bg-red-50 border border-red-200" : "bg-blue-50 border border-blue-200"}`}>
+      <div className="flex items-center justify-between mb-2">
+        <span className={`text-xs font-semibold uppercase tracking-wide ${isLow ? "text-red-600" : "text-blue-600"}`}>
+          Time Remaining
+        </span>
+        <span className={`text-2xl font-mono font-bold tabular-nums ${isLow ? "text-red-600 animate-pulse" : "text-blue-700"}`}>
+          {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+        </span>
+      </div>
+      {/* Progress bar */}
+      <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-1000 ${isLow ? "bg-red-500" : "bg-blue-500"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className={`text-[10px] mt-1.5 ${isLow ? "text-red-500" : "text-blue-500"}`}>
+        {isLow ? "Hurry! Request will expire soon." : "Pharmacies are being notified..."}
+      </p>
+    </div>
+  );
+}
 
 /**
  * SOS Status Page
@@ -100,6 +159,13 @@ export default function SOSStatus() {
           bg: "bg-red-100",
           label: "Rejected",
         };
+      case "expired":
+        return {
+          icon: Timer,
+          color: "text-gray-500",
+          bg: "bg-gray-100",
+          label: "Expired – No pharmacy responded in time",
+        };
       default:
         return {
           icon: AlertTriangle,
@@ -170,10 +236,27 @@ export default function SOSStatus() {
                 <p className={`font-semibold ${status.color}`}>{status.label}</p>
               </div>
             </div>
-            {sosRequest.status === "pending" && (
-              <div className="flex items-center gap-2 text-sm text-orange-600 bg-orange-50 rounded-lg p-3">
-                <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-                Searching for nearby pharmacies...
+            {sosRequest.status === "pending" && (() => {
+              const SOS_TTL_MS = 30 * 60 * 1000;
+              const createdAt = new Date(sosRequest.createdAt).getTime();
+              const expiresAt = createdAt + SOS_TTL_MS;
+              const remaining = Math.max(0, expiresAt - Date.now());
+              const mins = Math.floor(remaining / 60000);
+              const secs = Math.floor((remaining % 60000) / 1000);
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-orange-600 bg-orange-50 rounded-lg p-3">
+                    <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                    Searching for nearby pharmacies...
+                  </div>
+                  <CountdownTimer createdAt={sosRequest.createdAt} ttlMinutes={30} />
+                </div>
+              );
+            })()}
+            {sosRequest.status === "expired" && (
+              <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
+                <Timer size={16} />
+                This request expired after 30 minutes with no pharmacy response.
               </div>
             )}
           </motion.div>

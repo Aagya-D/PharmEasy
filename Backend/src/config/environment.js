@@ -27,7 +27,7 @@ const config = {
     name: "PharmEasy",
     version: "1.0.0",
     environment: validateEnv("NODE_ENV", "development"),
-    port: parseInt(validateEnv("PORT", "5000"), 10),
+    port: parseInt(validateEnv("PORT", "5050"), 10),
     host: validateEnv("HOST", "localhost"),
     corsOrigin: validateEnv("CORS_ORIGIN", "http://localhost:5173"),
   },

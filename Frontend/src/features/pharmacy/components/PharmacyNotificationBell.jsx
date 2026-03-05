@@ -15,8 +15,10 @@ import {
   Volume2,
   VolumeX,
   ExternalLink,
+  Zap,
 } from "lucide-react";
 import notificationService from "../../../core/services/notification.service";
+import { connectSocket, disconnectSocket } from "../../../core/services/socket";
 
 // ── Sound assets (CDN, royalty-free) 
 const SOUND_URGENT =
@@ -101,6 +103,18 @@ function getActionLink(n) {
 export default function PharmacyNotificationBell() {
   const navigate = useNavigate();
 
+  // ── Auth safety check ────────────────────────────────
+  // Prevent SECURITY_VIOLATION: INCOMPLETE_AUTH_STATE by verifying token exists
+  const token = typeof window !== "undefined"
+    ? localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken")
+    : null;
+  const storedUser = (() => {
+    try {
+      const raw = localStorage.getItem("user");
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -114,6 +128,11 @@ export default function PharmacyNotificationBell() {
   const subtleAudioRef = useRef(null);
   const panelRef = useRef(null);
   const bellRef = useRef(null);
+
+  // If auth state is incomplete, render nothing (avoids 401 cascade)
+  if (!token || !storedUser?.id) {
+    return null;
+  }
 
   // Audio setup 
   useEffect(() => {
@@ -140,6 +159,20 @@ export default function PharmacyNotificationBell() {
     [soundEnabled]
   );
 
+  // ── Fetch notifications (used by socket listener AND dropdown) ──
+  const fetchNotifications = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await notificationService.getNotifications(20, 0);
+      const data = res?.data?.data ?? [];
+      setNotifications(Array.isArray(data) ? data : []);
+    } catch {
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // ── Fetch unread count (polling every 20s) ───────────
   const fetchUnreadCount = useCallback(async () => {
     try {
@@ -149,7 +182,6 @@ export default function PharmacyNotificationBell() {
         res?.data?.data?.hasHighPriority ?? res?.data?.hasHighPriority ?? false;
 
       if (count > prevCountRef.current && prevCountRef.current !== 0) {
-        // New notification arrived — pick sound based on priority
         playSound(high && !prevHighRef.current);
       }
       prevCountRef.current = count;
@@ -167,20 +199,33 @@ export default function PharmacyNotificationBell() {
     return () => clearInterval(id);
   }, [fetchUnreadCount]);
 
-  // ── Fetch notifications when dropdown opens ──────────
-  const fetchNotifications = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await notificationService.getNotifications(20, 0);
-      const data = res?.data?.data ?? [];
-      setNotifications(Array.isArray(data) ? data : []);
-    } catch {
-      setNotifications([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // ── Real-time Socket.IO listener for NEW_SOS_ALERT & NEW_CHAT_MESSAGE ──
+  useEffect(() => {
+    const socket = connectSocket();
 
+    const onNewSOS = (payload) => {
+      // Always play the urgent siren for SOS alerts
+      playSound(true);
+      // Immediately refresh the full notification list from backend
+      // so the new SOS record appears in the dropdown instantly
+      fetchNotifications();
+      fetchUnreadCount();
+    };
+
+    const onNewChat = () => {
+      playSound(false);
+    };
+
+    socket.on("NEW_SOS_ALERT", onNewSOS);
+    socket.on("NEW_CHAT_MESSAGE", onNewChat);
+
+    return () => {
+      socket.off("NEW_SOS_ALERT", onNewSOS);
+      socket.off("NEW_CHAT_MESSAGE", onNewChat);
+    };
+  }, [playSound, fetchNotifications, fetchUnreadCount]);
+
+  // ── Refresh notifications when dropdown opens ────────
   useEffect(() => {
     if (isOpen) fetchNotifications();
   }, [isOpen, fetchNotifications]);
@@ -248,6 +293,18 @@ export default function PharmacyNotificationBell() {
   };
 
   const isHighPriority = (n) => n.priority === "high" || n.type === "SOS_UPDATE";
+
+  // Sort: SOS alerts at top (unread first), then by date
+  const sortedNotifications = [...notifications].sort((a, b) => {
+    const aIsSOS = a.type === "SOS_UPDATE" && !a.isRead;
+    const bIsSOS = b.type === "SOS_UPDATE" && !b.isRead;
+    if (aIsSOS && !bIsSOS) return -1;
+    if (!aIsSOS && bIsSOS) return 1;
+    // Then unread before read
+    if (!a.isRead && b.isRead) return -1;
+    if (a.isRead && !b.isRead) return 1;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
 
   return (
     <div className="relative">
@@ -375,11 +432,12 @@ export default function PharmacyNotificationBell() {
                 </div>
               ) : (
                 <ul className="divide-y divide-gray-50">
-                  {notifications.map((n) => {
+                  {sortedNotifications.map((n) => {
                     const cfg = getConfig(n.type);
                     const Icon = cfg.icon;
                     const highPri = isHighPriority(n);
                     const link = getActionLink(n);
+                    const isSOS = n.type === "SOS_UPDATE" && !n.isRead;
 
                     return (
                       <li
@@ -388,7 +446,9 @@ export default function PharmacyNotificationBell() {
                         className={`group relative flex gap-3 px-5 py-4 transition-colors ${
                           link ? "cursor-pointer" : ""
                         } ${
-                          !n.isRead
+                          isSOS
+                            ? "bg-red-50/70 hover:bg-red-100/70 border-l-4 border-red-500"
+                            : !n.isRead
                             ? highPri
                               ? "bg-red-50/50 hover:bg-red-50"
                               : "bg-blue-50/40 hover:bg-blue-50/60"
@@ -440,7 +500,21 @@ export default function PharmacyNotificationBell() {
                             >
                               {cfg.label}
                             </span>
-                            {link && (
+                            {isSOS && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (!n.isRead) handleMarkRead(n.id);
+                                  setIsOpen(false);
+                                  navigate(link || "/pharmacy/sos-requests");
+                                }}
+                                className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-red-600 text-white text-[11px] font-bold rounded hover:bg-red-700 transition-colors"
+                              >
+                                <Zap size={10} />
+                                Respond Now
+                              </button>
+                            )}
+                            {!isSOS && link && (
                               <span className="text-[11px] text-blue-500 flex items-center gap-0.5 ml-auto">
                                 <ExternalLink size={10} /> View
                               </span>

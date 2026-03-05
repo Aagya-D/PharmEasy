@@ -66,10 +66,47 @@ router.get("/medications", patientController.getMedications);
 router.post("/sos/request", uploadPrescription, patientController.submitSOSRequest);
 
 /**
+ * @route   GET /api/patient/sos/active
+ * @desc    Get the current pending SOS for countdown timer
+ * @access  Private (Patient only)
+ */
+router.get("/sos/active", patientController.getActiveSOS);
+
+/**
  * @route   GET /api/patient/sos/history
- * @desc    Get SOS request history
+ * @desc    Get SOS request history (supports ?filter=7days)
  * @access  Private (Patient only)
  */
 router.get("/sos/history", patientController.getSOSHistory);
+
+/**
+ * @route   GET /api/patient/sos/:sosId
+ * @desc    Get single SOS request details
+ * @access  Private (Patient only)
+ */
+router.get("/sos/:sosId", patientController.getSOSDetails);
+
+// ─── Favorite Medicines ──────────────────────────────
+
+/**
+ * @route   GET /api/patient/favorites
+ * @desc    Get patient's favorite medicines
+ * @access  Private (Patient only)
+ */
+router.get("/favorites", patientController.getFavorites);
+
+/**
+ * @route   POST /api/patient/favorites
+ * @desc    Add medicine to favorites
+ * @access  Private (Patient only)
+ */
+router.post("/favorites", patientController.addFavorite);
+
+/**
+ * @route   DELETE /api/patient/favorites/:id
+ * @desc    Remove medicine from favorites
+ * @access  Private (Patient only)
+ */
+router.delete("/favorites/:id", patientController.removeFavorite);
 
 export default router;

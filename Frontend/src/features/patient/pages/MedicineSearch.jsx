@@ -10,8 +10,10 @@ import {
   AlertCircle,
   Loader,
   CheckCircle,
+  Heart,
 } from "lucide-react";
 import searchService from "../../../core/services/search.service";
+import patientService from "../services/patient.service";
 import useGeoLocation from "../../../shared/hooks/useGeoLocation";
 import { useLocation } from "../../../context/LocationContext";
 import StarRating from "../../../shared/components/StarRating";
@@ -33,6 +35,53 @@ export default function MedicineSearch() {
     priceRange: [0, 1000],
     searchRadius: 50, // Default search radius in km
   });
+
+  // Favorites state - set of medicine names that are favorited
+  const [favoritedNames, setFavoritedNames] = useState(new Set());
+  const [togglingFav, setTogglingFav] = useState(null);
+
+  // Load existing favorites on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await patientService.getFavorites();
+        const names = new Set((res?.data?.favorites || []).map((f) => f.medicineName));
+        setFavoritedNames(names);
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
+
+  const toggleFavorite = async (medicine) => {
+    const name = medicine.medicine || medicine.brandName;
+    setTogglingFav(name);
+    try {
+      if (favoritedNames.has(name)) {
+        // Find the favorite ID first
+        const res = await patientService.getFavorites();
+        const fav = (res?.data?.favorites || []).find((f) => f.medicineName === name);
+        if (fav) await patientService.removeFromFavorites(fav.id);
+        setFavoritedNames((prev) => {
+          const next = new Set(prev);
+          next.delete(name);
+          return next;
+        });
+      } else {
+        await patientService.addToFavorites({
+          medicineName: name,
+          genericName: medicine.genericName || null,
+          lastPrice: medicine.price || null,
+          lastPharmacy: medicine.pharmacy?.name || null,
+        });
+        setFavoritedNames((prev) => new Set(prev).add(name));
+      }
+    } catch {
+      // ignore
+    } finally {
+      setTogglingFav(null);
+    }
+  };
 
   // Use custom geolocation hook
   const { location, loading: locationLoading, error: geoError, getLocation } = useGeoLocation(false);
@@ -267,8 +316,27 @@ export default function MedicineSearch() {
               {medicines.map((medicine) => (
                 <div
                   key={medicine.id}
-                  className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+                  className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow relative"
                 >
+                  {/* Favorite Heart Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(medicine);
+                    }}
+                    disabled={togglingFav === (medicine.medicine || medicine.brandName)}
+                    className="absolute top-4 right-4 p-2 rounded-full hover:bg-pink-50 transition-colors z-10"
+                    title={favoritedNames.has(medicine.medicine || medicine.brandName) ? "Remove from favorites" : "Add to favorites"}
+                  >
+                    <Heart
+                      size={20}
+                      className={`transition-colors ${
+                        favoritedNames.has(medicine.medicine || medicine.brandName)
+                          ? "text-pink-500 fill-pink-500"
+                          : "text-gray-300 hover:text-pink-400"
+                      }`}
+                    />
+                  </button>
                   {/* Medicine Name */}
                   <h3 className="text-lg font-bold text-gray-900 mb-2">
                     {medicine.medicine || medicine.brandName}

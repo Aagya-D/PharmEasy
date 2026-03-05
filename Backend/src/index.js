@@ -45,7 +45,7 @@ try {
 }
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5050;
 const HOST = process.env.HOST || "localhost";
 const NODE_ENV = process.env.NODE_ENV || "development";
 
@@ -331,7 +331,46 @@ const startServer = async () => {
 
     // Register chat socket handler
     chatHandler(io);
+    // Expose io globally so controllers can emit real-time events
+    app.set("io", io);
     console.log("✓ Socket.IO initialized with chat handler");
+
+    // Handle port-in-use errors gracefully — attempt auto-kill then retry once
+    server.on("error", async (err) => {
+      if (err.code === "EADDRINUSE") {
+        console.warn(`\n⚠️  Port ${PORT} is already in use. Attempting auto-cleanup...`);
+        try {
+          // Try to free the port automatically
+          const { execSync } = await import("child_process");
+          if (process.platform === "win32") {
+            // Find PID on the port and kill it
+            const out = execSync(`netstat -ano | findstr ":${PORT}"`, { encoding: "utf8" });
+            const pids = [...new Set(
+              out.split("\n")
+                .map(l => l.trim().split(/\s+/).pop())
+                .filter(p => p && /^\d+$/.test(p) && p !== "0" && p !== String(process.pid))
+            )];
+            for (const pid of pids) {
+              try { execSync(`taskkill /PID ${pid} /F`, { encoding: "utf8" }); } catch {}
+            }
+          } else {
+            execSync(`lsof -ti :${PORT} | xargs kill -9 2>/dev/null || true`, { encoding: "utf8" });
+          }
+          console.log(`✓ Cleared port ${PORT}. Retrying in 1 second...`);
+          await new Promise(r => setTimeout(r, 1000));
+          server.listen(PORT, HOST);
+          return;
+        } catch (killErr) {
+          console.error(`\n❌ Could not auto-clear port ${PORT}.`);
+          console.error(`   Manually kill the process and retry:\n`);
+          console.error(`   Windows:  netstat -ano | findstr ":${PORT}" → taskkill /PID <pid> /F`);
+          console.error(`   Mac/Linux: lsof -i :${PORT} → kill -9 <pid>\n`);
+        }
+        await prisma.$disconnect();
+        process.exit(1);
+      }
+      throw err;
+    });
 
     server.listen(PORT, HOST, () => {
       console.log(`

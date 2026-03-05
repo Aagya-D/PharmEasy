@@ -150,15 +150,21 @@ const patientService = {
     return response.data;
   },
 
-  // Get SOS history
-  getSOSHistory: async () => {
-    const response = await httpClient.get("/patient/sos/history");
+  // Get SOS history (supports ?filter=7days)
+  getSOSHistory: async (filter = "all") => {
+    const response = await httpClient.get(`/patient/sos/history?filter=${filter}`);
     return response.data;
   },
 
   // Get single SOS request details
   getSOSDetails: async (sosId) => {
     const response = await httpClient.get(`/patient/sos/${sosId}`);
+    return response.data;
+  },
+
+  // Get active pending SOS (for countdown)
+  getActiveSOS: async () => {
+    const response = await httpClient.get("/patient/sos/active");
     return response.data;
   },
 
@@ -173,13 +179,19 @@ const patientService = {
     return response.data;
   },
 
-  // Add to favorites
-  addToFavorites: async (pharmacyId) => {
-    const response = await httpClient.post("/patient/favorites", { pharmacyId });
+  // Add medicine to favorites
+  addToFavorites: async (data) => {
+    const response = await httpClient.post("/patient/favorites", data);
     return response.data;
   },
 
-  // Get favorites
+  // Remove medicine from favorites
+  removeFromFavorites: async (id) => {
+    const response = await httpClient.delete(`/patient/favorites/${id}`);
+    return response.data;
+  },
+
+  // Get favorite medicines
   getFavorites: async () => {
     const response = await httpClient.get("/patient/favorites");
     return response.data;
