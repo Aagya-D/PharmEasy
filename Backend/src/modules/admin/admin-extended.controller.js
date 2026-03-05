@@ -1,75 +1,18 @@
 /**
- * Admin Support & Ticketing Controller
- * Handles ticket management and support system
+ * Admin Extended Controller
+ * Handles advanced admin features: Map data, Inventory Insights, CMS
  */
 
 import { prisma } from '../../database/prisma.js';
 import { logActivity } from '../../utils/activityLogger.js';
 import notificationService from '../notifications/notification.service.js';
-
-/**
- * Get all tickets (with optional filtering)
- */
-export const getAllTickets = async (req, res) => {
-  try {
-    const { status, priority } = req.query;
-    
-    const where = {};
-    if (status) where.status = status;
-    if (priority) where.priority = priority;
-
-    const tickets = await prisma.ticket.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-    });
-
-    res.json({ success: true, data: tickets });
-  } catch (error) {
-    console.error('Error fetching tickets:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch tickets' });
-  }
-};
-
-/**
- * Update ticket status and resolution
- */
-export const updateTicket = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status, resolution } = req.body;
-
-    const updateData = { status };
-    
-    if (status === 'RESOLVED' || status === 'CLOSED') {
-      updateData.resolvedAt = new Date();
-      updateData.resolvedBy = req.user.id;
-      if (resolution) updateData.resolution = resolution;
-    }
-
-    const ticket = await prisma.ticket.update({
-      where: { id },
-      data: updateData,
-    });
-
-    await logActivity({
-      action: 'TICKET_UPDATED',
-      message: `Admin updated ticket #${id} status to ${status}`,
-      userId: req.user.id,
-      category: 'SYSTEM',
-      metadata: { ticketId: id, status },
-    });
-
-    res.json({ success: true, data: ticket });
-  } catch (error) {
-    console.error('Error updating ticket:', error);
-    res.status(500).json({ success: false, message: 'Failed to update ticket' });
-  }
-};
+import { BadRequestError, NotFoundError } from '../../utils/errors.js';
 
 /**
  * Get SOS requests for map
  */
-export const getSOSRequests = async (req, res) => {
+export const getSOSRequests = async (req, res, next) => {
+  const startTime = Date.now();
   try {
     const sosRequests = await prisma.sOSRequest.findMany({
       where: {
@@ -80,17 +23,20 @@ export const getSOSRequests = async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json({ success: true, data: sosRequests });
+    const duration = Date.now() - startTime;
+    res.json({ success: true, data: sosRequests, _meta: { duration } });
   } catch (error) {
-    console.error('Error fetching SOS requests:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch SOS requests' });
+    const duration = Date.now() - startTime;
+    console.error(`[ADMIN] Error fetching SOS requests (${duration}ms):`, error);
+    next(error);
   }
 };
 
 /**
  * Get pharmacy locations for map
  */
-export const getPharmacyLocations = async (req, res) => {
+export const getPharmacyLocations = async (req, res, next) => {
+  const startTime = Date.now();
   try {
     const pharmacies = await prisma.pharmacy.findMany({
       where: {
@@ -110,17 +56,17 @@ export const getPharmacyLocations = async (req, res) => {
       },
     });
 
-    res.json({ success: true, data: pharmacies });
+    const duration = Date.now() - startTime;
+    res.json({ success: true, data: pharmacies, _meta: { duration } });
   } catch (error) {
-    console.error('Error fetching pharmacies:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch pharmacies' });
+    const duration = Date.now() - startTime;
+    console.error(`[ADMIN] Error fetching pharmacies (${duration}ms):`, error);
+    next(error);
   }
 };
 
-/**
- * Get inventory insights - shortage tracker
- */
-export const getInventoryInsights = async (req, res) => {
+/**, next) => {
+  const startTime = Date.now();
   try {
     // Get all inventory items grouped by generic name
     const inventory = await prisma.inventory.groupBy({
@@ -147,6 +93,7 @@ export const getInventoryInsights = async (req, res) => {
       LIMIT 50
     `;
 
+    const duration = Date.now() - startTime;
     res.json({ 
       success: true, 
       data: { 
@@ -157,20 +104,26 @@ export const getInventoryInsights = async (req, res) => {
           outOfStockCount: Number(s.outOfStockCount),
           avgQuantity: Number(s.avgQuantity),
         })),
-      } 
+      },
+      _meta: { duration }
     });
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`[ADMIN] Error fetching inventory insights (${duration}ms):`, error);
+    next(error
   } catch (error) {
     console.error('Error fetching inventory insights:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch inventory insights' });
   }
 };
-
-/**
- * Send restock alert to pharmacies
- */
-export const sendRestockAlert = async (req, res) => {
+, next) => {
+  const startTime = Date.now();
   try {
     const { genericName, message } = req.body;
+
+    if (!genericName) {
+      throw new BadRequestError('Generic name is required');
+    }
 
     // Get all verified pharmacies
     const pharmacies = await prisma.pharmacy.findMany({
@@ -190,10 +143,17 @@ export const sendRestockAlert = async (req, res) => {
     // In a real system, you would send notifications here (email, SMS, push)
     // For now, we'll just log it
     
+    const duration = Date.now() - startTime;
     res.json({ 
       success: true, 
       message: `Restock alert sent to ${pharmacies.length} pharmacies`,
-      data: { notifiedCount: pharmacies.length }
+      data: { notifiedCount: pharmacies.length },
+      _meta: { duration }
+    });
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`[ADMIN] Error sending restock alert (${duration}ms):`, error);
+    next(error
     });
   } catch (error) {
     console.error('Error sending restock alert:', error);
@@ -204,25 +164,33 @@ export const sendRestockAlert = async (req, res) => {
 /**
  * Get all health tips
  */
-export const getHealthTips = async (req, res) => {
+export const getHealthTips = async (req, res, next) => {
+  const startTime = Date.now();
   try {
     const healthTips = await prisma.healthTip.findMany({
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json({ success: true, data: healthTips });
+    const duration = Date.now() - startTime;
+    res.json({ success: true, data: healthTips, _meta: { duration } });
   } catch (error) {
-    console.error('Error fetching health tips:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch health tips' });
+    const duration = Date.now() - startTime;
+    console.error(`[ADMIN] Error fetching health tips (${duration}ms):`, error);
+    next(error);
   }
 };
 
 /**
  * Create health tip
  */
-export const createHealthTip = async (req, res) => {
+export const createHealthTip = async (req, res, next) => {
+  const startTime = Date.now();
   try {
     const { title, content, category, imageUrl, publishDate, expiryDate, isActive } = req.body;
+
+    if (!title || !content) {
+      throw new BadRequestError('Title and content are required');
+    }
 
     const healthTip = await prisma.healthTip.create({
       data: {
@@ -245,17 +213,20 @@ export const createHealthTip = async (req, res) => {
       metadata: { healthTipId: healthTip.id },
     });
 
-    res.json({ success: true, data: healthTip });
+    const duration = Date.now() - startTime;
+    res.json({ success: true, data: healthTip, _meta: { duration } });
   } catch (error) {
-    console.error('Error creating health tip:', error);
-    res.status(500).json({ success: false, message: 'Failed to create health tip' });
+    const duration = Date.now() - startTime;
+    console.error(`[ADMIN] Error creating health tip (${duration}ms):`, error);
+    next(error);
   }
 };
 
 /**
  * Update health tip
  */
-export const updateHealthTip = async (req, res) => {
+export const updateHealthTip = async (req, res, next) => {
+  const startTime = Date.now();
   try {
     const { id } = req.params;
     const { title, content, category, imageUrl, publishDate, expiryDate, isActive } = req.body;
@@ -281,17 +252,20 @@ export const updateHealthTip = async (req, res) => {
       metadata: { healthTipId: id },
     });
 
-    res.json({ success: true, data: healthTip });
+    const duration = Date.now() - startTime;
+    res.json({ success: true, data: healthTip, _meta: { duration } });
   } catch (error) {
-    console.error('Error updating health tip:', error);
-    res.status(500).json({ success: false, message: 'Failed to update health tip' });
+    const duration = Date.now() - startTime;
+    console.error(`[ADMIN] Error updating health tip (${duration}ms):`, error);
+    next(error);
   }
 };
 
 /**
  * Delete health tip
  */
-export const deleteHealthTip = async (req, res) => {
+export const deleteHealthTip = async (req, res, next) => {
+  const startTime = Date.now();
   try {
     const { id } = req.params;
 
@@ -305,35 +279,45 @@ export const deleteHealthTip = async (req, res) => {
       metadata: { healthTipId: id },
     });
 
-    res.json({ success: true, message: 'Health tip deleted successfully' });
+    const duration = Date.now() - startTime;
+    res.json({ success: true, message: 'Health tip deleted successfully', _meta: { duration } });
   } catch (error) {
-    console.error('Error deleting health tip:', error);
-    res.status(500).json({ success: false, message: 'Failed to delete health tip' });
+    const duration = Date.now() - startTime;
+    console.error(`[ADMIN] Error deleting health tip (${duration}ms):`, error);
+    next(error);
   }
 };
 
 /**
  * Get all announcements
  */
-export const getAnnouncements = async (req, res) => {
+export const getAnnouncements = async (req, res, next) => {
+  const startTime = Date.now();
   try {
     const announcements = await prisma.announcement.findMany({
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json({ success: true, data: announcements });
+    const duration = Date.now() - startTime;
+    res.json({ success: true, data: announcements, _meta: { duration } });
   } catch (error) {
-    console.error('Error fetching announcements:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch announcements' });
+    const duration = Date.now() - startTime;
+    console.error(`[ADMIN] Error fetching announcements (${duration}ms):`, error);
+    next(error);
   }
 };
 
 /**
  * Create announcement
  */
-export const createAnnouncement = async (req, res) => {
+export const createAnnouncement = async (req, res, next) => {
+  const startTime = Date.now();
   try {
     const { title, message, type, priority, targetRole, publishDate, expiryDate, isActive } = req.body;
+
+    if (!title || !message) {
+      throw new BadRequestError('Title and message are required');
+    }
 
     const announcement = await prisma.announcement.create({
       data: {
@@ -366,17 +350,20 @@ export const createAnnouncement = async (req, res) => {
       // Continue despite notification failure
     }
 
-    res.json({ success: true, data: announcement });
+    const duration = Date.now() - startTime;
+    res.json({ success: true, data: announcement, _meta: { duration } });
   } catch (error) {
-    console.error('Error creating announcement:', error);
-    res.status(500).json({ success: false, message: 'Failed to create announcement' });
+    const duration = Date.now() - startTime;
+    console.error(`[ADMIN] Error creating announcement (${duration}ms):`, error);
+    next(error);
   }
 };
 
 /**
  * Update announcement
  */
-export const updateAnnouncement = async (req, res) => {
+export const updateAnnouncement = async (req, res, next) => {
+  const startTime = Date.now();
   try {
     const { id } = req.params;
     const { title, message, type, priority, targetRole, publishDate, expiryDate, isActive } = req.body;
@@ -403,17 +390,20 @@ export const updateAnnouncement = async (req, res) => {
       metadata: { announcementId: id },
     });
 
-    res.json({ success: true, data: announcement });
+    const duration = Date.now() - startTime;
+    res.json({ success: true, data: announcement, _meta: { duration } });
   } catch (error) {
-    console.error('Error updating announcement:', error);
-    res.status(500).json({ success: false, message: 'Failed to update announcement' });
+    const duration = Date.now() - startTime;
+    console.error(`[ADMIN] Error updating announcement (${duration}ms):`, error);
+    next(error);
   }
 };
 
 /**
  * Delete announcement
  */
-export const deleteAnnouncement = async (req, res) => {
+export const deleteAnnouncement = async (req, res, next) => {
+  const startTime = Date.now();
   try {
     const { id } = req.params;
 
@@ -427,9 +417,11 @@ export const deleteAnnouncement = async (req, res) => {
       metadata: { announcementId: id },
     });
 
-    res.json({ success: true, message: 'Announcement deleted successfully' });
+    const duration = Date.now() - startTime;
+    res.json({ success: true, message: 'Announcement deleted successfully', _meta: { duration } });
   } catch (error) {
-    console.error('Error deleting announcement:', error);
-    res.status(500).json({ success: false, message: 'Failed to delete announcement' });
+    const duration = Date.now() - startTime;
+    console.error(`[ADMIN] Error deleting announcement (${duration}ms):`, error);
+    next(error);
   }
 };
