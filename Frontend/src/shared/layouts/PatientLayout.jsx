@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useLocation as useLocationContext } from "../../context/LocationContext";
 import LocationModal from "../components/LocationModal";
+import NotificationDropdown from "../components/NotificationDropdown";
 import notificationService from "../../core/services/notification.service";
 import chatService from "../../features/chat/services/chat.service";
 import {
@@ -165,23 +166,8 @@ export function PatientLayout({ children, searchEnabled = true }) {
                 )}
               </button>
 
-              {/* Notifications Button */}
-              <button
-                onClick={() => {
-                  navigate("/notifications");
-                  // Reset count optimistically when navigating to notifications
-                  setNotificationCount(0);
-                }}
-                className="relative p-2 hover:bg-blue-50 rounded-lg transition-colors"
-                title="Notifications"
-              >
-                <Bell size={20} className={notificationCount > 0 ? "text-blue-600" : "text-slate-700"} />
-                {notificationCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center animate-pulse shadow-sm">
-                    {notificationCount > 99 ? "99+" : notificationCount}
-                  </span>
-                )}
-              </button>
+              {/* Notifications Dropdown */}
+              <NotificationDropdown />
 
               {/* Profile Dropdown */}
               <div className="relative">

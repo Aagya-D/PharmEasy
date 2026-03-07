@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
+import NotificationDropdown from "../../../shared/components/NotificationDropdown";
 import { 
   LayoutDashboard, 
   Package, 
@@ -193,6 +194,9 @@ const AdminLayout = ({ children }) => {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            {/* Notification Bell */}
+            <NotificationDropdown />
+
             <div style={{ textAlign: "right" }}>
               <p style={{ fontSize: "14px", fontWeight: "600", color: "#111827" }}>
                 {user?.name || "System Admin"}

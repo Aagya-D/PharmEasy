@@ -5,11 +5,12 @@ const reviewService = {
    * Submit a review for a pharmacy
    * POST /reviews
    */
-  submitReview: async ({ pharmacyId, rating, comment }) => {
+  submitReview: async ({ pharmacyId, rating, comment, sosRequestId }) => {
     const response = await httpClient.post("/reviews", {
       pharmacyId,
-      rating,
+      rating: Number(rating),
       comment,
+      sosRequestId,
     });
     return response.data;
   },

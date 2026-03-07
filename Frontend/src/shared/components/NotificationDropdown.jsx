@@ -19,9 +19,8 @@ import {
   Heart,
   AlertCircle,
   X,
-  CheckDone,
+  CheckCheck,
   Check,
-  ChevronDown,
 } from "lucide-react";
 import notificationService from "../../core/services/notification.service";
 
@@ -33,6 +32,26 @@ const NotificationDropdown = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const dropdownRef = useRef(null);
+  const prevCountRef = useRef(0);
+
+  const playChime = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.5);
+    } catch (e) {
+      // audio unavailable
+    }
+  };
 
   // Fetch unread count periodically (short polling every 60 seconds)
   useEffect(() => {
@@ -50,11 +69,19 @@ const NotificationDropdown = () => {
     // Fetch immediately on mount
     fetchUnreadCount();
 
-    // Set up polling every 60 seconds
-    const pollInterval = setInterval(fetchUnreadCount, 60000);
+    // Set up polling every 30 seconds
+    const pollInterval = setInterval(fetchUnreadCount, 30000);
 
     return () => clearInterval(pollInterval);
   }, []);
+
+  // Play chime when unread count increases
+  useEffect(() => {
+    if (unreadCount > prevCountRef.current) {
+      playChime();
+    }
+    prevCountRef.current = unreadCount;
+  }, [unreadCount]);
 
   // Fetch detailed notifications when dropdown opens
   useEffect(() => {
@@ -214,7 +241,7 @@ const NotificationDropdown = () => {
                 onClick={handleMarkAllAsRead}
                 className="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1"
               >
-                <CheckDone size={14} />
+                <CheckCheck size={14} />
                 Mark all as read
               </button>
             )}
@@ -237,7 +264,7 @@ const NotificationDropdown = () => {
             {!loading && !error && notifications.length === 0 && (
               <div className="px-4 py-12 text-center">
                 <div className="flex items-center justify-center mb-2">
-                  <CheckDone size={32} className="text-green-500" />
+                  <CheckCheck size={32} className="text-green-500" />
                 </div>
                 <p className="text-gray-700 font-semibold">You're all caught up!</p>
                 <p className="text-gray-500 text-sm mt-1">No new notifications at the moment.</p>

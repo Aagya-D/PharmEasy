@@ -603,7 +603,7 @@ export const getSOSDetails = async (req, res) => {
     let pharmacyName = null;
     if (sosRequest.acceptedBy) {
       const pharmacy = await prisma.pharmacy.findFirst({
-        where: { userId: sosRequest.acceptedBy },
+        where: { id: sosRequest.acceptedBy },
         select: { pharmacyName: true },
       });
       pharmacyName = pharmacy?.pharmacyName || null;

@@ -389,8 +389,9 @@ export default function SOSStatus() {
       <RatePharmacyModal
         isOpen={showRatingModal}
         onClose={() => setShowRatingModal(false)}
-        pharmacyId={sosRequest.acceptedBy?.id || sosRequest.pharmacyId || ""}
-        pharmacyName={sosRequest.acceptedBy?.pharmacyName || sosRequest.pharmacyName || "Pharmacy"}
+        pharmacyId={sosRequest.acceptedBy || ""}
+        pharmacyName={sosRequest.pharmacyName || "Pharmacy"}
+        sosRequestId={sosId}
         onSuccess={() => {
           setHasReviewed(true);
           setShowRatingModal(false);

@@ -22,6 +22,7 @@ export default function RatePharmacyModal({
   onClose,
   pharmacyId,
   pharmacyName = "Pharmacy",
+  sosRequestId,
   onSuccess,
 }) {
   const [rating, setRating] = useState(0);
@@ -43,8 +44,9 @@ export default function RatePharmacyModal({
     try {
       const result = await reviewService.submitReview({
         pharmacyId,
-        rating,
+        rating: Number(rating),
         comment: comment.trim() || undefined,
+        sosRequestId: sosRequestId || undefined,
       });
 
       setSuccess(true);

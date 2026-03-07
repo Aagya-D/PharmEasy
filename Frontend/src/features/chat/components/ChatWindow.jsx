@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Send, MessageCircle, Loader, WifiOff, X } from "lucide-react";
+import { Send, MessageCircle, Loader, WifiOff, X, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { connectSocket, disconnectSocket } from "../../../core/services/socket";
 import chatService from "../services/chat.service";
@@ -22,9 +22,12 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose }) {
   const [isSending, setIsSending] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState("");
+  // "pending" = room not yet created, retrying; "ready" = roomId resolved; "error" = fatal
+  const [roomStatus, setRoomStatus] = useState("pending");
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
   const inputRef = useRef(null);
+  const retryTimerRef = useRef(null);
 
   // Auto-scroll to latest message
   const scrollToBottom = useCallback(() => {
@@ -35,34 +38,54 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose }) {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // ── Step 1: Resolve sosRequestId → roomId on mount ─────────────────
+  // ── Step 1: Resolve sosRequestId → roomId (with polling retry) ─────
   useEffect(() => {
     if (!sosRequestId) return;
 
     let cancelled = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 12;   // 12 × 3 s = 36 s max wait
+    const RETRY_MS = 3000;
 
     const resolveRoom = async () => {
-      setIsLoading(true);
-      setError("");
+      if (cancelled) return;
       try {
         const res = await chatService.getRoomBySosRequest(sosRequestId);
-        if (!cancelled && res.success && res.data?.roomId) {
+        if (cancelled) return;
+
+        if (res.success && res.data?.roomId) {
+          setRoomStatus("ready");
           setRoomId(res.data.roomId);
-        } else if (!cancelled) {
-          setError("Chat room not found for this SOS request");
-          setIsLoading(false);
+          return;
         }
-      } catch (err) {
-        console.error("[CHAT] Failed to resolve room:", err);
-        if (!cancelled) {
-          setError("Failed to load chat room");
-          setIsLoading(false);
+
+        // notInitialized = room not yet created → keep retrying
+        if (res.notInitialized && attempts < MAX_ATTEMPTS) {
+          attempts += 1;
+          retryTimerRef.current = setTimeout(resolveRoom, RETRY_MS);
+          return;
+        }
+      } catch (_err) {
+        if (cancelled) return;
+        if (attempts < MAX_ATTEMPTS) {
+          attempts += 1;
+          retryTimerRef.current = setTimeout(resolveRoom, RETRY_MS);
+          return;
         }
       }
+
+      // Exhausted retries
+      setRoomStatus("error");
+      setError("Could not connect to chat room. Please close and try again.");
+      setIsLoading(false);
     };
 
+    setRoomStatus("pending");
     resolveRoom();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      clearTimeout(retryTimerRef.current);
+    };
   }, [sosRequestId]);
 
   // ── Step 2: Fetch chat history once roomId is known ─────────────────
@@ -257,7 +280,13 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose }) {
 
       {/* ── Messages area ── */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1 min-h-0 bg-gray-50">
-        {isLoading ? (
+        {roomStatus === "pending" ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-500 px-6 text-center">
+            <Clock className="animate-pulse text-green-500" size={36} />
+            <p className="font-medium text-gray-700">Connecting to Pharmacist...</p>
+            <p className="text-sm text-gray-400">Chat will open as soon as the request is processed.</p>
+          </div>
+        ) : isLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader className="animate-spin text-green-600" size={28} />
             <span className="ml-2 text-gray-500 text-sm">Loading chat...</span>
@@ -344,7 +373,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose }) {
           />
           <button
             onClick={handleSend}
-            disabled={!newMessage.trim() || isSending || !isConnected}
+            disabled={!newMessage.trim() || isSending || !isConnected || roomStatus !== "ready"}
             className="flex items-center justify-center w-10 h-10 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
             aria-label="Send message"
           >

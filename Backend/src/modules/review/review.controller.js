@@ -21,7 +21,7 @@ export const submitReview = async (req, res, next) => {
       return next(new AppError("Authentication required", 401));
     }
 
-    const { pharmacyId, rating, comment } = req.body;
+    const { pharmacyId, rating, comment, sosRequestId } = req.body;
 
     // ── Validation ──────────────────────────────────────────
     if (!pharmacyId) {
@@ -53,7 +53,7 @@ export const submitReview = async (req, res, next) => {
       return next(new AppError("You have already reviewed this pharmacy", 409));
     }
 
-    // ── Transaction: create review + recalculate average ────
+    // ── Transaction: create review + recalculate average + complete SOS ──
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create the review
       const review = await tx.review.create({
@@ -74,7 +74,7 @@ export const submitReview = async (req, res, next) => {
       const newCount = oldCount + 1;
       const newAvg = (oldAvg * oldCount + numRating) / newCount;
 
-      // 3. Update pharmacy
+      // 3. Update pharmacy rating
       await tx.pharmacy.update({
         where: { id: pharmacyId },
         data: {
@@ -82,6 +82,14 @@ export const submitReview = async (req, res, next) => {
           totalReviews: newCount,
         },
       });
+
+      // 4. Auto-complete the SOS request if provided and belongs to this patient
+      if (sosRequestId) {
+        await tx.sOSRequest.updateMany({
+          where: { id: sosRequestId, patientId, status: "accepted" },
+          data: { status: "completed" },
+        });
+      }
 
       return { review, newAvg: Math.round(newAvg * 100) / 100, newCount };
     });

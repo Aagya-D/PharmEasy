@@ -605,23 +605,59 @@ export const respondToSOS = async (req, res, next) => {
         }
       });
 
-      // Create ChatRoom for real-time communication
+      // Create ChatRoom for real-time communication (idempotent - upsert pattern)
       try {
-        await prisma.chatRoom.create({
-          data: {
-            sosRequestId: sosId,
+        const existingRoom = await prisma.chatRoom.findFirst({
+          where: { sosRequestId: sosId },
+          select: { id: true },
+        });
+
+        if (!existingRoom) {
+          const newRoom = await prisma.chatRoom.create({
+            data: {
+              sosRequestId: sosId,
+              patientId: sosRequest.patientId,
+              pharmacyId: userId, // userId is the pharmacy's User ID (foreign key on ChatRoom)
+            },
+          });
+          logger.info('[PHARMACY] ChatRoom created for SOS', {
+            sosId,
             patientId: sosRequest.patientId,
-            pharmacyId: user.id // This is the user ID, not pharmacy.id
+            pharmacyUserId: userId,
+          });
+
+          // Notify the pharmacy's own UI so the sidebar refreshes immediately
+          const io = req.app.get("io");
+          if (io) {
+            io.emit("new_chat_available", {
+              pharmacyId: userId,
+              room: {
+                id: newRoom.id,
+                sosRequestId: sosId,
+                patientId: sosRequest.patientId,
+                pharmacyId: userId,
+                createdAt: newRoom.createdAt,
+                patient: {
+                  id: sosRequest.patientId,
+                  name: sosRequest.patient?.name || sosRequest.patientName || "Patient",
+                },
+                sosRequest: {
+                  id: sosId,
+                  medicineName: sosRequest.medicineName,
+                  urgencyLevel: sosRequest.urgencyLevel,
+                  status: "accepted",
+                },
+                lastMessage: null,
+                unreadCount: 0,
+              },
+            });
           }
-        });
-        logger.info('[PHARMACY] ChatRoom created for SOS', {
-          sosId,
-          patientId: sosRequest.patientId,
-          pharmacyUserId: user.id
-        });
+        } else {
+          logger.info('[PHARMACY] ChatRoom already exists for SOS', { sosId, roomId: existingRoom.id });
+        }
       } catch (chatRoomError) {
-        // If ChatRoom already exists (duplicate), log but don't fail the request
-        console.error('[PHARMACY] ChatRoom creation error (may already exist):', chatRoomError.message);
+        // Non-blocking — log but never fail the accept response
+        logger.error('[PHARMACY] ChatRoom creation error:', { error: chatRoomError.message, sosId });
       }
 
       logger.info('[PHARMACY] SOS request accepted', {

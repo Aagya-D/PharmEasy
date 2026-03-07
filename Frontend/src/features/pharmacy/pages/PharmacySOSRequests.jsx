@@ -23,6 +23,7 @@ import ChatWindow from "../../chat/components/ChatWindow";
 export default function PharmacySOSRequests() {
   const { updateSOSCount } = useSOSContext();
   const [sosRequests, setSosRequests] = useState([]);
+  const [acceptedRequests, setAcceptedRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [respondingTo, setRespondingTo] = useState(null);
@@ -52,10 +53,12 @@ export default function PharmacySOSRequests() {
   // Fetch SOS requests on mount and set up polling every 30 seconds
   useEffect(() => {
     fetchSOSRequests();
+    fetchAcceptedRequests();
     
     // Poll every 30 seconds for real-time updates
     const interval = setInterval(() => {
       fetchSOSRequests(true); // Silent refresh
+      fetchAcceptedRequests();
     }, 30000);
 
     return () => clearInterval(interval);
@@ -101,6 +104,20 @@ export default function PharmacySOSRequests() {
   };
 
   /**
+   * Fetch accepted (active) SOS cases via chat rooms endpoint
+   */
+  const fetchAcceptedRequests = async () => {
+    try {
+      const response = await httpClient.get("/chat/rooms");
+      if (response.data.success) {
+        setAcceptedRequests(response.data.data?.chatRooms || []);
+      }
+    } catch (err) {
+      console.error("Error fetching accepted requests:", err);
+    }
+  };
+
+  /**
    * Respond to SOS request (accept or reject)
    */
   const handleRespond = async (sosId, response, note = "") => {
@@ -114,6 +131,7 @@ export default function PharmacySOSRequests() {
 
       // Refresh the list after responding
       await fetchSOSRequests();
+      await fetchAcceptedRequests();
 
       // Show success message
       alert(`SOS request ${response === 'accepted' ? 'accepted' : 'rejected'} successfully!`);
@@ -221,6 +239,51 @@ export default function PharmacySOSRequests() {
             <div className="flex items-center gap-2">
               <AlertTriangle size={20} />
               <span>{error}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Active (Accepted) Cases */}
+        {acceptedRequests.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <CheckCircle size={20} className="text-green-600" />
+              My Active Cases ({acceptedRequests.length})
+            </h2>
+            <div className="space-y-3">
+              {acceptedRequests.map((room) => (
+                <motion.div
+                  key={room.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white rounded-xl px-5 py-4 shadow-sm border border-green-100 flex items-center justify-between gap-4"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 flex items-center gap-2">
+                      <User size={15} className="text-gray-400 flex-shrink-0" />
+                      {room.patient?.name || room.sosRequest?.patientName || "Patient"}
+                    </p>
+                    {room.sosRequest?.medicineName && (
+                      <p className="text-sm text-gray-500 mt-0.5 truncate">
+                        💊 {room.sosRequest.medicineName}
+                      </p>
+                    )}
+                    {room.sosRequest?.contactNumber && (
+                      <p className="text-sm text-gray-400 mt-0.5 flex items-center gap-1">
+                        <Phone size={13} />
+                        {room.sosRequest.contactNumber}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setActiveChatSOS(room.sosRequestId)}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex-shrink-0"
+                  >
+                    <MessageCircle size={16} />
+                    Message Patient
+                  </button>
+                </motion.div>
+              ))}
             </div>
           </div>
         )}

@@ -341,6 +341,35 @@ export const sendMessage = async (req, res, next) => {
       },
     });
 
+    // Emit via Socket.IO so both sides receive the message in real-time
+    // (covers the REST path — socket send_message handler covers the WS path)
+    const io = req.app.get("io");
+    if (io) {
+      const roomName = `chatroom_${roomId}`;
+      const payload = {
+        id: message.id,
+        content: message.content,
+        senderId: message.senderId,
+        senderName: message.sender?.name,
+        roomId: message.roomId,
+        isRead: message.isRead,
+        createdAt: message.createdAt,
+      };
+      io.to(roomName).emit("receive_message", payload);
+
+      // Sidebar notification for the recipient
+      const recipientId =
+        userId === chatRoom.patientId ? chatRoom.pharmacyId : chatRoom.patientId;
+      io.emit("new_message_notification", {
+        roomId,
+        recipientId,
+        senderId: userId,
+        senderName: message.sender?.name,
+        preview: content.trim().substring(0, 80),
+        createdAt: message.createdAt,
+      });
+    }
+
     return res.status(201).json({
       success: true,
       data: {
@@ -381,7 +410,12 @@ export const getRoomBySosRequest = async (req, res, next) => {
     });
 
     if (!chatRoom) {
-      return next(new AppError("Chat room not found for this SOS request", 404));
+      // Return a soft 404 so the frontend can retry with a placeholder instead of crashing
+      return res.status(404).json({
+        success: false,
+        notInitialized: true,
+        message: "Chat room not yet initialized",
+      });
     }
 
     if (userId !== chatRoom.patientId && userId !== chatRoom.pharmacyId) {
