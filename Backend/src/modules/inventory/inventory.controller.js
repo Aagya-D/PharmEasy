@@ -15,8 +15,8 @@ import prisma from "../../database/prisma.js";
  * Requires: Authentication, PHARMACY_ADMIN role, VERIFIED pharmacy status
  */
 export const addMedicine = async (req, res, next) => {
+  const startTime = Date.now();
   try {
-    const startTime = Date.now();
     const pharmacyId = req.user.pharmacyId;
     logger.operation('INVENTORY', 'addMedicine', 'START', { pharmacyId });
 
@@ -121,8 +121,8 @@ export const getMyInventory = async (req, res, next) => {
  * Requires: Authentication, PHARMACY_ADMIN role, ownership validation
  */
 export const updateInventoryItem = async (req, res, next) => {
+  const startTime = Date.now();
   try {
-    const startTime = Date.now();
     const inventoryId = req.params.id;
     const pharmacyId = req.user.pharmacyId;
 
@@ -222,8 +222,8 @@ export const updateInventoryItem = async (req, res, next) => {
  * Requires: Authentication, PHARMACY_ADMIN role, ownership validation
  */
 export const deleteInventoryItem = async (req, res, next) => {
+  const startTime = Date.now();
   try {
-    const startTime = Date.now();
     const inventoryId = req.params.id;
     const pharmacyId = req.user.pharmacyId;
 

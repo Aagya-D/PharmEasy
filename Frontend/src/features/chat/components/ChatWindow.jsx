@@ -15,6 +15,7 @@ import chatService from "../services/chat.service";
  * @param {Function} [props.onClose]  - Optional callback to close/hide the chat panel
  */
 export default function ChatWindow({ sosRequestId, currentUser, onClose }) {
+  const [roomId, setRoomId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -34,39 +35,75 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose }) {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // ── Fetch chat history on mount ──────────────────────────
+  // ── Step 1: Resolve sosRequestId → roomId on mount ─────────────────
   useEffect(() => {
     if (!sosRequestId) return;
+
+    let cancelled = false;
+
+    const resolveRoom = async () => {
+      setIsLoading(true);
+      setError("");
+      try {
+        const res = await chatService.getRoomBySosRequest(sosRequestId);
+        if (!cancelled && res.success && res.data?.roomId) {
+          setRoomId(res.data.roomId);
+        } else if (!cancelled) {
+          setError("Chat room not found for this SOS request");
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.error("[CHAT] Failed to resolve room:", err);
+        if (!cancelled) {
+          setError("Failed to load chat room");
+          setIsLoading(false);
+        }
+      }
+    };
+
+    resolveRoom();
+    return () => { cancelled = true; };
+  }, [sosRequestId]);
+
+  // ── Step 2: Fetch chat history once roomId is known ─────────────────
+  useEffect(() => {
+    // Guard: do nothing until roomId is resolved
+    if (!roomId) return;
+
+    let cancelled = false;
 
     const fetchHistory = async () => {
       setIsLoading(true);
       setError("");
       try {
-        const response = await chatService.getChatHistory(sosRequestId);
-        if (response.success && response.data?.messages) {
+        const response = await chatService.getChatMessages(roomId);
+        if (!cancelled && response.success && response.data?.messages) {
           setMessages(response.data.messages);
         }
       } catch (err) {
         console.error("[CHAT] Failed to fetch history:", err);
-        setError("Failed to load chat history");
+        if (!cancelled) setError("Failed to load chat history");
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     fetchHistory();
-  }, [sosRequestId]);
+    return () => { cancelled = true; };
+  }, [roomId]);
 
-  // ── Socket connection & event listeners ──────────────────
+  // ── Step 3: Socket — only AFTER roomId AND userId are ready ────────
   useEffect(() => {
-    if (!sosRequestId || !currentUser?.id) return;
+    // Guard: do not connect until both roomId and user are available
+    if (!roomId || !currentUser?.id) return;
 
     const socket = connectSocket();
     socketRef.current = socket;
 
     const onConnect = () => {
       setIsConnected(true);
-      socket.emit("join_room", { sosRequestId });
+      // Send both roomId and userId as required by the backend chatHandler
+      socket.emit("join_room", { roomId, userId: currentUser.id });
     };
 
     const onDisconnect = () => {
@@ -99,11 +136,11 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose }) {
     // If already connected, join immediately
     if (socket.connected) {
       setIsConnected(true);
-      socket.emit("join_room", { sosRequestId });
+      socket.emit("join_room", { roomId, userId: currentUser.id });
     }
 
     return () => {
-      socket.emit("leave_room", { sosRequestId });
+      socket.emit("leave_room", { roomId });
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.off("room_joined", onRoomJoined);
@@ -111,16 +148,16 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose }) {
       socket.off("receive_message", onReceiveMessage);
       disconnectSocket();
     };
-  }, [sosRequestId, currentUser?.id]);
+  }, [roomId, currentUser?.id]);
 
   // ── Send a message ───────────────────────────────────────
   const handleSend = useCallback(() => {
     const trimmed = newMessage.trim();
-    if (!trimmed || !socketRef.current || isSending) return;
+    if (!trimmed || !socketRef.current || isSending || !roomId) return;
 
     setIsSending(true);
     socketRef.current.emit("send_message", {
-      sosRequestId,
+      roomId,
       senderId: currentUser.id,
       content: trimmed,
     });
@@ -128,7 +165,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose }) {
     setNewMessage("");
     setIsSending(false);
     inputRef.current?.focus();
-  }, [newMessage, sosRequestId, currentUser?.id, isSending]);
+  }, [newMessage, roomId, currentUser?.id, isSending]);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {

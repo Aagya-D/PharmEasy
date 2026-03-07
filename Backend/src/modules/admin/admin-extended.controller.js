@@ -65,7 +65,10 @@ export const getPharmacyLocations = async (req, res, next) => {
   }
 };
 
-/**, next) => {
+/**
+ * Get inventory insights
+ */
+export const getInventoryInsights = async (req, res, next) => {
   const startTime = Date.now();
   try {
     // Get all inventory items grouped by generic name
@@ -110,13 +113,14 @@ export const getPharmacyLocations = async (req, res, next) => {
   } catch (error) {
     const duration = Date.now() - startTime;
     console.error(`[ADMIN] Error fetching inventory insights (${duration}ms):`, error);
-    next(error
-  } catch (error) {
-    console.error('Error fetching inventory insights:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch inventory insights' });
+    next(error);
   }
 };
-, next) => {
+
+/**
+ * Send restock alert to pharmacies
+ */
+export const sendRestockAlert = async (req, res, next) => {
   const startTime = Date.now();
   try {
     const { genericName, message } = req.body;
@@ -140,9 +144,6 @@ export const getPharmacyLocations = async (req, res, next) => {
       metadata: { genericName, pharmacyCount: pharmacies.length },
     });
 
-    // In a real system, you would send notifications here (email, SMS, push)
-    // For now, we'll just log it
-    
     const duration = Date.now() - startTime;
     res.json({ 
       success: true, 
@@ -153,11 +154,7 @@ export const getPharmacyLocations = async (req, res, next) => {
   } catch (error) {
     const duration = Date.now() - startTime;
     console.error(`[ADMIN] Error sending restock alert (${duration}ms):`, error);
-    next(error
-    });
-  } catch (error) {
-    console.error('Error sending restock alert:', error);
-    res.status(500).json({ success: false, message: 'Failed to send restock alert' });
+    next(error);
   }
 };
 

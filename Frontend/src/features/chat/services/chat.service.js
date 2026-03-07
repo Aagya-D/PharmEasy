@@ -52,9 +52,13 @@ const chatService = {
     return response.data;
   },
 
-  // Legacy method for backward compatibility
-  getChatHistory: async (sosRequestId) => {
-    const response = await httpClient.get(`/chat/${sosRequestId}`);
+  /**
+   * Resolve a SOS request ID to the database ChatRoom ID.
+   * @param {string} sosRequestId
+   * @returns {Promise<{ success: boolean, data: { roomId: string } }>}
+   */
+  getRoomBySosRequest: async (sosRequestId) => {
+    const response = await httpClient.get(`/chat/rooms/by-sos/${sosRequestId}`);
     return response.data;
   },
 };

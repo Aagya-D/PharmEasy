@@ -362,6 +362,40 @@ export const sendMessage = async (req, res, next) => {
 };
 
 /**
+ * GET /api/chat/rooms/by-sos/:sosRequestId
+ * Resolves a SOS request ID to its associated ChatRoom ID.
+ * Used by the frontend ChatWindow to obtain the roomId needed for
+ * history fetching and socket join_room.
+ */
+export const getRoomBySosRequest = async (req, res, next) => {
+  try {
+    const { sosRequestId } = req.params;
+    const userId = req.user?.userId;
+
+    if (!userId) return next(new AppError("Authentication required", 401));
+    if (!sosRequestId) return next(new AppError("sosRequestId is required", 400));
+
+    const chatRoom = await prisma.chatRoom.findFirst({
+      where: { sosRequestId },
+      select: { id: true, patientId: true, pharmacyId: true },
+    });
+
+    if (!chatRoom) {
+      return next(new AppError("Chat room not found for this SOS request", 404));
+    }
+
+    if (userId !== chatRoom.patientId && userId !== chatRoom.pharmacyId) {
+      return next(new AppError("You are not authorized to access this chat room", 403));
+    }
+
+    return res.status(200).json({ success: true, data: { roomId: chatRoom.id } });
+  } catch (error) {
+    console.error("[CHAT ERROR] getRoomBySosRequest:", error.message, error.stack);
+    next(error);
+  }
+};
+
+/**
  * PUT /api/chat/rooms/:roomId/mark-read
  * Mark all messages in a room as read for the current user
  */
