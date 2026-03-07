@@ -86,7 +86,9 @@ model User {
   medications    Medication[]         @relation("PatientMedications")
   sosRequests         SOSRequest[]         @relation("PatientSOSRequests")
   notifications       Notification[]
-  messages            Message[]            @relation("UserMessages")
+  chatRoomsAsPatient  ChatRoom[]           @relation("PatientChatRooms")
+  chatRoomsAsPharmacy ChatRoom[]           @relation("PharmacyChatRooms")
+  chatMessages        ChatMessage[]        @relation("UserChatMessages")
   reviews             Review[]             @relation("PatientReviews")
   favoriteMedicines   FavoriteMedicine[]   @relation("PatientFavorites")
 
@@ -331,7 +333,7 @@ model SOSRequest {
   updatedAt            DateTime            @updatedAt
   patient              User                @relation("PatientSOSRequests", fields: [patientId], references: [id], onDelete: Cascade)
   pharmacyResponses    PharmacyResponse[]
-  messages             Message[]           @relation("SOSMessages")
+  chatRoom             ChatRoom?
 
   @@index([patientId])
   @@index([status])
@@ -517,18 +519,45 @@ model TwoFactorAuth {
 /// * 
 /// * Links to a specific SOS request so chat is scoped per emergency transaction.
 /// * senderId can be either the Patient's userId or the Pharmacy's userId.
-model Message {
-  id            String     @id @default(cuid())
-  content       String
-  senderId      String
-  sosRequestId  String
-  createdAt     DateTime   @default(now())
-  sender        User       @relation("UserMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  sosRequest    SOSRequest @relation("SOSMessages", fields: [sosRequestId], references: [id], onDelete: Cascade)
+/// *
+/// * ChatRoom Model - Represents a conversation between a patient and pharmacy
+/// * 
+/// * Created automatically when a pharmacy accepts an SOS request.
+/// * Each SOS request can have only one chat room (unique constraint).
+model ChatRoom {
+  id            String        @id @default(cuid())
+  sosRequestId  String        @unique
+  patientId     String
+  pharmacyId    String
+  createdAt     DateTime      @default(now())
+  patient       User          @relation("PatientChatRooms", fields: [patientId], references: [id], onDelete: Cascade)
+  pharmacy      User          @relation("PharmacyChatRooms", fields: [pharmacyId], references: [id], onDelete: Cascade)
+  sosRequest    SOSRequest    @relation(fields: [sosRequestId], references: [id], onDelete: Cascade)
+  messages      ChatMessage[]
 
   @@index([sosRequestId])
+  @@index([patientId])
+  @@index([pharmacyId])
+}
+
+/// *
+/// * ChatMessage Model - Individual messages within a chat room
+/// * 
+/// * Tracks message content, sender, read status, and timestamp.
+model ChatMessage {
+  id        String   @id @default(cuid())
+  roomId    String
+  senderId  String
+  content   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender    User     @relation("UserChatMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
   @@index([senderId])
   @@index([createdAt])
+  @@index([isRead])
 }
 
 /// *

@@ -28,6 +28,7 @@ import PatientHistory from "../features/patient/pages/PatientHistory";
 import ProfilePage from "../features/patient/pages/Profile/ProfilePage";
 import PrescriptionsPage from "../features/patient/pages/Prescriptions/PrescriptionsPage";
 import PatientSettings from "../features/patient/pages/PatientSettings";
+import PatientChat from "../features/patient/pages/PatientChat";
 
 // Pharmacy Pages
 import PharmacyDashboard from "../features/pharmacy/pages/PharmacyDashboard";
@@ -326,6 +327,16 @@ export const routes = [
   {
     path: "/unauthorized",
     element: <UnauthorizedPage />,
+  },
+
+  // --- PATIENT CHAT (Standalone — no Navbar/Footer for immersive UX) ---
+  {
+    path: "/patient/chat",
+    element: (
+      <ProtectedRoute allowedRoles={['PATIENT']}>
+        <PatientChat />
+      </ProtectedRoute>
+    ),
   },
 
   // --- PATIENT ZONE (Protected) ---

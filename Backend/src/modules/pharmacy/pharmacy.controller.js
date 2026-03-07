@@ -605,6 +605,25 @@ export const respondToSOS = async (req, res, next) => {
         }
       });
 
+      // Create ChatRoom for real-time communication
+      try {
+        await prisma.chatRoom.create({
+          data: {
+            sosRequestId: sosId,
+            patientId: sosRequest.patientId,
+            pharmacyId: user.id // This is the user ID, not pharmacy.id
+          }
+        });
+        logger.info('[PHARMACY] ChatRoom created for SOS', {
+          sosId,
+          patientId: sosRequest.patientId,
+          pharmacyUserId: user.id
+        });
+      } catch (chatRoomError) {
+        // If ChatRoom already exists (duplicate), log but don't fail the request
+        console.error('[PHARMACY] ChatRoom creation error (may already exist):', chatRoomError.message);
+      }
+
       logger.info('[PHARMACY] SOS request accepted', {
         pharmacyId: pharmacy.id,
         sosId,

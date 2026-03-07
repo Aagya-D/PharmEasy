@@ -1,7 +1,11 @@
 /**
  * Chat Controller
- * GET /api/chat/conversations - List active chat conversations
- * GET /api/chat/:sosRequestId - Retrieve chat history for an SOS request
+ * GET /api/chat/rooms - List active chat rooms
+ * GET /api/chat/rooms/:roomId - Get chat room details
+ * GET /api/chat/rooms/:roomId/messages - Retrieve chat messages for a room
+ * GET /api/chat/unread-count - Get unread message count
+ * POST /api/chat/rooms/:roomId/messages - Send a message
+ * PUT /api/chat/rooms/:roomId/mark-read - Mark messages as read
  * Security: Only the patient or the pharmacy involved can access.
  */
 
@@ -9,36 +13,68 @@ import { prisma } from "../../database/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 
 /**
- * GET /api/chat/conversations
- * Returns SOS requests that have been accepted by this pharmacy user's pharmacy,
- * along with the latest message and unread indicator.
+ * GET /api/chat/rooms
+ * Returns all chat rooms for the authenticated user.
+ * Response shape matches what the frontend PatientChat component expects:
+ *   { success, data: { chatRooms: [ { id, pharmacy, patient, sosRequest, lastMessage, unreadCount } ] } }
  */
-export const getConversations = async (req, res, next) => {
+export const getChatRooms = async (req, res, next) => {
   try {
     const userId = req.user?.userId;
     if (!userId) return next(new AppError("Authentication required", 401));
 
-    // Find the pharmacy owned by this user
-    const pharmacy = await prisma.pharmacy.findFirst({
-      where: { userId },
-      select: { id: true, name: true },
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { roleId: true },
     });
 
-    if (!pharmacy) {
-      return res.status(200).json({ success: true, data: { conversations: [] } });
+    if (!user) return next(new AppError("User not found", 404));
+
+    const isPatient  = user.roleId === 3;
+    const isPharmacy = user.roleId === 2;
+
+    // Neither patient nor pharmacy — return empty list gracefully
+    if (!isPatient && !isPharmacy) {
+      return res.status(200).json({ success: true, data: { chatRooms: [] } });
     }
 
-    // Find all accepted SOS requests for this pharmacy
-    const sosRequests = await prisma.sOSRequest.findMany({
-      where: { acceptedBy: pharmacy.id, status: "accepted" },
-      orderBy: { updatedAt: "desc" },
-      select: {
-        id: true,
-        patientName: true,
-        medicineName: true,
-        urgencyLevel: true,
-        createdAt: true,
-        updatedAt: true,
+    const whereClause = isPatient
+      ? { patientId: userId }
+      : { pharmacyId: userId };
+
+    // Single query — fetch rooms with all data needed in one round-trip
+    const rooms = await prisma.chatRoom.findMany({
+      where: whereClause,
+      orderBy: { createdAt: "desc" },
+      include: {
+        // pharmacy is a User; its Pharmacy profile lives at pharmacy.pharmacy
+        pharmacy: {
+          select: {
+            id: true,
+            name: true,                     // User.name (fallback display name)
+            pharmacy: {
+              select: {
+                pharmacyName: true,         // Pharmacy.pharmacyName (preferred)
+                address: true,
+              },
+            },
+          },
+        },
+        patient: {
+          select: { id: true, name: true },
+        },
+        sosRequest: {
+          select: {
+            id: true,
+            medicineName: true,
+            urgencyLevel: true,             // schema field
+            status: true,
+            patientName: true,
+            contactNumber: true,
+            createdAt: true,
+          },
+        },
+        // Grab only the single most-recent message for sidebar "last message" snippet
         messages: {
           orderBy: { createdAt: "desc" },
           take: 1,
@@ -46,90 +82,122 @@ export const getConversations = async (req, res, next) => {
             id: true,
             content: true,
             senderId: true,
+            isRead: true,
             createdAt: true,
-            sender: { select: { name: true } },
           },
         },
       },
     });
 
-    const conversations = sosRequests.map((sos) => {
-      const lastMsg = sos.messages[0] || null;
-      return {
-        sosRequestId: sos.id,
-        patientName: sos.patientName,
-        medicineName: sos.medicineName,
-        urgencyLevel: sos.urgencyLevel,
-        lastMessage: lastMsg
-          ? {
-              content: lastMsg.content,
-              senderName: lastMsg.sender?.name || "Unknown",
-              senderId: lastMsg.senderId,
-              createdAt: lastMsg.createdAt,
-            }
-          : null,
-        updatedAt: sos.updatedAt,
-      };
+    // Efficient unread counting — one groupBy query instead of N separate counts
+    const unreadGroups = await prisma.chatMessage.groupBy({
+      by: ["roomId"],
+      where: {
+        roomId:   { in: rooms.map((r) => r.id) },
+        senderId: { not: userId },
+        isRead:   false,
+      },
+      _count: { id: true },
     });
+    const unreadMap = Object.fromEntries(
+      unreadGroups.map((g) => [g.roomId, g._count.id])
+    );
 
-    return res.status(200).json({ success: true, data: { conversations } });
+    // Build the response in the shape the frontend expects
+    const chatRooms = rooms.map((room) => ({
+      id:           room.id,                   // frontend uses room.id everywhere
+      sosRequestId: room.sosRequestId,
+      patientId:    room.patientId,
+      pharmacyId:   room.pharmacyId,
+      createdAt:    room.createdAt,
+
+      // pharmacy.name — frontend getPharmacyName() reads room.pharmacy.name
+      pharmacy: {
+        id:   room.pharmacy.id,
+        name: room.pharmacy.pharmacy?.pharmacyName || room.pharmacy.name,
+      },
+
+      // patient.name — used by pharmacy-side view
+      patient: {
+        id:   room.patient.id,
+        name: room.patient.name,
+      },
+
+      // sosRequest — frontend reads .medicineName, .urgency, .status, .createdAt
+      sosRequest: room.sosRequest
+        ? {
+            id:            room.sosRequest.id,
+            medicineName:  room.sosRequest.medicineName,
+            urgency:       room.sosRequest.urgencyLevel,  // alias for frontend
+            urgencyLevel:  room.sosRequest.urgencyLevel,  // keep original too
+            status:        room.sosRequest.status,
+            patientName:   room.sosRequest.patientName,
+            contactNumber: room.sosRequest.contactNumber,
+            createdAt:     room.sosRequest.createdAt,
+          }
+        : null,
+
+      lastMessage: room.messages[0] ?? null,
+      unreadCount: unreadMap[room.id] ?? 0,
+    }));
+
+    return res.status(200).json({ success: true, data: { chatRooms } });
   } catch (error) {
+    console.error("[CHAT ERROR] getChatRooms:", error.message, error.stack);
     next(error);
   }
 };
 
 /**
- * GET /api/chat/:sosRequestId
- * Returns all messages for a given SOS request, sorted oldest-first.
+ * GET /api/chat/rooms/:roomId/messages
+ * Returns all messages for a chat room
  */
-export const getChatHistory = async (req, res, next) => {
+export const getChatMessages = async (req, res, next) => {
   try {
-    const { sosRequestId } = req.params;
+    const { roomId } = req.params;
     const userId = req.user?.userId;
 
     if (!userId) {
       return next(new AppError("Authentication required", 401));
     }
 
-    if (!sosRequestId) {
-      return next(new AppError("sosRequestId is required", 400));
+    if (!roomId) {
+      return next(new AppError("roomId is required", 400));
     }
 
-    // Fetch the SOS request to verify authorization
-    const sosRequest = await prisma.sOSRequest.findUnique({
-      where: { id: sosRequestId },
+    // Fetch the chat room to verify authorization
+    const chatRoom = await prisma.chatRoom.findUnique({
+      where: { id: roomId },
       select: {
         id: true,
         patientId: true,
-        acceptedBy: true,
-        status: true,
+        pharmacyId: true,
+        sosRequest: {
+          select: {
+            medicineName: true,
+            urgencyLevel: true,
+            prescriptionUrl: true,
+            additionalNotes: true,
+          },
+        },
       },
     });
 
-    if (!sosRequest) {
-      return next(new AppError("SOS request not found", 404));
+    if (!chatRoom) {
+      return next(new AppError("Chat room not found", 404));
     }
 
-    // Check if the requesting user is the patient
-    const isPatient = userId === sosRequest.patientId;
+    // Check if the requesting user is authorized
+    const isAuthorized =
+      userId === chatRoom.patientId || userId === chatRoom.pharmacyId;
 
-    // Check if the requesting user is the pharmacy owner
-    let isPharmacy = false;
-    if (sosRequest.acceptedBy) {
-      const pharmacy = await prisma.pharmacy.findUnique({
-        where: { id: sosRequest.acceptedBy },
-        select: { userId: true },
-      });
-      isPharmacy = pharmacy?.userId === userId;
-    }
-
-    if (!isPatient && !isPharmacy) {
+    if (!isAuthorized) {
       return next(new AppError("You are not authorized to view this chat", 403));
     }
 
     // Fetch messages sorted by createdAt ascending (oldest first)
-    const messages = await prisma.message.findMany({
-      where: { sosRequestId },
+    const messages = await prisma.chatMessage.findMany({
+      where: { roomId },
       orderBy: { createdAt: "asc" },
       include: {
         sender: {
@@ -143,15 +211,207 @@ export const getChatHistory = async (req, res, next) => {
       content: msg.content,
       senderId: msg.senderId,
       senderName: msg.sender?.name || "Unknown",
-      sosRequestId: msg.sosRequestId,
+      isRead: msg.isRead,
+      roomId: msg.roomId,
       createdAt: msg.createdAt,
     }));
 
     return res.status(200).json({
       success: true,
-      data: { messages: formattedMessages },
+      data: {
+        room: {
+          id: chatRoom.id,
+          sosDetails: chatRoom.sosRequest,
+        },
+        messages: formattedMessages,
+      },
     });
   } catch (error) {
+    console.error("[CHAT ERROR] getChatMessages:", error.message, error.stack);
+    next(error);
+  }
+};
+
+/**
+ * GET /api/chat/unread-count
+ * Returns total unread message count for the authenticated user
+ */
+export const getUnreadCount = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return next(new AppError("Authentication required", 401));
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { roleId: true },
+    });
+
+    if (!user) {
+      return next(new AppError("User not found", 404));
+    }
+
+    let chatRoomIds = [];
+
+    // Get chat room IDs for the user
+    if (user.roleId === 3) {
+      // Patient
+      chatRoomIds = await prisma.chatRoom.findMany({
+        where: { patientId: userId },
+        select: { id: true },
+      });
+    } else if (user.roleId === 2) {
+      // Pharmacy
+      chatRoomIds = await prisma.chatRoom.findMany({
+        where: { pharmacyId: userId },
+        select: { id: true },
+      });
+    }
+
+    const roomIds = chatRoomIds.map((room) => room.id);
+
+    // Count unread messages from other users
+    const unreadCount = await prisma.chatMessage.count({
+      where: {
+        roomId: { in: roomIds },
+        senderId: { not: userId },
+        isRead: false,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: { unreadCount },
+    });
+  } catch (error) {
+    console.error("[CHAT ERROR] getUnreadCount:", error.message, error.stack);
+    next(error);
+  }
+};
+
+/**
+ * POST /api/chat/rooms/:roomId/messages
+ * Send a new message in a chat room
+ */
+export const sendMessage = async (req, res, next) => {
+  try {
+    const { roomId } = req.params;
+    const { content } = req.body;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return next(new AppError("Authentication required", 401));
+    }
+
+    if (!content || content.trim() === "") {
+      return next(new AppError("Message content is required", 400));
+    }
+
+    // Verify the chat room exists and user is authorized
+    const chatRoom = await prisma.chatRoom.findUnique({
+      where: { id: roomId },
+      select: {
+        id: true,
+        patientId: true,
+        pharmacyId: true,
+      },
+    });
+
+    if (!chatRoom) {
+      return next(new AppError("Chat room not found", 404));
+    }
+
+    const isAuthorized =
+      userId === chatRoom.patientId || userId === chatRoom.pharmacyId;
+
+    if (!isAuthorized) {
+      return next(new AppError("You are not authorized to send messages in this chat", 403));
+    }
+
+    // Create the message
+    const message = await prisma.chatMessage.create({
+      data: {
+        roomId,
+        senderId: userId,
+        content: content.trim(),
+      },
+      include: {
+        sender: {
+          select: { id: true, name: true },
+        },
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        message: {
+          id: message.id,
+          content: message.content,
+          senderId: message.senderId,
+          senderName: message.sender?.name,
+          isRead: message.isRead,
+          roomId: message.roomId,
+          createdAt: message.createdAt,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("[CHAT ERROR] sendMessage:", error.message, error.stack);
+    next(error);
+  }
+};
+
+/**
+ * PUT /api/chat/rooms/:roomId/mark-read
+ * Mark all messages in a room as read for the current user
+ */
+export const markMessagesAsRead = async (req, res, next) => {
+  try {
+    const { roomId } = req.params;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return next(new AppError("Authentication required", 401));
+    }
+
+    // Verify the chat room exists and user is authorized
+    const chatRoom = await prisma.chatRoom.findUnique({
+      where: { id: roomId },
+      select: {
+        patientId: true,
+        pharmacyId: true,
+      },
+    });
+
+    if (!chatRoom) {
+      return next(new AppError("Chat room not found", 404));
+    }
+
+    const isAuthorized =
+      userId === chatRoom.patientId || userId === chatRoom.pharmacyId;
+
+    if (!isAuthorized) {
+      return next(new AppError("You are not authorized to access this chat", 403));
+    }
+
+    // Mark all messages from other users as read
+    await prisma.chatMessage.updateMany({
+      where: {
+        roomId,
+        senderId: { not: userId },
+        isRead: false,
+      },
+      data: {
+        isRead: true,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Messages marked as read",
+    });
+  } catch (error) {
+    console.error("[CHAT ERROR] markMessagesAsRead:", error.message, error.stack);
     next(error);
   }
 };

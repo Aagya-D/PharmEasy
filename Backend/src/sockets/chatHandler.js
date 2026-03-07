@@ -1,11 +1,13 @@
 /**
  * Chat Handler for Socket.IO
- * Manages real-time messaging between Patient and Pharmacy per SOS request.
+ * Manages real-time messaging between Patient and Pharmacy per ChatRoom.
  *
  * Events:
- *   join_room      - Client joins a room scoped to an SOS request
+ *   join_room      - Client joins a chat room
  *   send_message   - Client sends a message; server persists and broadcasts
  *   leave_room     - Client leaves the chat room
+ *   typing_start   - Client starts typing
+ *   typing_stop    - Client stops typing
  */
 
 import { prisma } from "../database/prisma.js";
@@ -17,41 +19,54 @@ export default function chatHandler(io) {
 
     /**
      * join_room
-     * Payload: { sosRequestId: string }
-     * Joins the socket to room_<sosRequestId>
+     * Payload: { roomId: string, userId: string }
+     * Joins the socket to chatroom_<roomId>
      */
-    socket.on("join_room", async ({ sosRequestId }) => {
-      if (!sosRequestId) {
-        socket.emit("chat_error", { message: "sosRequestId is required" });
+    socket.on("join_room", async ({ roomId, userId }) => {
+      if (!roomId || !userId) {
+        socket.emit("chat_error", { message: "roomId and userId are required" });
         return;
       }
 
       try {
-        // Verify the SOS request exists and is accepted
-        const sosRequest = await prisma.sOSRequest.findUnique({
-          where: { id: sosRequestId },
-          select: { id: true, status: true },
+        // Verify the chat room exists and user is authorized
+        const chatRoom = await prisma.chatRoom.findUnique({
+          where: { id: roomId },
+          select: {
+            id: true,
+            patientId: true,
+            pharmacyId: true,
+            sosRequest: {
+              select: { status: true },
+            },
+          },
         });
 
-        if (!sosRequest) {
-          socket.emit("chat_error", { message: "SOS request not found" });
+        if (!chatRoom) {
+          socket.emit("chat_error", { message: "Chat room not found" });
           return;
         }
 
-        if (sosRequest.status !== "accepted") {
+        // Verify user is authorized (either patient or pharmacy)
+        const isAuthorized =
+          userId === chatRoom.patientId || userId === chatRoom.pharmacyId;
+
+        if (!isAuthorized) {
           socket.emit("chat_error", {
-            message: "Chat is only available after the SOS request is accepted",
+            message: "You are not authorized to join this chat room",
           });
           return;
         }
 
-        const roomName = `room_${sosRequestId}`;
+        const roomName = `chatroom_${roomId}`;
         socket.join(roomName);
-        logger.info(`[SOCKET] ${socket.id} joined ${roomName}`);
+        socket.userId = userId; // Store userId on socket for later use
+        socket.currentRoom = roomName;
+        logger.info(`[SOCKET] ${socket.id} (user: ${userId}) joined ${roomName}`);
 
         socket.emit("room_joined", {
           room: roomName,
-          sosRequestId,
+          roomId,
         });
       } catch (error) {
         logger.error(`[SOCKET] join_room error: ${error.message}`);
@@ -61,13 +76,13 @@ export default function chatHandler(io) {
 
     /**
      * send_message
-     * Payload: { sosRequestId: string, senderId: string, content: string }
+     * Payload: { roomId: string, senderId: string, content: string }
      * Persists message to DB and broadcasts to the room
      */
-    socket.on("send_message", async ({ sosRequestId, senderId, content }) => {
-      if (!sosRequestId || !senderId || !content) {
+    socket.on("send_message", async ({ roomId, senderId, content }) => {
+      if (!roomId || !senderId || !content) {
         socket.emit("chat_error", {
-          message: "sosRequestId, senderId, and content are required",
+          message: "roomId, senderId, and content are required",
         });
         return;
       }
@@ -79,33 +94,26 @@ export default function chatHandler(io) {
       }
 
       try {
-        // Verify sender is part of this SOS transaction
-        const sosRequest = await prisma.sOSRequest.findUnique({
-          where: { id: sosRequestId },
-          select: { patientId: true, acceptedBy: true, status: true },
+        // Verify chat room exists and user is authorized
+        const chatRoom = await prisma.chatRoom.findUnique({
+          where: { id: roomId },
+          select: {
+            id: true,
+            patientId: true,
+            pharmacyId: true,
+            sosRequestId: true,
+          },
         });
 
-        if (!sosRequest || sosRequest.status !== "accepted") {
-          socket.emit("chat_error", {
-            message: "Cannot send messages - SOS request is not accepted",
-          });
+        if (!chatRoom) {
+          socket.emit("chat_error", { message: "Chat room not found" });
           return;
         }
 
-        // Find the pharmacy's userId from the pharmacy record
-        let pharmacyUserId = null;
-        if (sosRequest.acceptedBy) {
-          const pharmacy = await prisma.pharmacy.findUnique({
-            where: { id: sosRequest.acceptedBy },
-            select: { userId: true },
-          });
-          pharmacyUserId = pharmacy?.userId || null;
-        }
+        const isAuthorized =
+          senderId === chatRoom.patientId || senderId === chatRoom.pharmacyId;
 
-        const isPatient = senderId === sosRequest.patientId;
-        const isPharmacy = senderId === pharmacyUserId;
-
-        if (!isPatient && !isPharmacy) {
+        if (!isAuthorized) {
           socket.emit("chat_error", {
             message: "You are not authorized to send messages in this chat",
           });
@@ -113,11 +121,11 @@ export default function chatHandler(io) {
         }
 
         // Persist message to database
-        const message = await prisma.message.create({
+        const message = await prisma.chatMessage.create({
           data: {
             content: trimmedContent,
             senderId,
-            sosRequestId,
+            roomId,
           },
           include: {
             sender: {
@@ -126,7 +134,7 @@ export default function chatHandler(io) {
           },
         });
 
-        const roomName = `room_${sosRequestId}`;
+        const roomName = `chatroom_${roomId}`;
 
         // Broadcast to entire room (including sender for confirmation)
         io.to(roomName).emit("receive_message", {
@@ -134,14 +142,23 @@ export default function chatHandler(io) {
           content: message.content,
           senderId: message.senderId,
           senderName: message.sender?.name || "Unknown",
-          sosRequestId: message.sosRequestId,
+          roomId: message.roomId,
+          isRead: message.isRead,
           createdAt: message.createdAt,
         });
 
-        // Also emit a global event so the pharmacy header badge updates
-        io.emit("NEW_CHAT_MESSAGE", {
-          sosRequestId: message.sosRequestId,
-          senderId: message.senderId,
+        // Emit a notification event for unread count update
+        // Send to the recipient (not the sender)
+        const recipientId =
+          senderId === chatRoom.patientId
+            ? chatRoom.pharmacyId
+            : chatRoom.patientId;
+
+        io.emit("new_message_notification", {
+          roomId,
+          sosRequestId: chatRoom.sosRequestId,
+          recipientId,
+          senderId,
           senderName: message.sender?.name || "Unknown",
           preview: trimmedContent.substring(0, 80),
           createdAt: message.createdAt,
@@ -157,12 +174,43 @@ export default function chatHandler(io) {
     });
 
     /**
-     * leave_room
-     * Payload: { sosRequestId: string }
+     * typing_start
+     * Payload: { roomId: string, userId: string, userName: string }
+     * Broadcasts typing indicator to other users in the room
      */
-    socket.on("leave_room", ({ sosRequestId }) => {
-      if (sosRequestId) {
-        const roomName = `room_${sosRequestId}`;
+    socket.on("typing_start", ({ roomId, userId, userName }) => {
+      if (!roomId || !userId) return;
+
+      const roomName = `chatroom_${roomId}`;
+      socket.to(roomName).emit("user_typing", {
+        userId,
+        userName: userName || "Someone",
+        isTyping: true,
+      });
+    });
+
+    /**
+     * typing_stop
+     * Payload: { roomId: string, userId: string }
+     * Broadcasts stop typing indicator to other users in the room
+     */
+    socket.on("typing_stop", ({ roomId, userId }) => {
+      if (!roomId || !userId) return;
+
+      const roomName = `chatroom_${roomId}`;
+      socket.to(roomName).emit("user_typing", {
+        userId,
+        isTyping: false,
+      });
+    });
+
+    /**
+     * leave_room
+     * Payload: { roomId: string }
+     */
+    socket.on("leave_room", ({ roomId }) => {
+      if (roomId) {
+        const roomName = `chatroom_${roomId}`;
         socket.leave(roomName);
         logger.info(`[SOCKET] ${socket.id} left ${roomName}`);
       }
