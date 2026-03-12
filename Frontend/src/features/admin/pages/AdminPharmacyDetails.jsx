@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { useAuth } from "../../../context/AuthContext";
 import { getPharmacyById, approvePharmacy, rejectPharmacy } from "../../../core/services/pharmacy.service";
 import { 
@@ -17,6 +18,7 @@ import {
   Download
 } from "lucide-react";
 import AdminLayout from "../components/AdminLayout";
+import ConfirmModal from "../../../shared/components/ui/ConfirmModal";
 
 const AdminPharmacyDetails = () => {
   const { id } = useParams();
@@ -29,6 +31,7 @@ const AdminPharmacyDetails = () => {
   const [rejectionReason, setRejectionReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [confirmApprove, setConfirmApprove] = useState(false);
 
   useEffect(() => {
     if (user && user.roleId !== 1) {
@@ -54,17 +57,18 @@ const AdminPharmacyDetails = () => {
   };
 
   const handleApprove = async () => {
-    if (!window.confirm("Are you sure you want to approve this pharmacy?")) {
-      return;
-    }
+    setConfirmApprove(true);
+  };
 
+  const handleApproveConfirm = async () => {
+    setConfirmApprove(false);
     setActionLoading(true);
     try {
       await approvePharmacy(pharmacy.id);
       await fetchPharmacyDetails();
-      alert("Pharmacy approved successfully!");
+      toast.success('✅ Pharmacy approved successfully! The owner has been notified.');
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to approve pharmacy");
+      toast.error(err.response?.data?.message || '❌ Failed to approve pharmacy. Please try again.');
     } finally {
       setActionLoading(false);
     }
@@ -72,7 +76,7 @@ const AdminPharmacyDetails = () => {
 
   const handleRejectSubmit = async () => {
     if (!rejectionReason.trim()) {
-      alert("Please provide a rejection reason");
+      toast.error('⚠️ Please provide a rejection reason before submitting.');
       return;
     }
 
@@ -82,9 +86,9 @@ const AdminPharmacyDetails = () => {
       setShowRejectModal(false);
       setRejectionReason("");
       await fetchPharmacyDetails();
-      alert("Pharmacy rejected successfully!");
+      toast.success('✅ Pharmacy rejected and the owner has been notified.');
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to reject pharmacy");
+      toast.error(err.response?.data?.message || '❌ Failed to reject pharmacy. Please try again.');
     } finally {
       setActionLoading(false);
     }
@@ -95,6 +99,7 @@ const AdminPharmacyDetails = () => {
   }
 
   return (
+    <>
     <AdminLayout>
       <div style={{ marginBottom: "24px" }}>
         <button
@@ -757,8 +762,20 @@ const AdminPharmacyDetails = () => {
             />
           </div>
         </div>
-      )}
+      )}    
     </AdminLayout>
+
+    <ConfirmModal
+      isOpen={confirmApprove}
+      onClose={() => setConfirmApprove(false)}
+      onConfirm={handleApproveConfirm}
+      title="Approve Pharmacy"
+      message="Are you sure you want to approve this pharmacy? The owner will be notified and granted full platform access."
+      confirmLabel="Yes, Approve"
+      variant="warning"
+      isLoading={actionLoading}
+    />
+    </>
   );
 };
 

@@ -394,10 +394,16 @@ class NotificationService {
     try {
       const SOS_RADIUS_KM = 50;
 
-      // If patient has no coordinates, fall back to all approved pharmacies
+      logger.info("[BROADCAST] Starting pharmacy discovery", {
+        sosId: sosRequest.id,
+        hasCoords: sosRequest.latitude != null && sosRequest.longitude != null,
+        radiusKm: SOS_RADIUS_KM,
+      });
+
+      // If patient has no coordinates, fall back to all VERIFIED pharmacies
       if (sosRequest.latitude == null || sosRequest.longitude == null) {
         const pharmacyUsers = await prisma.pharmacy.findMany({
-          where: { verificationStatus: "APPROVED" },
+          where: { verificationStatus: "VERIFIED" },
           select: { userId: true },
         });
         const userIds = pharmacyUsers.map((p) => p.userId);
@@ -405,9 +411,9 @@ class NotificationService {
 
         return this.broadcastNotification(
           userIds,
-          `🚨 Urgent: New SOS for ${sosRequest.medicineName}`,
-          `${sosRequest.patientName} urgently needs ${sosRequest.medicineName}. Location: ${sosRequest.address}. Check SOS requests to respond.`,
-          "SOS_UPDATE",
+          "🚨 NEW EMERGENCY SOS",
+          `${sosRequest.patientName} needs ${sosRequest.medicineName} nearby.`,
+          "SOS_ALERT",
           {
             sosId: sosRequest.id,
             medicineName: sosRequest.medicineName,
@@ -420,10 +426,10 @@ class NotificationService {
         );
       }
 
-      // Find approved pharmacies with coordinates
+      // Find VERIFIED pharmacies with coordinates
       const pharmacies = await prisma.pharmacy.findMany({
         where: {
-          verificationStatus: "APPROVED",
+          verificationStatus: "VERIFIED",
           latitude: { not: null },
           longitude: { not: null },
         },
@@ -447,6 +453,12 @@ class NotificationService {
         })
         .map((p) => p.userId);
 
+      logger.info(`[BROADCAST] Radius filter result: ${nearbyUserIds.length}/${pharmacies.length} pharmacies within ${SOS_RADIUS_KM}km`, {
+        sosId: sosRequest.id,
+        total: pharmacies.length,
+        withinRadius: nearbyUserIds.length,
+      });
+
       // Fallback: if no pharmacies within radius, notify ALL approved pharmacies
       let targetUserIds = nearbyUserIds;
       if (targetUserIds.length === 0) {
@@ -461,9 +473,9 @@ class NotificationService {
 
       return this.broadcastNotification(
         targetUserIds,
-        `🚨 Urgent: New SOS for ${sosRequest.medicineName}`,
-        `${sosRequest.patientName} urgently needs ${sosRequest.medicineName}. Location: ${sosRequest.address}. Check SOS requests to respond.`,
-        "SOS_UPDATE",
+        "🚨 NEW EMERGENCY SOS",
+        `${sosRequest.patientName} needs ${sosRequest.medicineName} nearby.`,
+        "SOS_ALERT",
         {
           sosId: sosRequest.id,
           medicineName: sosRequest.medicineName,
@@ -494,10 +506,10 @@ class NotificationService {
    */
   async notifySosClaimedByOther(sosId, acceptedByPharmacyId, acceptedByPharmacyName, medicineName) {
     try {
-      // Find all other approved pharmacies (exclude the one that accepted)
+      // Find all other VERIFIED pharmacies (exclude the one that accepted)
       const otherPharmacies = await prisma.pharmacy.findMany({
         where: {
-          verificationStatus: "APPROVED",
+          verificationStatus: "VERIFIED",
           id: { not: acceptedByPharmacyId },
         },
         select: { userId: true },

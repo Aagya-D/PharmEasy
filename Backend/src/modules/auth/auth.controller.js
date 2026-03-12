@@ -6,6 +6,7 @@ import logger from "../../utils/logger.js";
 import { createLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
 import { hashPassword, comparePassword } from "../../utils/password.js";
 import { prisma } from "../../database/prisma.js";
+import { isValidNepaliPhone } from "../../utils/validation.js";
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -43,6 +44,16 @@ export const register = async (req, res, next) => {
         : firstName || lastName);
 
     logger.debug('AUTH', '[REGISTER] Full name resolved', { name: fullName });
+
+    // Validate phone number if provided
+    if (phone) {
+      if (!isValidNepaliPhone(phone)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid Nepali phone number. Must be 10 digits starting with 9.",
+        });
+      }
+    }
 
     // Call the correct service method
     const result = await userService.registerUser({
@@ -254,6 +265,7 @@ export const login = async (req, res, next) => {
         role: result.role,
         roleId: result.roleId,
         status: result.status,
+        isVerified: result.isVerified,
         pharmacy: result.pharmacy,
         isOnboarded: result.isOnboarded,
         needsOnboarding,
@@ -312,10 +324,15 @@ export const login = async (req, res, next) => {
 // ---------------- REFRESH TOKENS ----------------
 export const refreshTokens = async (req, res, next) => {
   try {
-    const token = req.cookies?.refresh_token;
+    // Accept token from request body (localStorage-based clients) OR httpOnly cookie
+    const token = req.body?.refreshToken || req.cookies?.refresh_token;
 
     if (!token) {
-      throw new AuthenticationError("No refresh token found");
+      // Return a clean 401 JSON — do not throw so the process is never crashed
+      return res.status(401).json({
+        success: false,
+        message: "No refresh token found",
+      });
     }
 
     let payload;
@@ -375,7 +392,9 @@ export const refreshTokens = async (req, res, next) => {
     });
 
     res.json({
+      success: true,
       message: "Tokens refreshed successfully",
+      data: { accessToken: newAccess },
       expiresIn: "15m",
     });
   } catch (err) {

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from "react";
 import authService from "../core/services/auth.service";
-import httpClient from "../core/services/httpClient";
+import httpClient, { clearAuth } from "../core/services/httpClient";
 import logger from "../utils/logger";
 import auditor from "../utils/auditor";
 
@@ -139,6 +139,28 @@ function authReducer(state, action) {
 // ✅ TASK: Robust Initializer - read from localStorage on first mount
 // This runs BEFORE the component renders, ensuring state is hydrated immediately
 function initAuthState(initial) {
+
+/**
+ * Lightweight JWT payload decoder — no external dependency needed.
+ * Returns null on any malformed input so callers can treat it as "invalid".
+ */
+function decodeTokenPayload(token) {
+  try {
+    return JSON.parse(atob(token.split(".")[1]));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Returns true when the JWT is structurally valid and its exp claim is
+ * in the past (or when the token cannot be decoded at all).
+ */
+function isTokenExpired(token) {
+  const payload = decodeTokenPayload(token);
+  if (!payload || typeof payload.exp !== "number") return true;
+  return payload.exp * 1000 < Date.now();
+}
   console.log('[AUTH INIT] Starting initialization from localStorage...');
   
   try {
@@ -208,7 +230,27 @@ export function AuthProvider({ children }) {
         
         if (storedUser && storedAccessToken) {
           const user = JSON.parse(storedUser);
-          
+
+          // ✅ TASK 3: Pre-check token expiry BEFORE hitting the network.
+          // If the stored access token is already expired, skip /api/auth/me
+          // entirely, clear the session, and let the user log in again.
+          if (isTokenExpired(storedAccessToken)) {
+            logger.warn("Stored access token is already expired — skipping /auth/me", {
+              userId: user.id,
+            });
+            clearAuth();
+            dispatch({
+              type: ACTIONS.RESTORE_SESSION,
+              payload: {
+                user: null,
+                accessToken: null,
+                isAuthenticated: false,
+                isOTPVerified: false,
+              },
+            });
+            return;
+          }
+
           logger.info("Session found in localStorage, verifying token", { 
             userId: user.id,
             role: user.roleId
@@ -235,9 +277,10 @@ export function AuthProvider({ children }) {
               role: userData.role,
               roleId: userData.roleId,
               status: userData.status,
+              isVerified: userData.isVerified ?? true,
               pharmacy: pharmacyData,
-              isOnboarded: userData.isOnboarded,
-              needsOnboarding: userData.needsOnboarding,
+              isOnboarded: userData.isOnboarded ?? true,
+              needsOnboarding: userData.needsOnboarding ?? false,
             };
 
             logger.authEvent("TOKEN_VERIFIED", { 
@@ -256,18 +299,23 @@ export function AuthProvider({ children }) {
               },
             });
           } catch (verificationError) {
-            // Token verification failed - token is invalid or expired
+            // Token verification failed — token is invalid, expired, or revoked
+            const status = verificationError.response?.status;
             logger.warn("Token verification failed during hydration", {
+              status,
               error: verificationError.message,
               userId: user.id,
             });
 
-            // Clear invalid session from localStorage
+            // Perform a clean logout: clear all session data
             localStorage.removeItem("accessToken");
             localStorage.removeItem("refreshToken");
             localStorage.removeItem("user");
+            localStorage.removeItem("pendingUserId");
+            localStorage.removeItem("pendingEmail");
+            // Remove stale default Authorization header so no further requests leak the old token
+            delete httpClient.defaults.headers.common["Authorization"];
 
-            // Start unauthenticated
             dispatch({
               type: ACTIONS.RESTORE_SESSION,
               payload: {
@@ -277,6 +325,12 @@ export function AuthProvider({ children }) {
                 isOTPVerified: false,
               },
             });
+
+            // On 401/403 redirect immediately — don't rely solely on route guards
+            // during the initialization phase so the app never hangs on Access Denied.
+            if ((status === 401 || status === 403) && typeof window !== "undefined") {
+              window.location.replace("/login");
+            }
           }
         } else {
           // No session - start unauthenticated
@@ -352,48 +406,58 @@ export function AuthProvider({ children }) {
         );
 
         // ✅ SKIP token refresh for auth endpoints (login, register, verify-otp, etc.)
-        // These endpoints fail legitimately and should NOT trigger token refresh
-        const authEndpoints = ['/auth/login', '/auth/register', '/auth/verify-otp', '/auth/forgot-password'];
-        const isAuthEndpoint = authEndpoints.some(endpoint => originalRequest?.url?.includes(endpoint));
+        // Also skip /auth/refresh itself — if it returns 401 there is nothing to
+        // retry and the circuit breaker in httpClient.js will call clearAuth().
+        const authEndpoints = [
+          "/auth/login",
+          "/auth/register",
+          "/auth/verify-otp",
+          "/auth/forgot-password",
+          "/auth/refresh",
+        ];
+        const isAuthEndpoint = authEndpoints.some((endpoint) =>
+          originalRequest?.url?.includes(endpoint)
+        );
 
         // If 401 and not already retried, try to refresh token
         // BUT: Skip refresh if this is an auth endpoint (login/register fail legitimately)
         if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
           originalRequest._retry = true;
 
-          try {
-            const refreshToken = localStorage.getItem("refreshToken");
-            if (refreshToken) {
-              logger.info("Attempting token refresh");
-              const response = await authService.refreshToken({
-                refreshToken,
-              });
-
-              const { accessToken } = response.data.data;
-              localStorage.setItem("accessToken", accessToken);
-              logger.authEvent("TOKEN_REFRESHED");
-
-              dispatch({
-                type: ACTIONS.REFRESH_TOKEN_SUCCESS,
-                payload: accessToken,
-              });
-
-              // Retry original request with new token
-              originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-              return httpClient(originalRequest);
-            }
-          } catch (refreshError) {
-            // Refresh failed, logout user and redirect to login
-            logger.warn("Token refresh failed, redirecting to login", { error: refreshError.message });
+          const refreshToken = localStorage.getItem("refreshToken");
+          if (!refreshToken) {
+            // No refresh token at all — clear everything and redirect
+            logger.warn("No refresh token in storage, clearing auth");
             dispatch({ type: ACTIONS.LOGOUT });
-            localStorage.removeItem("accessToken");
-            localStorage.removeItem("refreshToken");
-            localStorage.removeItem("user");
-            
-            // ✅ FIX: Redirect to login on token expiry
-            if (typeof window !== 'undefined') {
-              window.location.href = '/login';
-            }
+            clearAuth();
+            return Promise.reject(error);
+          }
+
+          try {
+            logger.info("Attempting token refresh");
+            // authService.refreshToken reads from localStorage internally
+            const response = await authService.refreshToken();
+
+            // Backend returns { success, data: { accessToken }, ... }
+            const { accessToken } = response.data;
+            localStorage.setItem("accessToken", accessToken);
+            logger.authEvent("TOKEN_REFRESHED");
+
+            dispatch({
+              type: ACTIONS.REFRESH_TOKEN_SUCCESS,
+              payload: accessToken,
+            });
+
+            // Retry original request with new token
+            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+            return httpClient(originalRequest);
+          } catch (refreshError) {
+            // Refresh failed — wipe auth state and go to login
+            logger.warn("Token refresh failed, redirecting to login", {
+              error: refreshError.message,
+            });
+            dispatch({ type: ACTIONS.LOGOUT });
+            clearAuth();
           }
         }
 
@@ -426,9 +490,10 @@ export function AuthProvider({ children }) {
         role: userData.role,
         roleId: userData.roleId,
         status: userData.status,
+        isVerified: userData.isVerified ?? true,
         pharmacy: userData.pharmacy,
-        isOnboarded: userData.isOnboarded,
-        needsOnboarding: userData.needsOnboarding,
+        isOnboarded: userData.isOnboarded ?? true,
+        needsOnboarding: userData.needsOnboarding ?? false,
       };
 
       // Store tokens and user info
@@ -607,9 +672,10 @@ export function AuthProvider({ children }) {
         roleId: apiData.user?.roleId,
         role: apiData.user?.role,
         status: apiData.user?.status,
+        isVerified: apiData.user?.isVerified ?? true,
         pharmacy: apiData.pharmacy,
-        isOnboarded: apiData.isOnboarded,
-        needsOnboarding: apiData.needsOnboarding,
+        isOnboarded: apiData.isOnboarded ?? true,
+        needsOnboarding: apiData.needsOnboarding ?? false,
       };
 
       // Store tokens and user info

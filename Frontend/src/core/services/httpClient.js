@@ -4,6 +4,26 @@ import logger from "../../utils/logger";
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5050/api";
 
 /**
+ * Circuit-breaker: wipe all local auth state and hard-redirect to /login.
+ * Called when a "terminal" auth endpoint (refresh / login) returns 401 so
+ * we can never enter an infinite retry loop.
+ */
+export const clearAuth = () => {
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("user");
+  localStorage.removeItem("pendingUserId");
+  localStorage.removeItem("pendingEmail");
+  if (typeof window !== "undefined") {
+    delete httpClient.defaults.headers.common["Authorization"];
+    // Only redirect if not already on the login page to avoid reload loops
+    if (window.location.pathname !== "/login") {
+      window.location.replace("/login");
+    }
+  }
+};
+
+/**
  * Centralized HTTP Client
  * All API requests must go through this client
  */
@@ -58,7 +78,7 @@ httpClient.interceptors.request.use(
     });
 
     // Auto-attach token if available
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("accessToken");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -117,18 +137,29 @@ httpClient.interceptors.response.use(
       console.error('[HTTP] Logger error:', logError.message);
     }
 
-    // These endpoints can legitimately return 401 for failed credentials
     if (status === 401) {
-      const authEndpoints = ['/auth/login', '/auth/register', '/auth/verify-otp', '/auth/forgot-password'];
-      const isAuthEndpoint = authEndpoints.some(endpoint => error.config?.url?.includes(endpoint));
-      
-      // Only auto-logout for non-auth endpoints (user session expired, token invalid)
-      if (!isAuthEndpoint) {
+      // Circuit breaker: if a token-refresh or login call itself gets a 401
+      // there is nothing left to retry — clear auth state immediately.
+      const circuitBreakerEndpoints = ["/auth/refresh", "/auth/login"];
+      const isCircuitBreaker = circuitBreakerEndpoints.some(
+        (endpoint) => error.config?.url?.includes(endpoint)
+      );
+
+      if (isCircuitBreaker) {
+        // Mark as already retried so no downstream interceptor tries again
+        if (error.config) error.config._retry = true;
+        clearAuth();
+        return Promise.reject(error);
+      }
+
+      // For other non-auth 401s, AuthContext's interceptor handles the
+      // token-refresh flow.  Only scrub the legacy "token" key here.
+      const legacyAuthEndpoints = ["/auth/register", "/auth/verify-otp", "/auth/forgot-password"];
+      const isLegacyAuth = legacyAuthEndpoints.some(
+        (endpoint) => error.config?.url?.includes(endpoint)
+      );
+      if (!isLegacyAuth) {
         localStorage.removeItem("token");
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("user");
-        window.location.href = "/login";
       }
     }
 

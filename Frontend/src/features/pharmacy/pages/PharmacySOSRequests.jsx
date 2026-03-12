@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { 
   AlertTriangle, 
   Loader, 
@@ -134,12 +135,16 @@ export default function PharmacySOSRequests() {
       await fetchAcceptedRequests();
 
       // Show success message
-      alert(`SOS request ${response === 'accepted' ? 'accepted' : 'rejected'} successfully!`);
+      if (response === 'accepted') {
+        toast.success('✅ SOS request accepted! The patient has been notified.');
+      } else {
+        toast('🟡 SOS request declined. The patient will be notified.', { icon: '🔔' });
+      }
     } catch (err) {
       console.error("Error responding to SOS:", err);
-      alert(
-        err.response?.data?.error?.message || 
-        "Failed to respond to SOS request. Please try again."
+      toast.error(
+        err.response?.data?.error?.message ||
+        '❌ Failed to respond to SOS request. Please check your connection.'
       );
     } finally {
       setRespondingTo(null);

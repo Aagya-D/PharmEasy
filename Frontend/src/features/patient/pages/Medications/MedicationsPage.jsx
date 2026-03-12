@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { Button } from "../../../../shared/components/ui";
+import ConfirmModal from "../../../../shared/components/ui/ConfirmModal";
 import patientService from "../../services/patient.service";
 import {
   Pill,
@@ -18,6 +20,7 @@ export function MedicationsPage() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [confirmRemove, setConfirmRemove] = useState({ open: false, medicationId: null });
 
   const tabs = [
     { id: "all", label: "All Medications" },
@@ -81,20 +84,27 @@ export function MedicationsPage() {
     }
   };
 
-  const handleRemoveMedication = async (medicationId) => {
-    if (window.confirm("Are you sure you want to remove this medication?")) {
-      try {
-        await patientService.removeMedication(medicationId);
-        setMedications((prev) =>
-          prev.filter((med) => med.id !== medicationId)
-        );
-      } catch (err) {
-        console.error("[REMOVE MEDICATION]", err);
-      }
+  const handleRemoveMedication = (medicationId) => {
+    setConfirmRemove({ open: true, medicationId });
+  };
+
+  const handleRemoveConfirm = async () => {
+    const { medicationId } = confirmRemove;
+    setConfirmRemove({ open: false, medicationId: null });
+    try {
+      await patientService.removeMedication(medicationId);
+      setMedications((prev) =>
+        prev.filter((med) => med.id !== medicationId)
+      );
+      toast.success('✅ Medication removed from your list.');
+    } catch (err) {
+      console.error("[REMOVE MEDICATION]", err);
+      toast.error('❌ Failed to remove medication. Please try again.');
     }
   };
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-6 mb-6 sticky top-0 z-10">
@@ -275,6 +285,17 @@ export function MedicationsPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmRemove.open}
+        onClose={() => setConfirmRemove({ open: false, medicationId: null })}
+        onConfirm={handleRemoveConfirm}
+        title="Remove Medication"
+        message="Are you sure you want to remove this medication from your list? You can always add it back later."
+        confirmLabel="Yes, Remove"
+        variant="danger"
+      />
+    </>
   );
 }
 

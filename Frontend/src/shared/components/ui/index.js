@@ -7,6 +7,7 @@
 export { Button } from "./Button";
 export { Input, TextArea } from "./Input";
 export { default as Modal } from "./Modal";
+export { default as ConfirmModal } from "./ConfirmModal";
 
 // Feedback Components
 export { Alert } from "./Alert";

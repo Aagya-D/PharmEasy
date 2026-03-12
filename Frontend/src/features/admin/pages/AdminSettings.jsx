@@ -24,6 +24,7 @@ import { useAuth } from "../../../context/AuthContext";
 import adminService from "../../../core/services/admin.service";
 import AdminLayout from "../components/AdminLayout";
 import { useDarkMode } from "../../../context/DarkModeContext";
+import ConfirmModal from "../../../shared/components/ui/ConfirmModal";
 
 /**
  * Password Strength Meter Component
@@ -158,6 +159,7 @@ const AdminSettings = () => {
   const [secret, setSecret] = useState("");
   const [backupCodes, setBackupCodes] = useState([]);
   const [verificationCode, setVerificationCode] = useState("");
+  const [confirmDisable2FA, setConfirmDisable2FA] = useState(false);
 
   // Profile form
   const {
@@ -260,8 +262,11 @@ const AdminSettings = () => {
   };
 
   const disable2FA = async () => {
-    if (!confirm('Are you sure you want to disable 2FA? This will reduce your account security.')) return;
-    
+    setConfirmDisable2FA(true);
+  };
+
+  const handleDisable2FAConfirm = async () => {
+    setConfirmDisable2FA(false);
     try {
       const response = await fetch('http://localhost:5000/api/admin/2fa/disable', {
         method: 'POST',
@@ -336,6 +341,7 @@ const AdminSettings = () => {
   };
 
   return (
+    <>
     <AdminLayout>
       <div className="max-w-4xl mx-auto">
         {/* Toast Notification */}
@@ -901,6 +907,17 @@ const AdminSettings = () => {
         </div>
       </div>
     </AdminLayout>
+
+    <ConfirmModal
+      isOpen={confirmDisable2FA}
+      onClose={() => setConfirmDisable2FA(false)}
+      onConfirm={handleDisable2FAConfirm}
+      title="Disable Two-Factor Authentication"
+      message="Disabling 2FA will reduce your account security. Are you sure you want to proceed?"
+      confirmLabel="Yes, Disable 2FA"
+      variant="warning"
+    />
+    </>
   );
 };
 

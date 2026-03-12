@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import toast from "react-hot-toast";
 import { AuthLayout } from "../components/AuthLayout";
 import { useAuth } from "../../../context/AuthContext";
 import { Input } from "../../../shared/components/ui";
@@ -29,11 +30,14 @@ export function Login() {
     }
 
     setIsLoading(true);
+    const loadingToast = toast.loading('🔐 Logging you in, please wait...');
 
     try {
       const result = await login(email, password);
+      toast.dismiss(loadingToast);
       
       if (result.success) {
+        toast.success(`👋 Welcome back, ${result.user?.name?.split(' ')[0] || 'there'}!`);
         // Use helper function for role-based navigation
         const dashboardPath = getDashboardPath(result.user);
         navigate(dashboardPath);
@@ -55,6 +59,7 @@ export function Login() {
         console.error("[LOGIN] Failed:", errorMessage);
       }
     } catch (err) {
+      toast.dismiss(loadingToast);
       // ✅ FIX: Catch unexpected errors, not from API response
       const errorMessage = err.response?.data?.message || err.message || "An unexpected error occurred";
       setError(errorMessage);

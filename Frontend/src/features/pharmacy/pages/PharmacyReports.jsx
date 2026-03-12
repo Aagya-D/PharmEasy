@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import {
   FileText,
   TrendingUp,
@@ -76,7 +77,7 @@ export default function PharmacyReports() {
       setTimeout(() => setExportSuccess(null), 3000);
     } catch (err) {
       console.error(`Export ${type} failed:`, err);
-      alert(`Failed to export ${type}. Please try again.`);
+      toast.error(`❌ Failed to export ${type} report. Please check your connection and try again.`);
     } finally {
       setExporting(false);
     }

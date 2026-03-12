@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { motion, AnimatePresence } from "framer-motion";
+import { isValidNepaliPhone, maskPhoneInput, NEPALI_PHONE_ERROR } from "../../../utils/phoneValidation";
 import {
   AlertTriangle,
   MapPin,
@@ -45,6 +47,7 @@ export default function EmergencySOS()
     urgencyLevel: "high",
     patientName: "",
     contactNumber: "",
+    contactNumberError: "",
     address: "",
     latitude: null,
     longitude: null,
@@ -81,7 +84,10 @@ export default function EmergencySOS()
     setLocationError("");
     setGpsError("");
 
+    const gpsToast = toast.loading('📍 Detecting your GPS location...');
+
     if (!navigator.geolocation) {
+      toast.dismiss(gpsToast);
       setLocationError("Geolocation is not supported by your browser");
       setLocationLoading(false);
       return;
@@ -94,11 +100,15 @@ export default function EmergencySOS()
 
         // The "0,0" trap — reject invalid coordinates (0,0 is in the ocean, not Nepal)
         if (!lat || !lng || lat === 0 || lng === 0) {
+          toast.dismiss(gpsToast);
+          toast.error('❌ GPS returned invalid coordinates. Please move to an open area and try again.');
           setLocationError("GPS returned invalid coordinates. Please try again or move to an open area.");
           setLocationLoading(false);
           return;
         }
 
+        toast.dismiss(gpsToast);
+        toast.success('📍 Location detected successfully!');
         setFormData((prev) => ({
           ...prev,
           latitude: lat,
@@ -108,6 +118,7 @@ export default function EmergencySOS()
         setLocationLoading(false);
       },
       (error) => {
+        toast.dismiss(gpsToast);
         if (error.code === error.PERMISSION_DENIED) {
           setLocationError(
             "Location permission denied. To re-enable: open your browser settings \u2192 Privacy & Security \u2192 Site Settings \u2192 Location, and allow this site. Then refresh and try again."
@@ -144,6 +155,14 @@ export default function EmergencySOS()
       // Validate required fields
       if (!formData.medicineName || !formData.patientName || !formData.contactNumber || !formData.address) {
         throw new Error("Please fill in all required fields");
+      }
+
+      if (!isValidNepaliPhone(formData.contactNumber)) {
+        throw new Error(NEPALI_PHONE_ERROR);
+      }
+
+      if (!isValidNepaliPhone(formData.contactNumber)) {
+        throw new Error(NEPALI_PHONE_ERROR);
       }
 
       // Call backend SOS API with all form data
@@ -239,6 +258,7 @@ export default function EmergencySOS()
                   urgencyLevel: "high",
                   patientName: "",
                   contactNumber: "",
+                  contactNumberError: "",
                   address: "",
                   latitude: null,
                   longitude: null,
@@ -613,15 +633,29 @@ export default function EmergencySOS()
                     type="tel"
                     required
                     value={formData.contactNumber}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const masked = maskPhoneInput(e.target.value);
                       setFormData({
                         ...formData,
-                        contactNumber: e.target.value,
-                      })
-                    }
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    placeholder="+91 XXXXX XXXXX"
+                        contactNumber: masked,
+                        contactNumberError:
+                          masked && !isValidNepaliPhone(masked)
+                            ? NEPALI_PHONE_ERROR
+                            : "",
+                      });
+                    }}
+                    className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent ${
+                      formData.contactNumberError
+                        ? "border-red-400"
+                        : "border-gray-200"
+                    }`}
+                    placeholder="98XXXXXXXX"
+                    maxLength={10}
+                    inputMode="numeric"
                   />
+                  {formData.contactNumberError && (
+                    <p className="text-xs text-red-500 mt-1">{formData.contactNumberError}</p>
+                  )}
                 </div>
               </div>
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { useAuth } from "../../../context/AuthContext";
 import { AnnouncementBanner } from "../../../shared/components/AnnouncementBanner";
 import { getAllPharmacies } from "../../../core/services/pharmacy.service";
@@ -85,7 +86,7 @@ const AdminDashboardHome = () => {
       }
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF report');
+      toast.error('❌ Failed to generate PDF report. Please check your connection.');
     } finally {
       setExporting(false);
       setShowExportModal(false);
@@ -120,7 +121,7 @@ const AdminDashboardHome = () => {
       }
     } catch (error) {
       console.error('Error generating Excel:', error);
-      alert('Failed to generate Excel report');
+      toast.error('❌ Failed to generate Excel report. Please check your connection.');
     } finally {
       setExporting(false);
       setShowExportModal(false);

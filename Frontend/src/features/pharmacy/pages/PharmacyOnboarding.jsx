@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { useForm } from "react-hook-form";
 import { ChevronRight, FileText, MapPin, Navigation, ShieldCheck, Upload, CheckCircle } from "lucide-react";
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
@@ -11,6 +12,7 @@ import { Input, TextArea } from "../../../shared/components/ui/Input";
 import { Button } from "../../../shared/components/ui/Button";
 import { Alert } from "../../../shared/components/ui/Alert";
 import { getMyPharmacy, submitPharmacyOnboarding } from "../../../core/services/pharmacy.service";
+import { isValidNepaliPhone, maskPhoneInput, NEPALI_PHONE_ERROR, NEPALI_PHONE_REGEX } from "../../../utils/phoneValidation";
 
 // Fix Leaflet default icon issue
 delete L.Icon.Default.prototype._getIconUrl;
@@ -20,7 +22,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const PHONE_REGEX = /^[+]?\d{7,15}$/;
+// Nepal mobile format: exactly 10 digits starting with 9
+const PHONE_REGEX = NEPALI_PHONE_REGEX;
 
 // Nepal geographic boundaries for validation
 const NEPAL_BOUNDS = {
@@ -58,7 +61,7 @@ function LocationPicker({ position, setPosition }) {
       ) {
         setPosition([lat, lng]);
       } else {
-        alert('Please select a location within Nepal');
+        toast.error('❌ Please select a location within Nepal.');
       }
     },
   });
@@ -499,16 +502,22 @@ const PharmacyOnboarding = () => {
                 <Input
                   label="Contact Number"
                   type="tel"
-                  placeholder="+977 9812345678"
+                  placeholder="98XXXXXXXX"
                   required
                   error={errors.contactNumber?.message}
                   {...registerField("contactNumber", {
                     required: "Contact number is required",
                     pattern: {
                       value: PHONE_REGEX,
-                      message: "Enter a valid phone number",
+                      message: NEPALI_PHONE_ERROR,
                     },
                   })}
+                  inputMode="numeric"
+                  maxLength={10}
+                  onChange={(e) => {
+                    const masked = maskPhoneInput(e.target.value);
+                    setValue("contactNumber", masked, { shouldValidate: true });
+                  }}
                 />
 
                 <Input

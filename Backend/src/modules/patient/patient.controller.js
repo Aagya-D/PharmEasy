@@ -6,6 +6,8 @@
 import { prisma } from "../../database/prisma.js";
 import logger from "../../utils/logger.js";
 import { createLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
+import notificationService from "../notifications/notification.service.js";
+import { isValidNepaliPhone } from "../../utils/validation.js";
 
 // ─── SOS Expiration Config ────────────────────────────
 const SOS_TTL_MINUTES = 30;
@@ -160,6 +162,14 @@ export const updateProfile = async (req, res) => {
     return res.status(401).json({
       success: false,
       message: "Authentication required"
+    });
+  }
+
+  // Validate phone format if provided
+  if (phone && !isValidNepaliPhone(phone)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid Nepali phone number. Must be 10 digits starting with 9.",
     });
   }
 
@@ -374,6 +384,14 @@ export const submitSOSRequest = async (req, res) => {
       });
     }
 
+    // Validate Nepal phone format
+    if (!isValidNepaliPhone(contactNumber)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Nepali phone number. Must be 10 digits starting with 9.",
+      });
+    }
+
     // GPS coordinates are mandatory for SOS requests
     const parsedLat = latitude ? parseFloat(latitude) : null;
     const parsedLng = longitude ? parseFloat(longitude) : null;
@@ -420,9 +438,16 @@ export const submitSOSRequest = async (req, res) => {
 
     // Notify nearby pharmacies about the new SOS request
     try {
-      const { default: notificationService } = await import("../notifications/notification.service.js");
+      logger.info(`[BROADCAST] SOS ${sosRequest.id} created — searching for nearby VERIFIED pharmacies within 50km`, {
+        sosId: sosRequest.id,
+        medicineName: sosRequest.medicineName,
+        patientName: sosRequest.patientName,
+        lat: sosRequest.latitude,
+        lng: sosRequest.longitude,
+      });
+
       const notifiedCount = await notificationService.notifyNearbyPharmacies(sosRequest);
-      logger.info("[SOS] Pharmacy notifications created", {
+      logger.info(`[BROADCAST] Notifying ${notifiedCount} pharmacies about new SOS`, {
         sosId: sosRequest.id,
         notifiedPharmacies: notifiedCount,
       });
@@ -430,18 +455,20 @@ export const submitSOSRequest = async (req, res) => {
       // Safety net: if notifyNearbyPharmacies created 0 records, create at least
       // one broadcast so the SOS is never silently lost
       if (notifiedCount === 0) {
-        logger.warn("[SOS] No pharmacies notified — broadcasting to all approved pharmacies");
+        logger.warn(`[BROADCAST] Warning: 0 pharmacies notified via radius — falling back to all VERIFIED pharmacies`, {
+          sosId: sosRequest.id,
+        });
         const allPharmacies = await prisma.pharmacy.findMany({
-          where: { verificationStatus: "APPROVED" },
+          where: { verificationStatus: "VERIFIED" },
           select: { userId: true },
         });
         const allUserIds = allPharmacies.map((p) => p.userId);
         if (allUserIds.length > 0) {
           await notificationService.broadcastNotification(
             allUserIds,
-            `🚨 URGENT: New SOS Request`,
-            `${sosRequest.patientName} needs ${sosRequest.medicineName} nearby. Location: ${sosRequest.address}.`,
-            "SOS_UPDATE",
+            `🚨 NEW EMERGENCY SOS`,
+            `${sosRequest.patientName} needs ${sosRequest.medicineName} nearby.`,
+            "SOS_ALERT",
             {
               sosId: sosRequest.id,
               medicineName: sosRequest.medicineName,
@@ -452,11 +479,14 @@ export const submitSOSRequest = async (req, res) => {
             "PHARMACY",
             "high"
           );
-          logger.info("[SOS] Fallback broadcast sent", { count: allUserIds.length });
+          logger.info(`[BROADCAST] Fallback broadcast sent to ${allUserIds.length} pharmacies`, {
+            sosId: sosRequest.id,
+            count: allUserIds.length,
+          });
         }
       }
 
-      // Real-time Socket.IO push to pharmacy clients
+      // Real-time Socket.IO push — broadcasted to all connected pharmacy clients
       const io = req.app.get("io");
       if (io) {
         const alertPayload = {
@@ -473,7 +503,9 @@ export const submitSOSRequest = async (req, res) => {
         };
         // Emit to a pharmacy-wide channel so every connected pharmacy client gets it
         io.emit("NEW_SOS_ALERT", alertPayload);
-        logger.info("[SOS] Real-time alert emitted to pharmacy clients", { sosId: sosRequest.id });
+        logger.info(`[BROADCAST] Socket.IO event NEW_SOS_ALERT emitted to all pharmacy clients`, { sosId: sosRequest.id });
+      } else {
+        logger.warn(`[BROADCAST] io not available — socket notification skipped`, { sosId: sosRequest.id });
       }
     } catch (notifErr) {
       console.error("[PATIENT] Failed to notify pharmacies:", notifErr.message);

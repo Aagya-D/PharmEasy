@@ -115,7 +115,21 @@ export const validateName = (name) => {
 };
 
 /**
- * Validate phone number (optional, basic format)
+ * Nepal mobile number regex: exactly 10 digits, must start with 9.
+ */
+const NEPALI_PHONE_REGEX = /^9\d{9}$/;
+
+/**
+ * Returns true if the value is a valid Nepali mobile number.
+ */
+export const isValidNepaliPhone = (phone) => {
+  if (!phone) return false;
+  return NEPALI_PHONE_REGEX.test(String(phone).trim());
+};
+
+/**
+ * Validate phone number — enforces Nepali mobile format.
+ * Phone is optional; if provided it must be 10 digits starting with 9.
  */
 export const validatePhone = (phone) => {
   if (!phone) return { valid: true, data: null };
@@ -126,8 +140,11 @@ export const validatePhone = (phone) => {
 
   const trimmed = phone.trim();
 
-  if (!validator.isMobilePhone(trimmed, "any", { strictMode: false })) {
-    return { valid: false, error: "Invalid phone number format" };
+  if (!NEPALI_PHONE_REGEX.test(trimmed)) {
+    return {
+      valid: false,
+      error: "Invalid Nepali phone number. Must be 10 digits starting with 9.",
+    };
   }
 
   return { valid: true, data: trimmed };

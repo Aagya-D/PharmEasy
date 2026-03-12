@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { Heart, Megaphone, Plus, Edit2, Trash2, Eye, EyeOff, Calendar, RefreshCw } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
 import { httpClient } from '../../../core/services/httpClient';
+import ConfirmModal from '../../../shared/components/ui/ConfirmModal';
 
 const AdminCMS = () => {
   const [activeTab, setActiveTab] = useState('healthTips');
@@ -11,6 +13,7 @@ const AdminCMS = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('healthTip'); // 'healthTip' or 'announcement'
   const [editingItem, setEditingItem] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null, type: null });
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -116,25 +119,37 @@ const AdminCMS = () => {
       }
       
       if (response.data.success) {
+        const isHealthTip = modalType === 'healthTip';
+        const action = editingItem ? 'updated' : 'published';
+        toast.success(
+          isHealthTip
+            ? `✅ Health Tip ${action} successfully!`
+            : `✅ Announcement ${action} successfully!`
+        );
         setShowModal(false);
         fetchData();
       }
     } catch (error) {
       console.error('Error saving:', error);
-      alert('Failed to save');
+      toast.error('❌ Failed to save. Please check your connection and try again.');
     }
   };
 
-  const handleDelete = async (id, type) => {
-    if (!confirm('Are you sure you want to delete this item?')) return;
-    
+  const handleDeleteClick = (id, type) => {
+    setConfirmDelete({ open: true, id, type });
+  };
+
+  const handleDeleteConfirm = async () => {
+    const { id, type } = confirmDelete;
+    setConfirmDelete((prev) => ({ ...prev, open: false }));
     try {
       const endpoint = type === 'healthTip' ? 'health-tips' : 'announcements';
       await httpClient.delete(`/admin/${endpoint}/${id}`);
+      toast.success('✅ Item deleted successfully!');
       fetchData();
     } catch (error) {
       console.error('Error deleting:', error);
-      alert('Failed to delete');
+      toast.error('❌ Failed to delete. Please try again.');
     }
   };
 
@@ -149,6 +164,7 @@ const AdminCMS = () => {
   };
 
   return (
+    <>
     <AdminLayout>
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
@@ -277,7 +293,7 @@ const AdminCMS = () => {
                           <Edit2 className="w-5 h-5" />
                         </button>
                         <button
-                          onClick={() => handleDelete(tip.id, 'healthTip')}
+                          onClick={() => handleDeleteClick(tip.id, 'healthTip')}
                           className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         >
                           <Trash2 className="w-5 h-5" />
@@ -355,7 +371,7 @@ const AdminCMS = () => {
                           <Edit2 className="w-5 h-5" />
                         </button>
                         <button
-                          onClick={() => handleDelete(announcement.id, 'announcement')}
+                          onClick={() => handleDeleteClick(announcement.id, 'announcement')}
                           className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         >
                           <Trash2 className="w-5 h-5" />
@@ -526,6 +542,17 @@ const AdminCMS = () => {
         )}
       </div>
     </AdminLayout>
+
+      <ConfirmModal
+        isOpen={confirmDelete.open}
+        onClose={() => setConfirmDelete({ open: false, id: null, type: null })}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Content"
+        message="Are you sure you want to permanently delete this item? This action cannot be undone."
+        confirmLabel="Yes, Delete"
+        variant="danger"
+      />
+    </>
   );
 };
 

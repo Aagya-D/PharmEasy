@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { Button } from "../../../../shared/components/ui";
+import ConfirmModal from "../../../../shared/components/ui/ConfirmModal";
 import patientService from "../../services/patient.service";
 import {
   FileText,
@@ -19,6 +21,7 @@ export function PrescriptionsPage() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [showUploadForm, setShowUploadForm] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState({ open: false, prescriptionId: null });
   const [formData, setFormData] = useState({
     doctorName: "",
     hospitalName: "",
@@ -107,21 +110,22 @@ export function PrescriptionsPage() {
     }
   };
 
-  const handleDelete = async (prescriptionId) => {
-    if (
-      window.confirm("Are you sure you want to delete this prescription?")
-    ) {
-      try {
-        await patientService.deletePrescription(prescriptionId);
-        setPrescriptions((prev) =>
-          prev.filter((p) => p.id !== prescriptionId)
-        );
-        setSuccess("Prescription deleted successfully!");
-        setTimeout(() => setSuccess(null), 3000);
-      } catch (err) {
-        setError(err.response?.data?.message || "Failed to delete prescription");
-        console.error("[PRESCRIPTION DELETE]", err);
-      }
+  const handleDelete = (prescriptionId) => {
+    setConfirmDelete({ open: true, prescriptionId });
+  };
+
+  const handleDeleteConfirm = async () => {
+    const { prescriptionId } = confirmDelete;
+    setConfirmDelete({ open: false, prescriptionId: null });
+    try {
+      await patientService.deletePrescription(prescriptionId);
+      setPrescriptions((prev) =>
+        prev.filter((p) => p.id !== prescriptionId)
+      );
+      toast.success('✅ Prescription deleted successfully!');
+    } catch (err) {
+      toast.error(err.response?.data?.message || '❌ Failed to delete prescription. Please try again.');
+      console.error("[PRESCRIPTION DELETE]", err);
     }
   };
 
@@ -144,6 +148,7 @@ export function PrescriptionsPage() {
   };
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-6 mb-6 sticky top-0 z-10">
@@ -434,6 +439,17 @@ export function PrescriptionsPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmDelete.open}
+        onClose={() => setConfirmDelete({ open: false, prescriptionId: null })}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Prescription"
+        message="Are you sure you want to permanently delete this prescription? This action cannot be undone."
+        confirmLabel="Yes, Delete"
+        variant="danger"
+      />
+    </>
   );
 }
 

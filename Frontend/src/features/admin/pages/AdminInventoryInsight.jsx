@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { Package, AlertTriangle, TrendingDown, Send, RefreshCw, Filter, Search } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
 import { httpClient } from '../../../core/services/httpClient';
@@ -69,7 +70,7 @@ const AdminInventoryInsight = () => {
       }
     } catch (error) {
       console.error('Error sending restock alert:', error);
-      alert('Failed to send restock alert');
+      toast.error('❌ Failed to send restock alert. Please check your connection.');
     } finally {
       setSendingAlert(false);
     }

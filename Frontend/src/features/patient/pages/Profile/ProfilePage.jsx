@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { useAuth } from "../../../../context/AuthContext";
 import { Button } from "../../../../shared/components/ui";
+import ConfirmModal from "../../../../shared/components/ui/ConfirmModal";
 import patientService from "../../services/patient.service";
 import {
   User,
@@ -20,6 +22,7 @@ export function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   const [formData, setFormData] = useState({
     name: user?.name || "",
@@ -74,12 +77,11 @@ export function ProfilePage() {
   };
 
   const handleLogout = () => {
-    if (window.confirm("Are you sure you want to logout?")) {
-      logout();
-    }
+    setConfirmLogout(true);
   };
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-6 mb-6 sticky top-0 z-10">
@@ -376,6 +378,17 @@ export function ProfilePage() {
           </button>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmLogout}
+        onClose={() => setConfirmLogout(false)}
+        onConfirm={() => { setConfirmLogout(false); logout(); }}
+        title="Sign Out"
+        message="Are you sure you want to sign out of your account? You will need to log in again to access your health data."
+        confirmLabel="Yes, Sign Out"
+        variant="warning"
+      />
+    </>
   );
 }
 

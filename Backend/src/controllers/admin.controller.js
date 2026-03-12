@@ -187,29 +187,35 @@ export const approvePharmacy = async (req, res, next) => {
       );
     }
 
-    // Update pharmacy verification status using existing fields
-    const updatedPharmacy = await prisma.pharmacy.update({
-      where: { id },
-      data: {
-        verificationStatus: "VERIFIED",
-        verifiedAt: new Date(),
-        verifiedBy: adminUserId,
-        rejectionReason: null,
-        rejectedAt: null,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
+    // Atomically update pharmacy verification status AND user account status
+    const [updatedPharmacy] = await prisma.$transaction([
+      prisma.pharmacy.update({
+        where: { id },
+        data: {
+          verificationStatus: "VERIFIED",
+          verifiedAt: new Date(),
+          verifiedBy: adminUserId,
+          rejectionReason: null,
+          rejectedAt: null,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.user.update({
+        where: { id: pharmacy.userId },
+        data: { status: "APPROVED" },
+      }),
+    ]);
 
     console.log(
-      `[ADMIN] Pharmacy ${id} approved by admin ${adminUserId}`
+      `[ADMIN] Pharmacy ${id} approved by admin ${adminUserId} - User ${pharmacy.userId} status set to APPROVED`
     );
 
     // Log activity
@@ -276,29 +282,35 @@ export const rejectPharmacy = async (req, res, next) => {
       throw new AppError("Pharmacy is already rejected", 400);
     }
 
-    // Update pharmacy verification status using existing fields
-    const updatedPharmacy = await prisma.pharmacy.update({
-      where: { id },
-      data: {
-        verificationStatus: "REJECTED",
-        rejectedAt: new Date(),
-        rejectionReason: reason.trim(),
-        verifiedAt: null,
-        verifiedBy: null,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
+    // Atomically update pharmacy verification status AND user account status
+    const [updatedPharmacy] = await prisma.$transaction([
+      prisma.pharmacy.update({
+        where: { id },
+        data: {
+          verificationStatus: "REJECTED",
+          rejectedAt: new Date(),
+          rejectionReason: reason.trim(),
+          verifiedAt: null,
+          verifiedBy: null,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.user.update({
+        where: { id: pharmacy.userId },
+        data: { status: "REJECTED" },
+      }),
+    ]);
 
     console.log(
-      `[ADMIN] Pharmacy ${id} rejected by admin ${adminUserId}: ${reason}`
+      `[ADMIN] Pharmacy ${id} rejected by admin ${adminUserId}: ${reason} - User ${pharmacy.userId} status set to REJECTED`
     );
 
     // Log activity

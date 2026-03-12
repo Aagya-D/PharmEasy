@@ -17,6 +17,7 @@
 
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import toast from "react-hot-toast";
 import { AuthLayout } from "../components/AuthLayout";
 import { Input } from "../../../shared/components/ui";
 import { Button } from "../../../shared/components/ui";
@@ -24,7 +25,8 @@ import { Alert } from "../../../shared/components/ui";
 import { RoleCard } from "../../../shared/components/RoleCard";
 import { useAuth } from "../../../context/AuthContext";
 import { REGISTRATION_ROLES } from "../../../core/constants/roles";
-import { User, Mail, Lock, Shield } from "lucide-react";
+import { isValidNepaliPhone, maskPhoneInput, NEPALI_PHONE_ERROR } from "../../../utils/phoneValidation";
+import { User, Mail, Lock, Shield, Phone } from "lucide-react";
 import registerHeroImage from "../../../assets/register-hero.svg";
 
 export function Register() {
@@ -38,6 +40,8 @@ export function Register() {
   const [confirmPassword, setConfirmPassword] = useState("");
   // Default to Patient role (ID 3)
   const [selectedRole, setSelectedRole] = useState(REGISTRATION_ROLES[0].id);
+  const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [passwordErrors, setPasswordErrors] = useState([]);
@@ -66,6 +70,16 @@ export function Register() {
   const handlePasswordChange = (value) => {
     setPassword(value);
     setPasswordErrors(validatePassword(value));
+  };
+
+  const handlePhoneChange = (e) => {
+    const masked = maskPhoneInput(e.target.value);
+    setPhone(masked);
+    if (masked && !isValidNepaliPhone(masked)) {
+      setPhoneError(NEPALI_PHONE_ERROR);
+    } else {
+      setPhoneError("");
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -99,7 +113,14 @@ export function Register() {
       return;
     }
 
+    // Phone is optional but if provided must be valid
+    if (phone && !isValidNepaliPhone(phone)) {
+      setError(NEPALI_PHONE_ERROR);
+      return;
+    }
+
     setIsLoading(true);
+    const loadingToast = toast.loading('📧 Creating your account...');
 
     try {
       const registrationData = {
@@ -108,18 +129,23 @@ export function Register() {
         email,
         password,
         roleId: selectedRole,
+        ...(phone ? { phone } : {}),
       };
 
       const result = await register(registrationData);
 
       if (result.success) {
+        toast.dismiss(loadingToast);
+        toast.success('🎉 Account created! Please verify your email to continue.');
         // Redirect to OTP verification with userId and email
         navigate("/verify-otp", { state: { email, userId: result.userId } });
       } else {
+        toast.dismiss(loadingToast);
         // ✅ FIX: Safely extract error message
         setError(result.error || "Registration failed");
       }
     } catch (err) {
+      toast.dismiss(loadingToast);
       // ✅ FIX: Safely extract error message from caught exception
       const errorMessage = err?.message || err?.response?.data?.message || "An unexpected error occurred";
       setError(errorMessage);
@@ -180,6 +206,21 @@ export function Register() {
           disabled={isLoading}
           required
           icon={<Mail size={18} />}
+        />
+
+        {/* Phone (optional) */}
+        <Input
+          label="Phone Number (optional)"
+          type="tel"
+          placeholder="98XXXXXXXX"
+          value={phone}
+          onChange={handlePhoneChange}
+          disabled={isLoading}
+          icon={<Phone size={18} />}
+          error={phoneError}
+          hint={!phone ? "Nepal mobile number — 10 digits starting with 9" : ""}
+          maxLength={10}
+          inputMode="numeric"
         />
 
         {/* Password */}

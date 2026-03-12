@@ -28,6 +28,14 @@ const SOUND_SUBTLE =
 
 // ── Type visual config
 const TYPE_CONFIG = {
+  SOS_ALERT: {
+    icon: Siren,
+    bg: "bg-red-100",
+    text: "text-red-600",
+    ring: "ring-red-300",
+    label: "Emergency SOS",
+    pulse: true,
+  },
   SOS_UPDATE: {
     icon: Siren,
     bg: "bg-red-100",
@@ -124,6 +132,7 @@ export default function PharmacyNotificationBell() {
 
   const prevCountRef = useRef(0);
   const prevHighRef = useRef(false);
+  const prevSosAlertCountRef = useRef(0);
   const urgentAudioRef = useRef(null);
   const subtleAudioRef = useRef(null);
   const panelRef = useRef(null);
@@ -159,19 +168,57 @@ export default function PharmacyNotificationBell() {
     [soundEnabled]
   );
 
+  // Distinctive multi-tone emergency beep — played exclusively for SOS_ALERT events.
+  // Three descending square-wave pulses (900 → 800 → 700 Hz) spaced 180ms apart
+  // to create the classic emergency alert cadence without any CDN dependency.
+  const playEmergencyBeep = useCallback(() => {
+    if (!soundEnabled) return;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [900, 800, 700].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "square";
+        osc.frequency.value = freq;
+        const start = ctx.currentTime + i * 0.18;
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.35, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.15);
+        osc.start(start);
+        osc.stop(start + 0.15);
+      });
+    } catch {
+      // Fallback to CDN alarm if Web Audio unavailable
+      playSound(true);
+    }
+  }, [soundEnabled, playSound]);
+
   // ── Fetch notifications (used by socket listener AND dropdown) ──
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
       const res = await notificationService.getNotifications(20, 0);
       const data = res?.data?.data ?? [];
-      setNotifications(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+
+      // Detect new unread SOS_ALERT items since last fetch and play emergency chime
+      const newSosCount = list.filter(
+        (n) => n.type === "SOS_ALERT" && !n.isRead
+      ).length;
+      if (newSosCount > prevSosAlertCountRef.current && prevSosAlertCountRef.current !== -1) {
+        playEmergencyBeep();
+      }
+      prevSosAlertCountRef.current = newSosCount;
+
+      setNotifications(list);
     } catch {
       setNotifications([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [playEmergencyBeep]);
 
   // ── Fetch unread count (polling every 20s) ───────────
   const fetchUnreadCount = useCallback(async () => {
@@ -204,8 +251,10 @@ export default function PharmacyNotificationBell() {
     const socket = connectSocket();
 
     const onNewSOS = (payload) => {
-      // Always play the urgent siren for SOS alerts
-      playSound(true);
+      // Play the distinctive emergency alert chime — three descending tones
+      playEmergencyBeep();
+      // Set prevSosAlertCountRef to -1 to suppress double-chime from fetchNotifications
+      prevSosAlertCountRef.current = -1;
       // Immediately refresh the full notification list from backend
       // so the new SOS record appears in the dropdown instantly
       fetchNotifications();
@@ -223,7 +272,7 @@ export default function PharmacyNotificationBell() {
       socket.off("NEW_SOS_ALERT", onNewSOS);
       socket.off("NEW_CHAT_MESSAGE", onNewChat);
     };
-  }, [playSound, fetchNotifications, fetchUnreadCount]);
+  }, [playEmergencyBeep, playSound, fetchNotifications, fetchUnreadCount]);
 
   // ── Refresh notifications when dropdown opens ────────
   useEffect(() => {
@@ -292,15 +341,18 @@ export default function PharmacyNotificationBell() {
     }
   };
 
-  const isHighPriority = (n) => n.priority === "high" || n.type === "SOS_UPDATE";
+  const isHighPriority = (n) =>
+    n.priority === "high" || n.type === "SOS_UPDATE" || n.type === "SOS_ALERT";
 
-  // Sort: SOS alerts at top (unread first), then by date
+  // Sort: SOS_ALERT first, then SOS_UPDATE, then unread, then by date
   const sortedNotifications = [...notifications].sort((a, b) => {
-    const aIsSOS = a.type === "SOS_UPDATE" && !a.isRead;
-    const bIsSOS = b.type === "SOS_UPDATE" && !b.isRead;
-    if (aIsSOS && !bIsSOS) return -1;
-    if (!aIsSOS && bIsSOS) return 1;
-    // Then unread before read
+    const aSOS = (a.type === "SOS_ALERT" || a.type === "SOS_UPDATE") && !a.isRead;
+    const bSOS = (b.type === "SOS_ALERT" || b.type === "SOS_UPDATE") && !b.isRead;
+    // Emergency SOS_ALERT always tops
+    if (a.type === "SOS_ALERT" && !a.isRead && b.type !== "SOS_ALERT") return -1;
+    if (b.type === "SOS_ALERT" && !b.isRead && a.type !== "SOS_ALERT") return 1;
+    if (aSOS && !bSOS) return -1;
+    if (!aSOS && bSOS) return 1;
     if (!a.isRead && b.isRead) return -1;
     if (a.isRead && !b.isRead) return 1;
     return new Date(b.createdAt) - new Date(a.createdAt);
@@ -437,7 +489,10 @@ export default function PharmacyNotificationBell() {
                     const Icon = cfg.icon;
                     const highPri = isHighPriority(n);
                     const link = getActionLink(n);
-                    const isSOS = n.type === "SOS_UPDATE" && !n.isRead;
+                    // Treat both SOS_ALERT and unread SOS_UPDATE as actionable SOS rows
+                    const isSOS = (n.type === "SOS_ALERT" || n.type === "SOS_UPDATE") && !n.isRead;
+                    // SOS_ALERT rows get the emergency red border; SOS_UPDATE unread get softer red
+                    const isEmergency = n.type === "SOS_ALERT" && !n.isRead;
 
                     return (
                       <li
@@ -446,8 +501,10 @@ export default function PharmacyNotificationBell() {
                         className={`group relative flex gap-3 px-5 py-4 transition-colors ${
                           link ? "cursor-pointer" : ""
                         } ${
-                          isSOS
+                          isEmergency
                             ? "bg-red-50/70 hover:bg-red-100/70 border-l-4 border-red-500"
+                            : isSOS
+                            ? "bg-red-50/40 hover:bg-red-50/70 border-l-2 border-red-400"
                             : !n.isRead
                             ? highPri
                               ? "bg-red-50/50 hover:bg-red-50"
@@ -508,10 +565,12 @@ export default function PharmacyNotificationBell() {
                                   setIsOpen(false);
                                   navigate(link || "/pharmacy/sos-requests");
                                 }}
-                                className="ml-auto flex items-center gap-1 px-2 py-0.5 bg-red-600 text-white text-[11px] font-bold rounded hover:bg-red-700 transition-colors"
+                                className={`ml-auto flex items-center gap-1 px-2 py-0.5 text-white text-[11px] font-bold rounded hover:opacity-90 transition-colors ${
+                                  isEmergency ? "bg-red-600" : "bg-red-500"
+                                }`}
                               >
                                 <Zap size={10} />
-                                Respond Now
+                                {isEmergency ? "Respond NOW" : "Respond"}
                               </button>
                             )}
                             {!isSOS && link && (

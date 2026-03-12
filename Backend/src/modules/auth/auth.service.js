@@ -514,7 +514,8 @@ export const login = async (
     name: user.name,
     role: user.role.name,
     roleId: user.roleId,
-    status: user.status, // ✅ Include user status for approval workflow
+    status: user.status,
+    isVerified: user.isVerified,
     pharmacy: user.pharmacy ? {
       id: user.pharmacy.id,
       pharmacyName: user.pharmacy.pharmacyName,

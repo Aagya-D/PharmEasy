@@ -39,9 +39,18 @@ const authService = {
 
   /**
    * Refresh access token
+   * Always reads refreshToken from localStorage so the caller does not need
+   * to pass it explicitly.  Falls back to tokenData for backwards-compat.
    */
   refreshToken: async (tokenData) => {
-    const response = await httpClient.post("/auth/refresh", tokenData);
+    const token =
+      tokenData?.refreshToken || localStorage.getItem("refreshToken");
+    if (!token) {
+      return Promise.reject(new Error("No refresh token available"));
+    }
+    const response = await httpClient.post("/auth/refresh", {
+      refreshToken: token,
+    });
     return response.data;
   },
 

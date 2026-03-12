@@ -8,6 +8,7 @@ import logger from "../../utils/logger.js";
 import { createLog, createAuditLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
 import prisma from "../../database/prisma.js";
 import notificationService from "../notifications/notification.service.js";
+import { isValidNepaliPhone } from "../../utils/validation.js";
 
 /**
  * POST /api/pharmacy/onboard
@@ -29,6 +30,14 @@ export const onboardPharmacy = async (req, res, next) => {
       fileName: req.file?.originalname,
       fileSize: req.file?.size
     });
+
+    // Validate contactNumber
+    if (!isValidNepaliPhone(pharmacyData.contactNumber)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Nepali phone number. Must be 10 digits starting with 9.",
+      });
+    }
 
     // If file was uploaded via Cloudinary, attach the URL
     if (req.file && req.file.path) {

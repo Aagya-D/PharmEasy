@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import inventoryService from "../../../core/services/inventory.service";
 import Modal from "../../../shared/components/ui/Modal";
+import ConfirmModal from "../../../shared/components/ui/ConfirmModal";
 import { Input } from "../../../shared/components/ui/Input";
 import LoadingSpinner from "../../../shared/components/ui/LoadingSpinner";
 import logger from "../../../utils/logger";
@@ -56,6 +58,7 @@ export default function PharmacyInventory() {
     totalPages: 1,
     totalItems: 0,
   });
+  const [confirmDelete, setConfirmDelete] = useState({ open: false, itemId: null, itemName: "" });
 
   // Statistics calculated from inventory
   const stats = React.useMemo(() => {
@@ -158,27 +161,29 @@ export default function PharmacyInventory() {
     } catch (err) {
       logger.error("INVENTORY", "Failed to update item", err);
       const errorMessage = err?.message || "Failed to update item";
-      alert(errorMessage);
+      toast.error(`❌ ${errorMessage}`);
     }
   };
 
-  // Handle delete
-  const handleDelete = async (itemId, itemName) => {
-    if (!window.confirm(`Are you sure you want to delete "${itemName}"?`)) {
-      return;
-    }
+  // Handle delete — opens ConfirmModal
+  const handleDelete = (itemId, itemName) => {
+    setConfirmDelete({ open: true, itemId, itemName });
+  };
 
+  // Execute deletion after confirmation
+  const handleDeleteConfirm = async () => {
+    const { itemId } = confirmDelete;
+    setConfirmDelete({ open: false, itemId: null, itemName: "" });
     try {
       logger.info("INVENTORY", "Deleting inventory item", { itemId });
       await inventoryService.deleteInventoryItem(itemId);
       logger.success("INVENTORY", "Item deleted successfully");
-      
-      // Refresh inventory
+      toast.success('✅ Medicine removed from inventory successfully!');
       await fetchInventory(pagination.currentPage);
     } catch (err) {
       logger.error("INVENTORY", "Failed to delete item", err);
       const errorMessage = err?.message || "Failed to delete item";
-      alert(errorMessage);
+      toast.error(`❌ ${errorMessage}`);
     }
   };
 
@@ -436,6 +441,17 @@ export default function PharmacyInventory() {
           setIsAddModalOpen(false);
           fetchInventory(pagination.currentPage);
         }}
+      />
+
+      {/* Confirm Delete Modal */}
+      <ConfirmModal
+        isOpen={confirmDelete.open}
+        onClose={() => setConfirmDelete({ open: false, itemId: null, itemName: "" })}
+        onConfirm={handleDeleteConfirm}
+        title="Remove Medicine"
+        message={`Are you sure you want to permanently remove "${confirmDelete.itemName}" from your inventory? This action cannot be undone.`}
+        confirmLabel="Yes, Remove"
+        variant="danger"
       />
     </div>
   );
