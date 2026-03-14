@@ -74,4 +74,8 @@ router.post("/logout", authenticate(), authController.logout);
 // Change password (requires current password verification)
 router.post("/change-password", authenticate(), authController.changePassword);
 
+// PATCH /auth/shipping-address
+// Save/update user's default shipping address
+router.patch("/shipping-address", authenticate(), authController.updateShippingAddress);
+
 export default router;

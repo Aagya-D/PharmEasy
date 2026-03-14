@@ -71,6 +71,16 @@ const authService = {
   },
 
   /**
+   * Update user's persistent shipping address
+   */
+  updateShippingAddress: async (shippingAddress) => {
+    const response = await httpClient.patch("/auth/shipping-address", {
+      shippingAddress,
+    });
+    return response.data;
+  },
+
+  /**
    * Request password reset
    */
   forgotPassword: async (emailData) => {

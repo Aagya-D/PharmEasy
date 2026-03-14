@@ -243,9 +243,36 @@ export const getOrders = async (req, res) => {
       where: whereClause,
       take: parseInt(limit) || 10,
       orderBy: { createdAt: 'desc' },
+      include: {
+        items: {
+          include: {
+            inventory: {
+              select: {
+                id: true,
+                name: true,
+                genericName: true,
+              },
+            },
+          },
+        },
+        pharmacy: {
+          select: {
+            id: true,
+            pharmacyName: true,
+            address: true,
+            contactNumber: true,
+            latitude: true,
+            longitude: true,
+          },
+        },
+      },
     });
 
-    logger.info("[PATIENT] Orders retrieved", { userId: patientId, count: orders.length });
+    logger.info("PATIENT", "Orders retrieved", {
+      userId: patientId,
+      count: orders.length,
+      duration: `${Date.now() - startTime}ms`,
+    });
 
     return res.status(200).json({
       success: true,

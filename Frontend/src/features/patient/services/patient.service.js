@@ -123,6 +123,7 @@ const patientService = {
     const body = Array.isArray(payload)
       ? { itemIds: payload }
       : {
+          mode: payload?.mode,
           itemIds: Array.isArray(payload?.itemIds) ? payload.itemIds : undefined,
           items: Array.isArray(payload?.items) ? payload.items : undefined,
           deliveryAddress: payload?.deliveryAddress,

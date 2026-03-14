@@ -67,6 +67,7 @@ model User {
   name           String
   password       String
   phone          String?
+  shippingAddress Json?
   roleId         Int
   status         UserStatus           @default(APPROVED)
   isVerified     Boolean              @default(false)
@@ -256,6 +257,7 @@ model Order {
   patientId   String
   pharmacyId  String
   status      OrderStatus @default(PENDING)
+  inventoryDeducted Boolean @default(false)
   totalAmount Float       @default(0)
   deliveryAddress String
   paymentMethod String @default("CASH_ON_DELIVERY")

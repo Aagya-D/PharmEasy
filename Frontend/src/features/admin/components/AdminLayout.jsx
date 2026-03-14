@@ -39,7 +39,10 @@ const AdminLayout = ({ children }) => {
     { icon: Settings, label: "Settings", path: "/admin/settings" },
   ];
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => {
+    const currentPath = location.pathname;
+    return currentPath === path || currentPath.startsWith(`${path}/`);
+  };
 
   return (
     <div style={{ display: "flex", height: "100vh", backgroundColor: "#F9FAFB" }}>

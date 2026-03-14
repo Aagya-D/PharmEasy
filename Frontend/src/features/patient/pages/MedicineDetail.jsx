@@ -117,6 +117,7 @@ export default function MedicineDetail() {
           {
             id: medicineId,
             medicineId,
+            pharmacyId: medicine?.pharmacy?.id || medicine?.pharmacyId || null,
             medicineName,
             genericName: medicine?.genericName || null,
             quantity: 1,

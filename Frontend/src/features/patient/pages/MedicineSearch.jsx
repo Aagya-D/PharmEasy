@@ -153,6 +153,7 @@ export default function MedicineSearch() {
           {
             id: routeId,
             medicineId: routeId,
+            pharmacyId: medicine?.pharmacy?.id || medicine?.pharmacyId || null,
             medicineName: medicine?.medicine || medicine?.brandName || "Medicine",
             genericName: medicine?.genericName || null,
             quantity: 1,

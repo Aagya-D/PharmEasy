@@ -8,6 +8,54 @@ import { hashPassword, comparePassword } from "../../utils/password.js";
 import { prisma } from "../../database/prisma.js";
 import { isValidNepaliPhone } from "../../utils/validation.js";
 
+const normalizeShippingAddress = (payload) => {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  const cleaned = {
+    fullName: String(payload.fullName || "").trim(),
+    phone: String(payload.phone || "").replace(/\D/g, "").trim(),
+    region: String(payload.region || "").trim(),
+    city: String(payload.city || "").trim(),
+    area: String(payload.area || "").trim(),
+    street: String(payload.street || "").trim(),
+    landmark: String(payload.landmark || "").trim(),
+    label: String(payload.label || "Home").trim() || "Home",
+    _lat:
+      payload._lat === null || payload._lat === undefined || payload._lat === ""
+        ? null
+        : Number(payload._lat),
+    _lng:
+      payload._lng === null || payload._lng === undefined || payload._lng === ""
+        ? null
+        : Number(payload._lng),
+  };
+
+  if (!cleaned.fullName || !cleaned.phone || !cleaned.region || !cleaned.city || !cleaned.area || !cleaned.street) {
+    throw new ValidationError(
+      "Shipping address requires fullName, phone, region, city, area, and street"
+    );
+  }
+
+  if (!isValidNepaliPhone(cleaned.phone)) {
+    throw new ValidationError("Shipping address phone must be a valid 10-digit Nepali number");
+  }
+
+  if ((cleaned._lat === null) !== (cleaned._lng === null)) {
+    throw new ValidationError("Both _lat and _lng are required when saving GPS coordinates");
+  }
+
+  if (
+    (cleaned._lat !== null && Number.isNaN(cleaned._lat)) ||
+    (cleaned._lng !== null && Number.isNaN(cleaned._lng))
+  ) {
+    throw new ValidationError("Invalid _lat/_lng values in shipping address");
+  }
+
+  return cleaned;
+};
+
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
@@ -179,6 +227,7 @@ export const verifyEmailOTP = async (req, res, next) => {
           role: user.role.name,
           isVerified: user.isVerified,
           status: user.status,
+          shippingAddress: user.shippingAddress || null,
         },
         pharmacy: user.pharmacy ? {
           id: user.pharmacy.id,
@@ -266,6 +315,7 @@ export const login = async (req, res, next) => {
         roleId: result.roleId,
         status: result.status,
         isVerified: result.isVerified,
+        shippingAddress: result.shippingAddress || null,
         pharmacy: result.pharmacy,
         isOnboarded: result.isOnboarded,
         needsOnboarding,
@@ -539,6 +589,7 @@ export const getCurrentUser = async (req, res, next) => {
           isVerified: user.isVerified,
           isOnboarded,
           needsOnboarding,
+          shippingAddress: user.shippingAddress || null,
         },
         pharmacy: user.pharmacy ? {
           id: user.pharmacy.id,
@@ -645,6 +696,57 @@ export const changePassword = async (req, res, next) => {
     const duration = Date.now() - startTime;
     logger.timing('AUTH', 'changePassword', duration, 'ERROR');
     logger.error('AUTH', `[CHANGE_PASSWORD] Failed: ${err.message}`, err);
+    next(err);
+  }
+};
+
+// ---------------- UPDATE SHIPPING ADDRESS ----------------
+export const updateShippingAddress = async (req, res, next) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Authentication required" });
+    }
+
+    const incomingAddress = req.body?.shippingAddress || req.body;
+    const shippingAddress = normalizeShippingAddress(incomingAddress);
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { shippingAddress },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        roleId: true,
+        status: true,
+        isVerified: true,
+        shippingAddress: true,
+        role: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Shipping address updated",
+      data: {
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          name: updatedUser.name,
+          roleId: updatedUser.roleId,
+          role: updatedUser.role?.name,
+          status: updatedUser.status,
+          isVerified: updatedUser.isVerified,
+          shippingAddress: updatedUser.shippingAddress,
+        },
+      },
+    });
+  } catch (err) {
     next(err);
   }
 };

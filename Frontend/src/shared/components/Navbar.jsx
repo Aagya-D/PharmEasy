@@ -86,7 +86,15 @@ export function Navbar() {
     setShowUserMenu(false);
   };
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => {
+    const currentPath = location.pathname;
+
+    if (path === "/") {
+      return currentPath === "/";
+    }
+
+    return currentPath === path || currentPath.startsWith(`${path}/`);
+  };
 
   // Get navigation links based on user role
   const getNavLinks = () => {

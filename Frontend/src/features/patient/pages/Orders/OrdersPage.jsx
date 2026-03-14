@@ -22,7 +22,7 @@ export function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showFilterMenu, setShowFilterMenu] = useState(false);
 
-  const statuses = ["all", "pending", "confirmed", "delivered", "cancelled"];
+  const statuses = ["all", "pending", "accepted", "preparing", "ready", "completed", "cancelled"];
 
   useEffect(() => {
     loadOrders();
@@ -52,8 +52,11 @@ export function OrdersPage() {
     if (searchTerm) {
       filtered = filtered.filter(
         (order) =>
-          order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          order.pharmacyName.toLowerCase().includes(searchTerm.toLowerCase())
+          order.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          order.pharmacy?.pharmacyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          order.items?.some((item) =>
+            item.medicineName?.toLowerCase().includes(searchTerm.toLowerCase())
+          )
       );
     }
 
@@ -64,16 +67,6 @@ export function OrdersPage() {
     }
 
     setFilteredOrders(filtered);
-  };
-
-  const getStatusColor = (status) => {
-    const colors = {
-      pending: { bg: "bg-yellow-50", text: "text-yellow-800", badge: "bg-yellow-100" },
-      confirmed: { bg: "bg-blue-50", text: "text-blue-800", badge: "bg-blue-100" },
-      delivered: { bg: "bg-green-50", text: "text-green-800", badge: "bg-green-100" },
-      cancelled: { bg: "bg-red-50", text: "text-red-800", badge: "bg-red-100" },
-    };
-    return colors[status?.toLowerCase()] || colors.pending;
   };
 
   return (
@@ -180,12 +173,11 @@ export function OrdersPage() {
             ) : filteredOrders.length > 0 ? (
               <div className="space-y-4">
                 {filteredOrders.map((order) => (
-                  <div key={order.id} onClick={() => navigate(`/patient/orders/${order.id}`)}>
-                    <OrderCard
-                      order={order}
-                      onViewDetails={(id) => navigate(`/patient/orders/${id}`)}
-                    />
-                  </div>
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    onViewDetails={(id) => navigate(`/patient/orders/${id}`)}
+                  />
                 ))}
               </div>
             ) : (

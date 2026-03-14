@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -36,7 +36,7 @@ function composeAddressString(addr) {
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, updateShippingAddress } = useAuth();
   const { refreshCart } = useCart();
 
   const [placingOrder, setPlacingOrder] = useState(false);
@@ -55,6 +55,8 @@ export default function CheckoutPage() {
       return [
         {
           id: medicineId || medicine?.id,
+          medicineId: medicineId || medicine?.id,
+          pharmacyId: medicine?.pharmacy?.id || medicine?.pharmacyId || null,
           medicineName: medicine?.medicine || medicine?.brandName || "Selected Medicine",
           genericName: medicine?.genericName || null,
           quantity: 1,
@@ -73,6 +75,8 @@ export default function CheckoutPage() {
       return [
         {
           id: medicineId,
+          medicineId,
+          pharmacyId: parsed?.pharmacy?.id || parsed?.pharmacyId || null,
           medicineName: parsed?.medicine || parsed?.brandName || "Selected Medicine",
           genericName: parsed?.genericName || null,
           quantity: 1,
@@ -100,10 +104,21 @@ export default function CheckoutPage() {
     /^9\d{9}$/.test(savedContactNumber) &&
     Boolean(paymentMethod);
 
-  const handleSaveAddress = (addr) => {
-    setSavedAddress(addr);
-    setShowAddressModal(false);
-    toast.success("Address saved!");
+  useEffect(() => {
+    if (!savedAddress && user?.shippingAddress && typeof user.shippingAddress === "object") {
+      setSavedAddress(user.shippingAddress);
+    }
+  }, [savedAddress, user?.shippingAddress]);
+
+  const handleSaveAddress = async (addr) => {
+    try {
+      const result = await updateShippingAddress(addr);
+      setSavedAddress(result?.user?.shippingAddress || addr);
+      setShowAddressModal(false);
+      toast.success("Address saved!");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to save address.");
+    }
   };
 
   const handleConfirmOrder = async () => {
@@ -117,12 +132,14 @@ export default function CheckoutPage() {
       cartItemId: item.id || item.cartItemId || null,
       inventoryId: item.medicineId || item.inventoryId || item.id,
       medicineId: item.medicineId || item.inventoryId || item.id,
+      pharmacyId: item.pharmacyId || null,
       quantity: Number(item.quantity || 1),
     }));
 
     try {
       setPlacingOrder(true);
       const response = await patientService.placeOrderFromCart({
+        mode: mode || "cart",
         itemIds: selectedItemIds,
         items: checkoutPayloadItems,
         deliveryAddress: `${savedAddress.fullName}, ${savedContactNumber} - ${composeAddressString(savedAddress)}`,

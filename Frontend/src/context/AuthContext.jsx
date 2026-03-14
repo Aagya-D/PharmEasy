@@ -282,6 +282,7 @@ export function AuthProvider({ children }) {
               roleId: userData.roleId,
               status: userData.status,
               isVerified: userData.isVerified ?? true,
+              shippingAddress: userData.shippingAddress || null,
               pharmacy: pharmacyData,
               isOnboarded: userData.isOnboarded ?? true,
               needsOnboarding: userData.needsOnboarding ?? false,
@@ -527,6 +528,7 @@ export function AuthProvider({ children }) {
         roleId: userData.roleId,
         status: userData.status,
         isVerified: userData.isVerified ?? true,
+        shippingAddress: userData.shippingAddress || null,
         pharmacy: userData.pharmacy,
         isOnboarded: userData.isOnboarded ?? true,
         needsOnboarding: userData.needsOnboarding ?? false,
@@ -709,6 +711,7 @@ export function AuthProvider({ children }) {
         role: apiData.user?.role,
         status: apiData.user?.status,
         isVerified: apiData.user?.isVerified ?? true,
+        shippingAddress: apiData.user?.shippingAddress || null,
         pharmacy: apiData.pharmacy,
         isOnboarded: apiData.isOnboarded ?? true,
         needsOnboarding: apiData.needsOnboarding ?? false,
@@ -790,6 +793,7 @@ export function AuthProvider({ children }) {
           role: userData.user.role,
           status: userData.user.status,
           isVerified: userData.user.isVerified,
+          shippingAddress: userData.user.shippingAddress || null,
           pharmacy: userData.pharmacy || null,
         };
 
@@ -822,6 +826,20 @@ export function AuthProvider({ children }) {
     logout,
     updateUser,
     refreshUser,
+    updateShippingAddress: async (shippingAddress) => {
+      const response = await authService.updateShippingAddress(shippingAddress);
+      const updatedUserFromApi = response?.data?.user;
+
+      const nextUser = {
+        ...(state.user || {}),
+        ...(updatedUserFromApi || {}),
+        shippingAddress:
+          updatedUserFromApi?.shippingAddress ?? shippingAddress ?? null,
+      };
+
+      updateUser(nextUser);
+      return { success: true, user: nextUser };
+    },
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

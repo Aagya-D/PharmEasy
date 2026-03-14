@@ -516,6 +516,7 @@ export const login = async (
     roleId: user.roleId,
     status: user.status,
     isVerified: user.isVerified,
+    shippingAddress: user.shippingAddress || null,
     pharmacy: user.pharmacy ? {
       id: user.pharmacy.id,
       pharmacyName: user.pharmacy.pharmacyName,

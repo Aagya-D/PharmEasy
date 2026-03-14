@@ -3,9 +3,18 @@ import notificationService from "../notifications/notification.service.js";
 import { isValidNepaliPhone } from "../../utils/validation.js";
 import logger from "../../utils/logger.js";
 
+const ORDER_STATUS_ENUM_VALUES = [
+  "PENDING",
+  "ACCEPTED",
+  "PREPARING",
+  "READY",
+  "COMPLETED",
+  "CANCELLED",
+];
+
 const STATUS_TRANSITIONS = {
   PENDING: ["ACCEPTED", "CANCELLED"],
-  ACCEPTED: ["PREPARING", "CANCELLED"],
+  ACCEPTED: ["PREPARING", "READY", "CANCELLED"],
   PREPARING: ["READY", "CANCELLED"],
   READY: ["COMPLETED", "CANCELLED"],
   COMPLETED: [],
@@ -51,22 +60,76 @@ const formatShippingAddress = (shippingAddress) => {
   return `${prefix || addressLine}${suffix}`.trim();
 };
 
-const resolveRequestedItemIds = (itemIds, items) => {
+const resolveRequestedItemIds = (itemIds) => {
   const explicitIds = Array.isArray(itemIds) ? itemIds : [];
-  const itemDerivedIds = Array.isArray(items)
-    ? items.flatMap((item) => [item?.id, item?.cartItemId, item?.medicineId, item?.inventoryId])
-    : [];
+  return [...new Set(explicitIds.filter(Boolean).map(String))];
+};
 
-  return [...new Set([...explicitIds, ...itemDerivedIds].filter(Boolean).map(String))];
+const normalizePayloadItems = (items) => {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items
+    .map((item) => ({
+      id: item?.id || item?.medicineId || item?.inventoryId || null,
+      medicineId: String(item?.medicineId || item?.inventoryId || item?.id || "").trim(),
+      pharmacyId: String(item?.pharmacyId || "").trim(),
+      quantity: Number(item?.quantity || 1),
+      medicineName: item?.medicineName || null,
+      genericName: item?.genericName || null,
+    }))
+    .filter((item) => item.medicineId);
 };
 
 const createHttpError = (statusCode, message, extra = {}) =>
   Object.assign(new Error(message), { statusCode, ...extra });
 
+const ORDER_STATUS_PATIENT_MESSAGES = {
+  PENDING: "Your order is pending confirmation.",
+  ACCEPTED: "Your order has been accepted by the pharmacy.",
+  PREPARING: "Your order is being prepared.",
+  READY: "Your order is now Out for Delivery.",
+  COMPLETED: "Your order has been completed.",
+  CANCELLED: "Your order has been cancelled.",
+};
+
+const shouldAttemptInventoryDeduction = (nextStatus) =>
+  nextStatus === "ACCEPTED" || nextStatus === "COMPLETED";
+
+const deductOrderInventory = async (tx, order, pharmacyId) => {
+  const items = Array.isArray(order.items) ? order.items : [];
+
+  if (items.length === 0) {
+    throw createHttpError(400, "Order has no items to deduct from inventory");
+  }
+
+  for (const item of items) {
+    const updated = await tx.inventory.updateMany({
+      where: {
+        id: item.inventoryId,
+        pharmacyId,
+        quantity: { gte: item.quantity },
+      },
+      data: {
+        quantity: { decrement: item.quantity },
+      },
+    });
+
+    if (updated.count !== 1) {
+      throw createHttpError(
+        409,
+        `Insufficient inventory for ${item.medicineName || "an order item"}`
+      );
+    }
+  }
+};
+
 export const placeOrderFromCart = async (req, res) => {
   const startTime = Date.now();
   const userId = req.user?.userId || req.user?.id;
   const {
+    mode,
     itemIds,
     items,
     deliveryAddress,
@@ -77,6 +140,10 @@ export const placeOrderFromCart = async (req, res) => {
     latitude,
     longitude,
   } = req.body || {};
+
+  // Direct purchase: "buy-now" mode means items come directly from the medicine page,
+  // not from the Cart table. The frontend always sends `mode` explicitly.
+  const isDirectPurchase = mode === "buy-now";
 
   if (!userId) {
     return res.status(401).json({ success: false, message: "Authentication required" });
@@ -89,7 +156,8 @@ export const placeOrderFromCart = async (req, res) => {
   const normalizedContactNumber = normalizePhoneNumber(
     contactNumber || shippingAddress?.phone
   );
-  const requestedItemIds = resolveRequestedItemIds(itemIds, items);
+  const payloadItems = normalizePayloadItems(items);
+  const requestedItemIds = resolveRequestedItemIds(itemIds);
   const clientItemsTotal = summary?.itemsTotal === undefined ? null : Number(summary.itemsTotal);
   const clientDeliveryFee = summary?.deliveryFee === undefined ? null : Number(summary.deliveryFee);
   const clientTotal = summary?.total === undefined ? null : Number(summary.total);
@@ -143,6 +211,13 @@ export const placeOrderFromCart = async (req, res) => {
     });
   }
 
+  if (payloadItems.length === 0 && requestedItemIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Provide either items or itemIds for checkout",
+    });
+  }
+
   try {
     const patient = await prisma.user.findUnique({
       where: { id: userId },
@@ -159,29 +234,45 @@ export const placeOrderFromCart = async (req, res) => {
       });
     }
 
-    const cart = await prisma.cart.findUnique({
-      where: { userId },
-      include: {
-        items: {
-          orderBy: { createdAt: "asc" },
-        },
-      },
-    });
-
-    if (!cart || cart.items.length === 0) {
-      return res.status(400).json({ success: false, message: "Cart is empty" });
-    }
-
-    const eligibleItems = requestedItemIds.length > 0
-      ? cart.items.filter(
-          (item) =>
-            requestedItemIds.includes(String(item.id)) ||
-            requestedItemIds.includes(String(item.medicineId))
-        )
-      : cart.items.filter((item) => item.selected);
+    let cart = null;
+    let eligibleItems = isDirectPurchase || requestedItemIds.length === 0 ? payloadItems : [];
 
     if (eligibleItems.length === 0) {
-      return res.status(400).json({ success: false, message: "No cart items selected for checkout" });
+      // Fallback for legacy cart-driven checkout when payload items are not sent.
+      cart = await prisma.cart.findUnique({
+        where: { userId },
+        include: {
+          items: {
+            orderBy: { createdAt: "asc" },
+          },
+        },
+      });
+
+      if (!cart || cart.items.length === 0) {
+        return res.status(400).json({ success: false, message: "Cart is empty" });
+      }
+
+      eligibleItems = requestedItemIds.length > 0
+        ? cart.items.filter(
+            (item) =>
+              requestedItemIds.includes(String(item.id)) ||
+              requestedItemIds.includes(String(item.medicineId))
+          )
+        : cart.items.filter((item) => item.selected);
+
+      if (eligibleItems.length === 0) {
+        return res.status(400).json({ success: false, message: "No cart items selected for checkout" });
+      }
+    }
+
+    const invalidPayloadItems = eligibleItems.filter(
+      (item) => !item.pharmacyId || !Number.isInteger(item.quantity) || item.quantity <= 0
+    );
+    if (invalidPayloadItems.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Each checkout item must include medicineId, pharmacyId, and a positive quantity",
+      });
     }
 
     const pharmacyIds = [...new Set(eligibleItems.map((item) => item.pharmacyId))];
@@ -251,6 +342,7 @@ export const placeOrderFromCart = async (req, res) => {
       }, 0);
       const deliveryFee = eligibleItems.length > 0 ? STANDARD_DELIVERY_FEE : 0;
       const grandTotal = itemsSubtotal + deliveryFee;
+      const persistedTotal = clientTotal !== null ? clientTotal : grandTotal;
 
       if (
         (clientItemsTotal !== null && Math.abs(clientItemsTotal - itemsSubtotal) > 0.01) ||
@@ -265,7 +357,8 @@ export const placeOrderFromCart = async (req, res) => {
           patientId: userId,
           pharmacyId,
           status: "PENDING",
-          totalAmount: grandTotal,
+          inventoryDeducted: true,
+          totalAmount: persistedTotal,
           deliveryAddress: normalizedDeliveryAddress,
           paymentMethod: normalizedPaymentMethod,
           contactNumber: finalContactNumber,
@@ -307,12 +400,14 @@ export const placeOrderFromCart = async (req, res) => {
         }
       }
 
-      await tx.cartItem.deleteMany({
-        where: {
-          cartId: cart.id,
-          id: { in: eligibleItems.map((item) => item.id) },
-        },
-      });
+      if (!isDirectPurchase && cart) {
+        await tx.cartItem.deleteMany({
+          where: {
+            cartId: cart.id,
+            id: { in: eligibleItems.map((item) => item.id) },
+          },
+        });
+      }
 
       return tx.order.findUnique({
         where: { id: order.id },
@@ -387,15 +482,22 @@ export const placeOrderFromCart = async (req, res) => {
 
 export const updateOrderStatus = async (req, res) => {
   const userId = req.user?.userId;
-  const { orderId } = req.params;
+  const orderId = String(req.params?.orderId || req.params?.id || "").trim();
   const nextStatus = normalizeStatus(req.body?.status);
 
   if (!userId) {
     return res.status(401).json({ success: false, message: "Authentication required" });
   }
 
-  if (!nextStatus || !Object.keys(STATUS_TRANSITIONS).includes(nextStatus)) {
-    return res.status(400).json({ success: false, message: "Invalid target status" });
+  if (!orderId) {
+    return res.status(400).json({ success: false, message: "Order id is required" });
+  }
+
+  if (!nextStatus || !ORDER_STATUS_ENUM_VALUES.includes(nextStatus)) {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid order status. Allowed values: ${ORDER_STATUS_ENUM_VALUES.join(", ")}`,
+    });
   }
 
   try {
@@ -408,33 +510,91 @@ export const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: "Pharmacy not found" });
     }
 
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      select: {
-        id: true,
-        status: true,
-        pharmacyId: true,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          status: true,
+          pharmacyId: true,
+          patientId: true,
+          inventoryDeducted: true,
+          items: {
+            select: {
+              inventoryId: true,
+              medicineName: true,
+              quantity: true,
+            },
+          },
+        },
+      });
+
+      if (!order || order.pharmacyId !== pharmacy.id) {
+        throw createHttpError(404, "Order not found");
+      }
+
+      const currentStatus = normalizeStatus(order.status);
+      const allowed = STATUS_TRANSITIONS[currentStatus] || [];
+
+      if (!allowed.includes(nextStatus)) {
+        throw createHttpError(
+          400,
+          `Cannot transition order from ${currentStatus} to ${nextStatus}`
+        );
+      }
+
+      if (shouldAttemptInventoryDeduction(nextStatus) && !order.inventoryDeducted) {
+        await deductOrderInventory(tx, order, pharmacy.id);
+      }
+
+      const markInventoryDeducted =
+        shouldAttemptInventoryDeduction(nextStatus) && !order.inventoryDeducted;
+
+      return tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: nextStatus,
+          ...(markInventoryDeducted ? { inventoryDeducted: true } : {}),
+        },
+      });
     });
 
-    if (!order || order.pharmacyId !== pharmacy.id) {
-      return res.status(404).json({ success: false, message: "Order not found" });
-    }
+    try {
+      const statusMessage =
+        ORDER_STATUS_PATIENT_MESSAGES[nextStatus] ||
+        `Your order status is now ${nextStatus.replaceAll("_", " ")}.`;
 
-    const currentStatus = normalizeStatus(order.status);
-    const allowed = STATUS_TRANSITIONS[currentStatus] || [];
+      await notificationService.createNotification(
+        updated.patientId,
+        "Order Status Updated",
+        statusMessage,
+        "NEW_ORDER",
+        {
+          orderId: updated.id,
+          status: nextStatus,
+          link: "/patient/orders",
+          sound: "standard",
+        },
+        "PATIENT",
+        "normal"
+      );
 
-    if (!allowed.includes(nextStatus)) {
-      return res.status(400).json({
-        success: false,
-        message: `Cannot transition order from ${currentStatus} to ${nextStatus}`,
+      const io = req.app.get("io");
+      if (io) {
+        io.emit("NEW_ORDER", {
+          orderId: updated.id,
+          recipientId: updated.patientId,
+          status: nextStatus,
+          message: statusMessage,
+        });
+      }
+    } catch (notificationError) {
+      logger.error("ORDER", "Order status updated but patient notification failed", {
+        orderId: updated.id,
+        patientId: updated.patientId,
+        error: notificationError.message,
       });
     }
-
-    const updated = await prisma.order.update({
-      where: { id: orderId },
-      data: { status: nextStatus },
-    });
 
     return res.status(200).json({
       success: true,
@@ -443,6 +603,6 @@ export const updateOrderStatus = async (req, res) => {
     });
   } catch (error) {
     console.error("[ORDER] updateOrderStatus error", error.message);
-    return res.status(500).json({ success: false, message: "Failed to update order status" });
+    return res.status(400).json({ success: false, message: error.message });
   }
 };

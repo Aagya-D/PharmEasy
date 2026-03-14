@@ -6,7 +6,6 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "predev": "npx kill-port 5050 || true",
     "dev": "nodemon src/index.js",
     "prod": "NODE_ENV=production node src/index.js",
     "build:frontend": "cd ../Frontend && npm run build",

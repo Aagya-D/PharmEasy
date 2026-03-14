@@ -62,7 +62,15 @@ export function PatientLayout({ children, searchEnabled = true }) {
     navigate("/login");
   };
 
-  const isActive = (path) => routeLocation.pathname.startsWith(path);
+  const isActive = (path) => {
+    const currentPath = routeLocation.pathname;
+
+    if (path === "/patient") {
+      return currentPath === "/patient";
+    }
+
+    return currentPath === path || currentPath.startsWith(`${path}/`);
+  };
 
   const navLinks = [
     { label: "Home", href: "/patient", icon: Home },

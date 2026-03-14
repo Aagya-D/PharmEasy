@@ -88,7 +88,8 @@ export default function PharmacyOrders() {
   const updateOrderStatus = async (orderId, status) => {
     try {
       setUpdatingOrderId(orderId);
-      await httpClient.patch(`/pharmacy/orders/${orderId}/status`, { status });
+      const normalizedStatus = String(status || "").trim().toUpperCase();
+      await httpClient.patch(`/pharmacy/orders/${orderId}/status`, { status: normalizedStatus });
       await fetchOrders();
     } catch (err) {
       console.error("Failed to update order status", err);
