@@ -693,54 +693,63 @@ export const getSOSLocations = async (req, res, next) => {
  * Get inventory insights across all pharmacies
  */
 export const getInventoryInsights = async (req, res, next) => {
+  const startTime = Date.now();
   try {
     // Fetch all inventory items with pharmacy information
-    const inventoryItems = await prisma.inventoryItem.findMany({
+    // Correct model: prisma.inventory (schema.prisma: model Inventory)
+    const inventoryItems = await prisma.inventory.findMany({
       include: {
         pharmacy: {
           select: {
             id: true,
             pharmacyName: true,
-            contactPhone: true,
+            contactNumber: true,
           },
         },
       },
     });
 
-    // Calculate insights
+    // Low stock threshold — Inventory model has no reorderLevel field
+    const LOW_STOCK_THRESHOLD = 10;
+
     const lowStockItems = inventoryItems.filter(
-      (item) => item.quantity <= item.reorderLevel
+      (item) => item.quantity > 0 && item.quantity <= LOW_STOCK_THRESHOLD
     );
 
     const outOfStockItems = inventoryItems.filter(
       (item) => item.quantity === 0
     );
 
-    // Group by medicine for shortage analysis
+    // Group by generic name for shortage analysis (covers both low-stock and out-of-stock)
     const medicineMap = new Map();
-    lowStockItems.forEach((item) => {
-      if (!medicineMap.has(item.medicineName)) {
-        medicineMap.set(item.medicineName, {
-          medicineName: item.medicineName,
+    [...lowStockItems, ...outOfStockItems].forEach((item) => {
+      const key = item.genericName;
+      if (!medicineMap.has(key)) {
+        medicineMap.set(key, {
+          genericName: item.genericName,
+          medicineName: item.name,
           totalStock: 0,
+          outOfStockCount: 0,
           pharmaciesAffected: [],
           severity: "LOW",
         });
       }
-      const medicine = medicineMap.get(item.medicineName);
-      medicine.totalStock += item.quantity;
+      const medicine = medicineMap.get(key);
+      medicine.totalStock += item.quantity || 0;
+      if (item.quantity === 0) medicine.outOfStockCount += 1;
       medicine.pharmaciesAffected.push({
         pharmacyId: item.pharmacy.id,
         pharmacyName: item.pharmacy.pharmacyName,
         currentStock: item.quantity,
-        reorderLevel: item.reorderLevel,
       });
     });
 
     const shortages = Array.from(medicineMap.values()).map((medicine) => {
-      // Determine severity
-      const avgStock =
-        medicine.totalStock / medicine.pharmaciesAffected.length;
+      // Safe aggregation — handles empty pharmacy list
+      const total = medicine.pharmaciesAffected.length > 0
+        ? medicine.totalStock / medicine.pharmaciesAffected.length
+        : 0;
+      const avgStock = total || 0;
       medicine.severity =
         avgStock === 0 ? "CRITICAL" : avgStock < 10 ? "HIGH" : "MEDIUM";
       return medicine;
@@ -759,7 +768,7 @@ export const getInventoryInsights = async (req, res, next) => {
       },
     });
   } catch (error) {
-    console.error("[ADMIN] Error fetching inventory insights:", error);
+    console.error("[INSIGHTS ERROR]", error.message, error.stack);
     next(error);
   }
 };
@@ -1047,6 +1056,25 @@ export const createAnnouncement = async (req, res, next) => {
     } catch (notificationError) {
       console.error("[ADMIN] Failed to broadcast notification:", notificationError);
       // Continue despite notification failure - don't block announcement creation
+    }
+
+    // Real-time Socket.IO push — ADMIN_BROADCAST to all connected clients
+    try {
+      const io = req.app.get("io");
+      if (io) {
+        io.emit("ADMIN_BROADCAST", {
+          type: "ADMIN_BROADCAST",
+          announcementId: announcement.id,
+          title: announcement.title,
+          message: announcement.message,
+          priority: announcement.priority,
+          targetRole: announcement.targetRole,
+          createdAt: announcement.publishDate,
+        });
+        console.log(`[ADMIN] Socket.IO ADMIN_BROADCAST emitted for announcement ${announcement.id}`);
+      }
+    } catch (socketError) {
+      console.error("[ADMIN] Failed to emit ADMIN_BROADCAST socket event:", socketError);
     }
 
     res.status(201).json({

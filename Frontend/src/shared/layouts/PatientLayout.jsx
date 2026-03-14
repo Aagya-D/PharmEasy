@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useLocation as useLocationContext } from "../../context/LocationContext";
+import { useNotification } from "../../context/NotificationContext";
+import { useCart } from "../../context/CartContext";
 import LocationModal from "../components/LocationModal";
 import NotificationDropdown from "../components/NotificationDropdown";
-import notificationService from "../../core/services/notification.service";
-import chatService from "../../features/chat/services/chat.service";
 import {
   Search,
   ShoppingCart,
@@ -41,46 +41,13 @@ export function PatientLayout({ children, searchEnabled = true }) {
   const routeLocation = useLocation();
   const { user, logout } = useAuth();
   const { selectedLocation } = useLocationContext();
+  const { unreadNotifications: notificationCount, unreadMessages: unreadChatCount } = useNotification();
+  const { cartCount } = useCart();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
-  const [cartCount] = useState(0); // TODO: Connect to actual cart state
-  const [notificationCount, setNotificationCount] = useState(0);
-  const [unreadChatCount, setUnreadChatCount] = useState(0);
-
-  // Poll unread notification count every 30 seconds
-  const fetchUnreadCount = useCallback(async () => {
-    try {
-      const response = await notificationService.getUnreadCount();
-      setNotificationCount(response.data?.unreadCount || 0);
-    } catch (err) {
-      // Silently fail — badge just stays at previous value
-    }
-  }, []);
-
-  // Poll unread chat count every 30 seconds
-  const fetchUnreadChatCount = useCallback(async () => {
-    try {
-      const response = await chatService.getUnreadCount();
-      if (response.success) {
-        setUnreadChatCount(response.data.unreadCount || 0);
-      }
-    } catch (err) {
-      // Silently fail — badge just stays at previous value
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchUnreadCount();
-    fetchUnreadChatCount();
-    const interval = setInterval(() => {
-      fetchUnreadCount();
-      fetchUnreadChatCount();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [fetchUnreadCount, fetchUnreadChatCount]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -154,9 +121,9 @@ export function PatientLayout({ children, searchEnabled = true }) {
             <div className="hidden sm:flex items-center gap-4">
               {/* Cart Button */}
               <button
-                onClick={() => navigate("/patient/orders")}
+                onClick={() => navigate("/patient/cart")}
                 className="relative p-2 hover:bg-blue-50 rounded-lg transition-colors"
-                title="My Orders"
+                title="Cart"
               >
                 <ShoppingCart size={20} className="text-slate-700" />
                 {cartCount > 0 && (
@@ -323,7 +290,6 @@ export function PatientLayout({ children, searchEnabled = true }) {
                 onClick={() => {
                   navigate("/notifications");
                   setIsMobileMenuOpen(false);
-                  setNotificationCount(0);
                 }}
                 className="w-full text-left px-4 py-2 rounded-lg flex items-center gap-3 text-slate-700 hover:bg-blue-50 transition-colors"
               >

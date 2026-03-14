@@ -105,6 +105,7 @@ export const getDashboard = async (req, res) => {
  * Get patient profile
  */
 export const getProfile = async (req, res) => {
+  const startTime = Date.now();
   const patientId = req.user?.userId;
 
   // Validate user identity
@@ -154,6 +155,7 @@ export const getProfile = async (req, res) => {
  * Update patient profile
  */
 export const updateProfile = async (req, res) => {
+  const startTime = Date.now();
   const patientId = req.user?.userId;
   const { name, phone } = req.body;
 
@@ -219,6 +221,7 @@ export const updateProfile = async (req, res) => {
  * Get patient orders
  */
 export const getOrders = async (req, res) => {
+  const startTime = Date.now();
   const patientId = req.user?.userId;
   const { limit = 10, status } = req.query;
 
@@ -233,7 +236,7 @@ export const getOrders = async (req, res) => {
   try {
     const whereClause = { patientId };
     if (status) {
-      whereClause.status = status;
+      whereClause.status = String(status).toUpperCase();
     }
 
     const orders = await prisma.order.findMany({
@@ -265,6 +268,7 @@ export const getOrders = async (req, res) => {
  * Get patient prescriptions
  */
 export const getPrescriptions = async (req, res) => {
+  const startTime = Date.now();
   const patientId = req.user?.userId;
 
   // Validate user identity
@@ -304,6 +308,7 @@ export const getPrescriptions = async (req, res) => {
  * Get patient medications
  */
 export const getMedications = async (req, res) => {
+  const startTime = Date.now();
   const patientId = req.user?.userId;
 
   // Validate user identity
@@ -343,6 +348,7 @@ export const getMedications = async (req, res) => {
  * Submit SOS request
  */
 export const submitSOSRequest = async (req, res) => {
+  const startTime = Date.now();
   const patientId = req.user?.userId;
 
   // Validate user identity first
@@ -532,6 +538,7 @@ export const submitSOSRequest = async (req, res) => {
  * Get SOS history (with auto-expiration)
  */
 export const getSOSHistory = async (req, res) => {
+  const startTime = Date.now();
   const patientId = req.user?.userId;
 
   if (!patientId) {
@@ -603,6 +610,7 @@ export const getSOSHistory = async (req, res) => {
  * Get single SOS request details (with auto-expiration)
  */
 export const getSOSDetails = async (req, res) => {
+  const startTime = Date.now();
   const patientId = req.user?.userId;
   const { sosId } = req.params;
 
@@ -659,6 +667,7 @@ export const getSOSDetails = async (req, res) => {
  * Used by dashboard to show countdown timer
  */
 export const getActiveSOS = async (req, res) => {
+  const startTime = Date.now();
   const patientId = req.user?.userId;
 
   if (!patientId) {
@@ -690,6 +699,7 @@ export const getActiveSOS = async (req, res) => {
  * List patient's favorite medicines
  */
 export const getFavorites = async (req, res) => {
+  const startTime = Date.now();
   const userId = req.user?.userId;
 
   if (!userId) {
@@ -718,6 +728,7 @@ export const getFavorites = async (req, res) => {
  * Body: { medicineName, genericName?, imageUrl?, lastPrice?, lastPharmacy? }
  */
 export const addFavorite = async (req, res) => {
+  const startTime = Date.now();
   const userId = req.user?.userId;
 
   if (!userId) {
@@ -766,6 +777,7 @@ export const addFavorite = async (req, res) => {
  * Remove a medicine from favorites
  */
 export const removeFavorite = async (req, res) => {
+  const startTime = Date.now();
   const userId = req.user?.userId;
   const { id } = req.params;
 
@@ -785,5 +797,274 @@ export const removeFavorite = async (req, res) => {
   } catch (error) {
     console.error("[PATIENT] Remove favorite error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to remove favorite" });
+  }
+};
+
+// ─── Cart Management ───────────────────────────────
+
+const cartItemSelect = {
+  id: true,
+  medicineId: true,
+  pharmacyId: true,
+  medicineName: true,
+  genericName: true,
+  price: true,
+  quantity: true,
+  selected: true,
+  inStock: true,
+  expiryDate: true,
+  pharmacyName: true,
+  pharmacyAddress: true,
+  pharmacyContact: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
+const cartInclude = {
+  items: {
+    orderBy: { createdAt: "desc" },
+    select: cartItemSelect,
+  },
+};
+
+const getOrCreateCart = async (userId) => {
+  return prisma.cart.upsert({
+    where: { userId },
+    update: {},
+    create: { userId },
+  });
+};
+
+/**
+ * GET /api/patient/cart
+ * Returns persistent cart with items
+ */
+export const getCart = async (req, res) => {
+  const userId = req.user?.userId;
+
+  if (!userId) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  try {
+    const cart = await prisma.cart.upsert({
+      where: { userId },
+      update: {},
+      create: { userId },
+      include: cartInclude,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: { cart },
+      message: "Cart retrieved successfully",
+    });
+  } catch (error) {
+    console.error("[PATIENT] Get cart error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to get cart" });
+  }
+};
+
+/**
+ * POST /api/patient/cart/items
+ * Add a medicine to cart, incrementing quantity if item already exists
+ */
+export const addCartItem = async (req, res) => {
+  const userId = req.user?.userId;
+
+  if (!userId) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  const {
+    medicineId,
+    pharmacyId,
+    medicineName,
+    genericName,
+    price,
+    quantity,
+    inStock,
+    expiryDate,
+    pharmacyName,
+    pharmacyAddress,
+    pharmacyContact,
+  } = req.body || {};
+
+  if (!medicineId || !medicineName || price === undefined || price === null) {
+    return res.status(400).json({
+      success: false,
+      message: "medicineId, medicineName and price are required",
+    });
+  }
+
+  const safePrice = Number(price);
+  if (!Number.isFinite(safePrice) || safePrice < 0) {
+    return res.status(400).json({ success: false, message: "price must be a valid non-negative number" });
+  }
+
+  const safeQuantity = Math.max(1, Number.parseInt(quantity || 1, 10) || 1);
+  const normalizedPharmacyId = String(pharmacyId || "unknown-pharmacy");
+
+  try {
+    const cart = await getOrCreateCart(userId);
+
+    await prisma.cartItem.upsert({
+      where: {
+        cartId_medicineId_pharmacyId: {
+          cartId: cart.id,
+          medicineId: String(medicineId),
+          pharmacyId: normalizedPharmacyId,
+        },
+      },
+      update: {
+        quantity: { increment: safeQuantity },
+        selected: true,
+        price: safePrice,
+        inStock: inStock !== undefined ? Boolean(inStock) : true,
+        genericName: genericName || null,
+        expiryDate: expiryDate ? new Date(expiryDate) : null,
+        pharmacyName: pharmacyName || null,
+        pharmacyAddress: pharmacyAddress || null,
+        pharmacyContact: pharmacyContact || null,
+      },
+      create: {
+        cartId: cart.id,
+        medicineId: String(medicineId),
+        pharmacyId: normalizedPharmacyId,
+        medicineName: String(medicineName),
+        genericName: genericName || null,
+        price: safePrice,
+        quantity: safeQuantity,
+        selected: true,
+        inStock: inStock !== undefined ? Boolean(inStock) : true,
+        expiryDate: expiryDate ? new Date(expiryDate) : null,
+        pharmacyName: pharmacyName || null,
+        pharmacyAddress: pharmacyAddress || null,
+        pharmacyContact: pharmacyContact || null,
+      },
+    });
+
+    const refreshed = await prisma.cart.findUnique({
+      where: { id: cart.id },
+      include: cartInclude,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: { cart: refreshed },
+      message: "Item added to cart",
+    });
+  } catch (error) {
+    console.error("[PATIENT] Add cart item error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to add item to cart" });
+  }
+};
+
+/**
+ * PATCH /api/patient/cart/items/:itemId
+ * Update quantity or selected state
+ */
+export const updateCartItem = async (req, res) => {
+  const userId = req.user?.userId;
+  const { itemId } = req.params;
+  const { quantity, selected } = req.body || {};
+
+  if (!userId) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  try {
+    const cart = await getOrCreateCart(userId);
+
+    const existing = await prisma.cartItem.findFirst({
+      where: {
+        id: itemId,
+        cartId: cart.id,
+      },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ success: false, message: "Cart item not found" });
+    }
+
+    const updateData = {};
+
+    if (quantity !== undefined) {
+      const safeQuantity = Number.parseInt(quantity, 10);
+      if (!Number.isFinite(safeQuantity) || safeQuantity < 1) {
+        return res.status(400).json({ success: false, message: "quantity must be at least 1" });
+      }
+      updateData.quantity = safeQuantity;
+    }
+
+    if (selected !== undefined) {
+      updateData.selected = Boolean(selected);
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ success: false, message: "No valid fields to update" });
+    }
+
+    await prisma.cartItem.update({
+      where: { id: itemId },
+      data: updateData,
+    });
+
+    const refreshed = await prisma.cart.findUnique({
+      where: { id: cart.id },
+      include: cartInclude,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: { cart: refreshed },
+      message: "Cart item updated",
+    });
+  } catch (error) {
+    console.error("[PATIENT] Update cart item error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to update cart item" });
+  }
+};
+
+/**
+ * DELETE /api/patient/cart/items/:itemId
+ * Remove item from cart
+ */
+export const removeCartItem = async (req, res) => {
+  const userId = req.user?.userId;
+  const { itemId } = req.params;
+
+  if (!userId) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  try {
+    const cart = await getOrCreateCart(userId);
+
+    const deleted = await prisma.cartItem.deleteMany({
+      where: {
+        id: itemId,
+        cartId: cart.id,
+      },
+    });
+
+    if (deleted.count === 0) {
+      return res.status(404).json({ success: false, message: "Cart item not found" });
+    }
+
+    const refreshed = await prisma.cart.findUnique({
+      where: { id: cart.id },
+      include: cartInclude,
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: { cart: refreshed },
+      message: "Item removed from cart",
+    });
+  } catch (error) {
+    console.error("[PATIENT] Remove cart item error:", error.message);
+    return res.status(500).json({ success: false, message: "Failed to remove cart item" });
   }
 };

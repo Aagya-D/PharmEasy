@@ -18,13 +18,8 @@ import {
   Zap,
 } from "lucide-react";
 import notificationService from "../../../core/services/notification.service";
-import { connectSocket, disconnectSocket } from "../../../core/services/socket";
-
-// ── Sound assets (CDN, royalty-free) 
-const SOUND_URGENT =
-  "https://cdn.pixabay.com/audio/2022/03/24/audio_4160e2e206.mp3"; // alarm tone for SOS
-const SOUND_SUBTLE =
-  "https://cdn.pixabay.com/audio/2024/11/27/audio_8aab2b3781.mp3"; // gentle ping for stock/system
+import { connectSocket } from "../../../core/services/socket";
+import { useNotification } from "../../../context/NotificationContext";
 
 // ── Type visual config
 const TYPE_CONFIG = {
@@ -84,6 +79,14 @@ const TYPE_CONFIG = {
     label: "System",
     pulse: false,
   },
+  NEW_ORDER: {
+    icon: Package,
+    bg: "bg-blue-100",
+    text: "text-blue-600",
+    ring: "ring-blue-200",
+    label: "New Order",
+    pulse: true,
+  },
 };
 
 function getConfig(type) {
@@ -112,7 +115,6 @@ export default function PharmacyNotificationBell() {
   const navigate = useNavigate();
 
   // ── Auth safety check ────────────────────────────────
-  // Prevent SECURITY_VIOLATION: INCOMPLETE_AUTH_STATE by verifying token exists
   const token = typeof window !== "undefined"
     ? localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken")
     : null;
@@ -123,18 +125,21 @@ export default function PharmacyNotificationBell() {
     } catch { return null; }
   })();
 
+  // ── Global notification state from context ───────────
+  const {
+    unreadNotifications: unreadCount,
+    hasHighPriority,
+    decrementNotifications,
+    clearNotifications,
+    setUnreadNotifications,
+    setHasHighPriority,
+  } = useNotification();
+
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [hasHighPriority, setHasHighPriority] = useState(false);
   const [loading, setLoading] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  const prevCountRef = useRef(0);
-  const prevHighRef = useRef(false);
-  const prevSosAlertCountRef = useRef(0);
-  const urgentAudioRef = useRef(null);
-  const subtleAudioRef = useRef(null);
   const panelRef = useRef(null);
   const bellRef = useRef(null);
 
@@ -143,140 +148,43 @@ export default function PharmacyNotificationBell() {
     return null;
   }
 
-  // Audio setup 
-  useEffect(() => {
-    const urgent = new Audio(SOUND_URGENT);
-    urgent.volume = 0.5;
-    urgent.preload = "auto";
-    urgentAudioRef.current = urgent;
-
-    const subtle = new Audio(SOUND_SUBTLE);
-    subtle.volume = 0.35;
-    subtle.preload = "auto";
-    subtleAudioRef.current = subtle;
-  }, []);
-
-  const playSound = useCallback(
-    (isUrgent = false) => {
-      if (!soundEnabled) return;
-      const src = isUrgent ? urgentAudioRef.current : subtleAudioRef.current;
-      if (!src) return;
-      const clone = src.cloneNode();
-      clone.volume = isUrgent ? 0.5 : 0.35;
-      clone.play().catch(() => {});
-    },
-    [soundEnabled]
-  );
-
-  // Distinctive multi-tone emergency beep — played exclusively for SOS_ALERT events.
-  // Three descending square-wave pulses (900 → 800 → 700 Hz) spaced 180ms apart
-  // to create the classic emergency alert cadence without any CDN dependency.
-  const playEmergencyBeep = useCallback(() => {
-    if (!soundEnabled) return;
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      [900, 800, 700].forEach((freq, i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = "square";
-        osc.frequency.value = freq;
-        const start = ctx.currentTime + i * 0.18;
-        gain.gain.setValueAtTime(0, start);
-        gain.gain.linearRampToValueAtTime(0.35, start + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.15);
-        osc.start(start);
-        osc.stop(start + 0.15);
-      });
-    } catch {
-      // Fallback to CDN alarm if Web Audio unavailable
-      playSound(true);
-    }
-  }, [soundEnabled, playSound]);
-
-  // ── Fetch notifications (used by socket listener AND dropdown) ──
+  // ── Fetch notifications list (for dropdown display) ──
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
       const res = await notificationService.getNotifications(20, 0);
       const data = res?.data?.data ?? [];
       const list = Array.isArray(data) ? data : [];
-
-      // Detect new unread SOS_ALERT items since last fetch and play emergency chime
-      const newSosCount = list.filter(
-        (n) => n.type === "SOS_ALERT" && !n.isRead
-      ).length;
-      if (newSosCount > prevSosAlertCountRef.current && prevSosAlertCountRef.current !== -1) {
-        playEmergencyBeep();
-      }
-      prevSosAlertCountRef.current = newSosCount;
-
       setNotifications(list);
+
+      // Sync badge count from the authoritative DB list
+      const realUnread = list.filter((n) => !n.isRead).length;
+      setUnreadNotifications(realUnread);
+      setHasHighPriority(
+        list.some(
+          (n) => !n.isRead && (n.priority === "high" || n.type === "SOS_ALERT" || n.type === "SOS_UPDATE")
+        )
+      );
     } catch {
       setNotifications([]);
     } finally {
       setLoading(false);
     }
-  }, [playEmergencyBeep]);
-
-  // ── Fetch unread count (polling every 20s) ───────────
-  const fetchUnreadCount = useCallback(async () => {
-    try {
-      const res = await notificationService.getUnreadCount();
-      const count = res?.data?.data?.unreadCount ?? res?.data?.unreadCount ?? 0;
-      const high =
-        res?.data?.data?.hasHighPriority ?? res?.data?.hasHighPriority ?? false;
-
-      if (count > prevCountRef.current && prevCountRef.current !== 0) {
-        playSound(high && !prevHighRef.current);
-      }
-      prevCountRef.current = count;
-      prevHighRef.current = high;
-      setUnreadCount(count);
-      setHasHighPriority(high);
-    } catch {
-      /* silent */
-    }
-  }, [playSound]);
-
-  useEffect(() => {
-    fetchUnreadCount();
-    const id = setInterval(fetchUnreadCount, 20_000);
-    return () => clearInterval(id);
-  }, [fetchUnreadCount]);
-
-  // ── Real-time Socket.IO listener for NEW_SOS_ALERT & NEW_CHAT_MESSAGE ──
-  useEffect(() => {
-    const socket = connectSocket();
-
-    const onNewSOS = (payload) => {
-      // Play the distinctive emergency alert chime — three descending tones
-      playEmergencyBeep();
-      // Set prevSosAlertCountRef to -1 to suppress double-chime from fetchNotifications
-      prevSosAlertCountRef.current = -1;
-      // Immediately refresh the full notification list from backend
-      // so the new SOS record appears in the dropdown instantly
-      fetchNotifications();
-      fetchUnreadCount();
-    };
-
-    const onNewChat = () => {
-      playSound(false);
-    };
-
-    socket.on("NEW_SOS_ALERT", onNewSOS);
-    socket.on("NEW_CHAT_MESSAGE", onNewChat);
-
-    return () => {
-      socket.off("NEW_SOS_ALERT", onNewSOS);
-      socket.off("NEW_CHAT_MESSAGE", onNewChat);
-    };
-  }, [playEmergencyBeep, playSound, fetchNotifications, fetchUnreadCount]);
+  }, [setUnreadNotifications, setHasHighPriority]);
 
   // ── Refresh notifications when dropdown opens ────────
   useEffect(() => {
     if (isOpen) fetchNotifications();
+  }, [isOpen, fetchNotifications]);
+
+  // ── Also refresh list on SOS alert (keep list fresh) ─
+  // NotificationContext already handles sound + badge increment.
+  // We just need to refresh the list so the new SOS row appears.
+  useEffect(() => {
+    const socket = connectSocket();
+    const onSOS = () => { if (isOpen) fetchNotifications(); };
+    socket.on("NEW_SOS_ALERT", onSOS);
+    return () => { socket.off("NEW_SOS_ALERT", onSOS); };
   }, [isOpen, fetchNotifications]);
 
   // ── Click-outside to close popover ───────────────────
@@ -302,7 +210,7 @@ export default function PharmacyNotificationBell() {
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
       );
-      setUnreadCount((c) => Math.max(0, c - 1));
+      decrementNotifications(1);
     } catch {
       /* silent */
     }
@@ -312,8 +220,7 @@ export default function PharmacyNotificationBell() {
     try {
       await notificationService.markAllAsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      setUnreadCount(0);
-      setHasHighPriority(false);
+      clearNotifications();
     } catch {
       /* silent */
     }
@@ -323,7 +230,7 @@ export default function PharmacyNotificationBell() {
     try {
       await notificationService.deleteNotification(id);
       setNotifications((prev) => prev.filter((n) => n.id !== id));
-      if (wasUnread) setUnreadCount((c) => Math.max(0, c - 1));
+      if (wasUnread) decrementNotifications(1);
     } catch {
       /* silent */
     }

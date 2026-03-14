@@ -154,7 +154,7 @@ export default function chatHandler(io) {
             ? chatRoom.pharmacyId
             : chatRoom.patientId;
 
-        io.emit("new_message_notification", {
+        const notifPayload = {
           roomId,
           sosRequestId: chatRoom.sosRequestId,
           recipientId,
@@ -162,7 +162,13 @@ export default function chatHandler(io) {
           senderName: message.sender?.name || "Unknown",
           preview: trimmedContent.substring(0, 80),
           createdAt: message.createdAt,
-        });
+        };
+
+        // Canonical NEW_MESSAGE event — consumed by NotificationContext
+        io.emit("NEW_MESSAGE", notifPayload);
+
+        // Legacy alias kept for backward-compat
+        io.emit("new_message_notification", notifPayload);
 
         logger.info(
           `[SOCKET] Message in ${roomName} by ${senderId}: ${trimmedContent.substring(0, 50)}`

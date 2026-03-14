@@ -7,6 +7,7 @@ import { httpClient } from '../../../core/services/httpClient';
 const AdminInventoryInsight = () => {
   const [inventoryData, setInventoryData] = useState([]);
   const [shortages, setShortages] = useState([]);
+  const [insights, setInsights] = useState({ totalItems: 0, lowStock: 0, outOfStock: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMedicine, setSelectedMedicine] = useState(null);
@@ -28,9 +29,15 @@ const AdminInventoryInsight = () => {
       if (data.success) {
         setShortages(data.data.shortages || []);
         setInventoryData(data.data.inventory || []);
+        setInsights({
+          totalItems: data.data.totalItems || 0,
+          lowStock: data.data.lowStockCount || 0,
+          outOfStock: data.data.outOfStockCount || 0,
+        });
       }
     } catch (error) {
       console.error('Error fetching inventory insights:', error);
+      toast.error('Failed to load inventory insights. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -118,7 +125,7 @@ const AdminInventoryInsight = () => {
                 <div>
                   <p className="text-gray-600 text-sm font-medium">Total Items</p>
                   <p className="text-3xl font-bold text-gray-900 mt-2">
-                    {inventoryData.reduce((sum, item) => sum + (item.totalItems || 0), 0)}
+                    {insights.totalItems}
                   </p>
                 </div>
                 <div className="bg-blue-100 p-3 rounded-full">

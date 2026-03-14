@@ -2,13 +2,12 @@
  * NotificationDropdown Component
  * 
  * Features:
- * - Real-time unread badge count
+ * - Real-time unread badge count via NotificationContext (socket-driven)
  * - Dropdown list of latest notifications
  * - Distinct icons for different notification types
  * - Mark single notification as read
  * - Mark all as read button
  * - Empty state message
- * - Short polling (every 60 seconds for real-time updates)
  */
 
 import React, { useState, useEffect, useRef } from "react";
@@ -23,67 +22,25 @@ import {
   Check,
 } from "lucide-react";
 import notificationService from "../../core/services/notification.service";
+import { useNotification } from "../../context/NotificationContext";
 
 const NotificationDropdown = () => {
   const navigate = useNavigate();
+  const {
+    unreadNotifications: unreadCount,
+    decrementNotifications,
+    clearNotifications,
+    setUnreadNotifications,
+    setHasHighPriority,
+  } = useNotification();
+
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const dropdownRef = useRef(null);
-  const prevCountRef = useRef(0);
 
-  const playChime = () => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(880, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.5);
-    } catch (e) {
-      // audio unavailable
-    }
-  };
-
-  // Fetch unread count periodically (short polling every 60 seconds)
-  useEffect(() => {
-    const fetchUnreadCount = async () => {
-      try {
-        const response = await notificationService.getUnreadCount();
-        if (response.data) {
-          setUnreadCount(response.data.unreadCount || 0);
-        }
-      } catch (err) {
-        console.error("[NOTIFICATION DROPDOWN] Failed to fetch unread count:", err);
-      }
-    };
-
-    // Fetch immediately on mount
-    fetchUnreadCount();
-
-    // Set up polling every 30 seconds
-    const pollInterval = setInterval(fetchUnreadCount, 30000);
-
-    return () => clearInterval(pollInterval);
-  }, []);
-
-  // Play chime when unread count increases
-  useEffect(() => {
-    if (unreadCount > prevCountRef.current) {
-      playChime();
-    }
-    prevCountRef.current = unreadCount;
-  }, [unreadCount]);
-
-  // Fetch detailed notifications when dropdown opens
+  // Fetch detailed notifications when dropdown opens; sync badge count from real list
   useEffect(() => {
     if (!isOpen) return;
 
@@ -95,7 +52,10 @@ const NotificationDropdown = () => {
         const notifs = Array.isArray(response.data) ? response.data : response.data?.data || [];
         setNotifications(notifs);
 
-        console.log("[NOTIFICATION DROPDOWN] Fetched notifications:", notifs.length);
+        // Sync the badge with the real unread count from this fetch
+        const realUnread = notifs.filter((n) => !n.isRead).length;
+        setUnreadNotifications(realUnread);
+        setHasHighPriority(notifs.some((n) => !n.isRead && (n.priority === "high" || n.type === "SOS_ALERT" || n.type === "SOS_UPDATE")));
       } catch (err) {
         console.error("[NOTIFICATION DROPDOWN] Failed to fetch notifications:", err);
         setError("Failed to load notifications");
@@ -105,7 +65,7 @@ const NotificationDropdown = () => {
     };
 
     fetchNotifications();
-  }, [isOpen]);
+  }, [isOpen, setUnreadNotifications, setHasHighPriority]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -136,15 +96,14 @@ const NotificationDropdown = () => {
     try {
       await notificationService.markNotificationAsRead(notificationId);
       
-      // Update UI
+      // Update local list
       setNotifications((prev) =>
         prev.map((notif) =>
           notif.id === notificationId ? { ...notif, isRead: true } : notif
         )
       );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-
-      console.log("[NOTIFICATION DROPDOWN] Marked notification as read:", notificationId);
+      // Decrement global badge
+      decrementNotifications(1);
     } catch (err) {
       console.error("[NOTIFICATION DROPDOWN] Failed to mark as read:", err);
     }
@@ -154,11 +113,10 @@ const NotificationDropdown = () => {
     try {
       await notificationService.markAllAsRead();
       
-      // Update UI
+      // Update local list
       setNotifications((prev) => prev.map((notif) => ({ ...notif, isRead: true })));
-      setUnreadCount(0);
-
-      console.log("[NOTIFICATION DROPDOWN] Marked all as read");
+      // Clear global badge instantly
+      clearNotifications();
     } catch (err) {
       console.error("[NOTIFICATION DROPDOWN] Failed to mark all as read:", err);
     }
@@ -168,14 +126,12 @@ const NotificationDropdown = () => {
     try {
       await notificationService.deleteNotification(notificationId);
       
-      // Update UI
-      setNotifications((prev) => prev.filter((notif) => notif.id !== notificationId));
+      // Update local list and badge
       const deletedNotif = notifications.find((n) => n.id === notificationId);
+      setNotifications((prev) => prev.filter((notif) => notif.id !== notificationId));
       if (deletedNotif && !deletedNotif.isRead) {
-        setUnreadCount((prev) => Math.max(0, prev - 1));
+        decrementNotifications(1);
       }
-
-      console.log("[NOTIFICATION DROPDOWN] Deleted notification:", notificationId);
     } catch (err) {
       console.error("[NOTIFICATION DROPDOWN] Failed to delete notification:", err);
     }

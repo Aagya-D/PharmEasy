@@ -94,6 +94,50 @@ const patientService = {
     return response.data;
   },
 
+  // Get persistent cart
+  getCart: async () => {
+    const response = await httpClient.get("/cart");
+    return response.data;
+  },
+
+  // Add medicine to cart (creates or increments)
+  addCartItem: async (itemData) => {
+    const response = await httpClient.post("/cart/items", itemData);
+    return response.data;
+  },
+
+  // Update cart item quantity/selected state
+  updateCartItem: async (itemId, payload) => {
+    const response = await httpClient.patch(`/cart/items/${itemId}`, payload);
+    return response.data;
+  },
+
+  // Remove cart item
+  removeCartItem: async (itemId) => {
+    const response = await httpClient.delete(`/cart/items/${itemId}`);
+    return response.data;
+  },
+
+  // Place order from selected cart items
+  placeOrderFromCart: async (payload = null) => {
+    const body = Array.isArray(payload)
+      ? { itemIds: payload }
+      : {
+          itemIds: Array.isArray(payload?.itemIds) ? payload.itemIds : undefined,
+          items: Array.isArray(payload?.items) ? payload.items : undefined,
+          deliveryAddress: payload?.deliveryAddress,
+          shippingAddress: payload?.shippingAddress,
+          paymentMethod: payload?.paymentMethod,
+          contactNumber: payload?.contactNumber,
+          summary: payload?.summary,
+          latitude: payload?.latitude,
+          longitude: payload?.longitude,
+        };
+
+    const response = await httpClient.post("/patient/orders/checkout", body);
+    return response.data;
+  },
+
   // Cancel order
   cancelOrder: async (orderId) => {
     const response = await httpClient.put(`/patient/orders/${orderId}/cancel`);

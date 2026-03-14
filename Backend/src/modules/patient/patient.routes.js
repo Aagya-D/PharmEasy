@@ -8,6 +8,8 @@ import { authenticate } from "../../middlewares/auth.js";
 import { requirePatient } from "../../middlewares/roleCheck.js";
 import { uploadPrescription } from "../../middlewares/upload.middleware.js";
 import * as patientController from "./patient.controller.js";
+import * as cartController from "../cart/cart.controller.js";
+import { placeOrderFromCart } from "../order/order.controller.js";
 
 const router = express.Router();
 
@@ -42,6 +44,41 @@ router.put("/profile", patientController.updateProfile);
  * @access  Private (Patient only)
  */
 router.get("/orders", patientController.getOrders);
+
+/**
+ * @route   GET /api/patient/cart
+ * @desc    Get patient cart with grouped cart items
+ * @access  Private (Patient only)
+ */
+router.get("/cart", cartController.getCart);
+
+/**
+ * @route   POST /api/patient/cart/items
+ * @desc    Add or increment a medicine in cart
+ * @access  Private (Patient only)
+ */
+router.post("/cart/items", cartController.addToCart);
+
+/**
+ * @route   PATCH /api/patient/cart/items/:itemId
+ * @desc    Update cart item quantity/selection
+ * @access  Private (Patient only)
+ */
+router.patch("/cart/items/:itemId", cartController.updateQuantity);
+
+/**
+ * @route   DELETE /api/patient/cart/items/:itemId
+ * @desc    Remove cart item
+ * @access  Private (Patient only)
+ */
+router.delete("/cart/items/:itemId", cartController.removeItem);
+
+/**
+ * @route   POST /api/patient/orders/checkout
+ * @desc    Convert selected cart items into an order
+ * @access  Private (Patient only)
+ */
+router.post("/orders/checkout", placeOrderFromCart);
 
 /**
  * @route   GET /api/patient/prescriptions

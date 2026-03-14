@@ -90,6 +90,7 @@ model User {
   chatMessages        ChatMessage[]        @relation("UserChatMessages")
   reviews             Review[]             @relation("PatientReviews")
   favoriteMedicines   FavoriteMedicine[]   @relation("PatientFavorites")
+  cart                Cart?
 
   @@index([email])
   @@index([roleId])
@@ -187,6 +188,7 @@ model Pharmacy {
   updatedAt          DateTime       @updatedAt
   user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   inventory          Inventory[]
+  orders             Order[]
   reviews            Review[]       @relation("PharmacyReviews")
 
   @@index([userId])
@@ -218,6 +220,7 @@ model Inventory {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   pharmacy    Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  orderItems  OrderItem[]
 
   @@index([pharmacyId])
   @@index([genericName])
@@ -249,19 +252,54 @@ enum PharmacyStatus {
 /// * Represents an order from a patient to a pharmacy
 /// * Status flow: PENDING → CONFIRMED → DELIVERED or CANCELLED
 model Order {
-  id          String    @id @default(cuid())
+  id          String      @id @default(cuid())
   patientId   String
-  pharmacyId  String?
-  status      String    @default("pending")
-  totalAmount Float?
+  pharmacyId  String
+  status      OrderStatus @default(PENDING)
+  totalAmount Float       @default(0)
+  deliveryAddress String
+  paymentMethod String @default("CASH_ON_DELIVERY")
+  contactNumber String
+  latitude Float?
+  longitude Float?
   notes       String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  patient     User      @relation("PatientOrders", fields: [patientId], references: [id], onDelete: Cascade)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  patient     User        @relation("PatientOrders", fields: [patientId], references: [id], onDelete: Cascade)
+  pharmacy    Pharmacy    @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  items       OrderItem[]
 
   @@index([patientId])
+  @@index([pharmacyId])
   @@index([status])
   @@index([createdAt])
+}
+
+model OrderItem {
+  id          String    @id @default(cuid())
+  orderId     String
+  inventoryId String
+  medicineName String
+  genericName String?
+  unitPrice   Float
+  quantity    Int
+  lineTotal   Float
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([inventoryId])
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
 }
 
 /// *
@@ -407,6 +445,7 @@ enum LogCategory {
 
 enum NotificationType {
   CMS_ALERT
+  NEW_ORDER
   SOS_ALERT         /// NEW: pharmacy-targeted emergency SOS broadcast (replaces SOS_UPDATE for pharmacy alerts)
   SOS_UPDATE
   MEDICINE_ALERT
@@ -601,4 +640,48 @@ model FavoriteMedicine {
 
   @@unique([userId, medicineName])
   @@index([userId])
+}
+
+/// *
+/// * Cart Model - Persistent shopping cart for patient purchases
+/// *
+/// * One cart per patient. Items are grouped by pharmacy in the frontend.
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+
+  @@index([userId])
+}
+
+/// *
+/// * CartItem Model - Individual medicine entries inside a cart
+/// *
+/// * medicineId + pharmacyId are used to keep one row per medicine source.
+model CartItem {
+  id              String    @id @default(cuid())
+  cartId          String
+  medicineId      String
+  pharmacyId      String
+  medicineName    String
+  genericName     String?
+  price           Float
+  quantity        Int       @default(1)
+  selected        Boolean   @default(true)
+  inStock         Boolean   @default(true)
+  expiryDate      DateTime?
+  pharmacyName    String?
+  pharmacyAddress String?
+  pharmacyContact String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  cart            Cart      @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, medicineId, pharmacyId])
+  @@index([cartId])
+  @@index([medicineName])
+  @@index([pharmacyName])
 }

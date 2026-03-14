@@ -36,6 +36,7 @@ export default function PharmacyOrders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filterStatus, setFilterStatus] = useState("all");
+  const [updatingOrderId, setUpdatingOrderId] = useState(null);
 
   useEffect(() => {
     fetchOrders();
@@ -70,17 +71,71 @@ export default function PharmacyOrders() {
 
   const getStatusBadge = (status) => {
     const styles = {
-      pending: "bg-yellow-100 text-yellow-700",
-      confirmed: "bg-blue-100 text-blue-700",
-      delivered: "bg-green-100 text-green-700",
-      fulfilled: "bg-green-100 text-green-700",
-      cancelled: "bg-red-100 text-red-700",
+      PENDING: "bg-yellow-100 text-yellow-700",
+      ACCEPTED: "bg-blue-100 text-blue-700",
+      PREPARING: "bg-indigo-100 text-indigo-700",
+      READY: "bg-emerald-100 text-emerald-700",
+      COMPLETED: "bg-green-100 text-green-700",
+      CANCELLED: "bg-red-100 text-red-700",
     };
     return (
-      <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${styles[status] || "bg-gray-100 text-gray-700"}`}>
-        {status}
+      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${styles[status] || "bg-gray-100 text-gray-700"}`}>
+        {status?.replaceAll("_", " ")}
       </span>
     );
+  };
+
+  const updateOrderStatus = async (orderId, status) => {
+    try {
+      setUpdatingOrderId(orderId);
+      await httpClient.patch(`/pharmacy/orders/${orderId}/status`, { status });
+      await fetchOrders();
+    } catch (err) {
+      console.error("Failed to update order status", err);
+      setError(err.response?.data?.message || "Failed to update order status");
+    } finally {
+      setUpdatingOrderId(null);
+    }
+  };
+
+  const renderActionButton = (order) => {
+    if (order.status === "PENDING") {
+      return (
+        <button
+          onClick={() => updateOrderStatus(order.id, "ACCEPTED")}
+          disabled={updatingOrderId === order.id}
+          className="px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-xs font-semibold"
+        >
+          Accept
+        </button>
+      );
+    }
+
+    if (order.status === "ACCEPTED" || order.status === "PREPARING") {
+      return (
+        <button
+          onClick={() => updateOrderStatus(order.id, "READY")}
+          disabled={updatingOrderId === order.id}
+          className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white text-xs font-semibold"
+        >
+          Mark as Ready
+        </button>
+      );
+    }
+
+    if (order.status === "READY") {
+      return (
+        <button
+          onClick={() => updateOrderStatus(order.id, "COMPLETED")}
+          disabled={updatingOrderId === order.id}
+          className="px-3 py-1.5 rounded-md bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white text-xs font-semibold"
+        >
+          Complete
+        </button>
+      );
+    }
+
+    return <span className="text-xs text-gray-400">No actions</span>;
   };
 
   const statCards = orderStats ? [
@@ -157,10 +212,12 @@ export default function PharmacyOrders() {
             className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Orders</option>
-            <option value="pending">Pending</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="delivered">Delivered</option>
-            <option value="cancelled">Cancelled</option>
+            <option value="PENDING">Pending</option>
+            <option value="ACCEPTED">Accepted</option>
+            <option value="PREPARING">Preparing</option>
+            <option value="READY">Ready</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
           </select>
         </div>
 
@@ -177,7 +234,9 @@ export default function PharmacyOrders() {
                   <th className="text-left px-6 py-4">Customer</th>
                   <th className="text-left px-6 py-4">Status</th>
                   <th className="text-left px-6 py-4">Total</th>
+                  <th className="text-left px-6 py-4">Items</th>
                   <th className="text-left px-6 py-4">Date</th>
+                  <th className="text-left px-6 py-4">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -189,7 +248,7 @@ export default function PharmacyOrders() {
                   </>
                 ) : orders.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-16 text-center">
+                    <td colSpan="7" className="px-6 py-16 text-center">
                       <Package className="mx-auto mb-3 text-gray-300" size={48} />
                       <p className="text-gray-700 font-semibold text-lg">No orders yet</p>
                       <p className="text-gray-500 text-sm mt-1">
@@ -206,8 +265,14 @@ export default function PharmacyOrders() {
                       <td className="px-6 py-4 text-gray-600">
                         {order.totalAmount ? `Rs. ${order.totalAmount.toLocaleString()}` : "-"}
                       </td>
+                      <td className="px-6 py-4 text-gray-600 text-xs">
+                        {order.items?.length || 0}
+                      </td>
                       <td className="px-6 py-4 text-gray-500 text-xs">
                         {new Date(order.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4">
+                        {renderActionButton(order)}
                       </td>
                     </tr>
                   ))

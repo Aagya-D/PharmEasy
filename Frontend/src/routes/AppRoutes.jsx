@@ -24,11 +24,15 @@ import NotificationCenter from "../features/patient/pages/NotificationCenter";
 import PatientDashboard from "../features/patient/pages/Dashboard/PatientDashboard";
 import OrdersPage from "../features/patient/pages/Orders/OrdersPage";
 import MedicationsPage from "../features/patient/pages/Medications/MedicationsPage";
+import CheckoutPage from "../features/patient/pages/CheckoutPage";
+import Cart from "../features/patient/pages/Cart";
+import MedicineDetail from "../features/patient/pages/MedicineDetail";
 import PatientHistory from "../features/patient/pages/PatientHistory";
 import ProfilePage from "../features/patient/pages/Profile/ProfilePage";
 import PrescriptionsPage from "../features/patient/pages/Prescriptions/PrescriptionsPage";
 import PatientSettings from "../features/patient/pages/PatientSettings";
 import PatientChat from "../features/patient/pages/PatientChat";
+import OrderSuccess from "../features/patient/pages/OrderSuccess";
 
 // Pharmacy Pages
 import PharmacyDashboard from "../features/pharmacy/pages/PharmacyDashboard";
@@ -355,12 +359,28 @@ export const routes = [
         element: <PatientDashboard />,
       },
       {
+        path: "cart",
+        element: <Cart />,
+      },
+      {
         path: "orders",
         element: <OrdersPage />,
       },
       {
+        path: "checkout",
+        element: <CheckoutPage />,
+      },
+      {
+        path: "order-success",
+        element: <OrderSuccess />,
+      },
+      {
         path: "orders/:id",
         element: <OrdersPage />,
+      },
+      {
+        path: "medicine/:id",
+        element: <MedicineDetail />,
       },
       {
         path: "medications",

@@ -360,14 +360,21 @@ export const sendMessage = async (req, res, next) => {
       // Sidebar notification for the recipient
       const recipientId =
         userId === chatRoom.patientId ? chatRoom.pharmacyId : chatRoom.patientId;
-      io.emit("new_message_notification", {
+
+      const notifPayload = {
         roomId,
         recipientId,
         senderId: userId,
         senderName: message.sender?.name,
         preview: content.trim().substring(0, 80),
         createdAt: message.createdAt,
-      });
+      };
+
+      // Canonical NEW_MESSAGE event — consumed by NotificationContext
+      io.emit("NEW_MESSAGE", notifPayload);
+
+      // Legacy alias kept for backward-compat with PharmacyNotificationBell
+      io.emit("new_message_notification", notifPayload);
     }
 
     return res.status(201).json({

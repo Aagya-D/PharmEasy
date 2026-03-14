@@ -136,17 +136,16 @@ function authReducer(state, action) {
   }
 }
 
-// ✅ TASK: Robust Initializer - read from localStorage on first mount
-// This runs BEFORE the component renders, ensuring state is hydrated immediately
-function initAuthState(initial) {
-
 /**
  * Lightweight JWT payload decoder — no external dependency needed.
  * Returns null on any malformed input so callers can treat it as "invalid".
  */
 function decodeTokenPayload(token) {
   try {
-    return JSON.parse(atob(token.split(".")[1]));
+    if (!token || typeof token !== "string") return null;
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    return JSON.parse(atob(parts[1]));
   } catch {
     return null;
   }
@@ -161,6 +160,10 @@ function isTokenExpired(token) {
   if (!payload || typeof payload.exp !== "number") return true;
   return payload.exp * 1000 < Date.now();
 }
+
+// ✅ TASK: Robust Initializer - read from localStorage on first mount
+// This runs BEFORE the component renders, ensuring state is hydrated immediately
+function initAuthState(initial) {
   console.log('[AUTH INIT] Starting initialization from localStorage...');
   
   try {
@@ -274,6 +277,7 @@ export function AuthProvider({ children }) {
               id: userData.userId || userData.id,
               email: userData.email,
               name: userData.name,
+              phone: userData.phone || user?.phone || null,
               role: userData.role,
               roleId: userData.roleId,
               status: userData.status,
@@ -469,6 +473,38 @@ export function AuthProvider({ children }) {
       httpClient.interceptors.request.eject(requestInterceptor);
       httpClient.interceptors.response.eject(responseInterceptor);
     };
+  }, [state.accessToken]);
+
+  // Silent token refresh — schedules a proactive refresh 1 minute before the
+  // access token expires so the user is never interrupted by a 401 error.
+  useEffect(() => {
+    if (!state.accessToken || !state.isAuthenticated) return;
+
+    const payload = decodeTokenPayload(state.accessToken);
+    if (!payload?.exp) return;
+
+    // Fire 60 s before expiry; if already within that window, fire immediately.
+    const msUntilRefresh = payload.exp * 1000 - Date.now() - 60 * 1000;
+    const delay = msUntilRefresh > 0 ? msUntilRefresh : 0;
+
+    const timer = setTimeout(async () => {
+      try {
+        logger.info("Silent token refresh triggered");
+        const response = await authService.refreshToken();
+        const { accessToken } = response.data;
+        localStorage.setItem("accessToken", accessToken);
+        dispatch({ type: ACTIONS.REFRESH_TOKEN_SUCCESS, payload: accessToken });
+        logger.authEvent("SILENT_REFRESH_SUCCESS");
+      } catch (err) {
+        logger.warn("Silent token refresh failed, logging out", {
+          error: err.message,
+        });
+        dispatch({ type: ACTIONS.LOGOUT });
+        clearAuth();
+      }
+    }, delay);
+
+    return () => clearTimeout(timer);
   }, [state.accessToken]);
 
   // Login action

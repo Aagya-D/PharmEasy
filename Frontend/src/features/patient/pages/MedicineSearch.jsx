@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import {
   Search,
   MapPin,
@@ -16,6 +17,7 @@ import searchService from "../../../core/services/search.service";
 import patientService from "../services/patient.service";
 import useGeoLocation from "../../../shared/hooks/useGeoLocation";
 import { useLocation } from "../../../context/LocationContext";
+import { useCart } from "../../../context/CartContext";
 import StarRating from "../../../shared/components/StarRating";
 
 /**
@@ -24,6 +26,7 @@ import StarRating from "../../../shared/components/StarRating";
  */
 export default function MedicineSearch() {
   const navigate = useNavigate();
+  const { addToCart, clearCart, isPharmacyMismatchError } = useCart();
   const [searchQuery, setSearchQuery] = useState("");
   const [medicines, setMedicines] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -88,6 +91,80 @@ export default function MedicineSearch() {
 
   // Location context - user's selected search location
   const { selectedLocation } = useLocation();
+
+  const getMedicineRouteId = (medicine) => {
+    return String(medicine?.id || `${medicine?.medicine || medicine?.brandName || "medicine"}`);
+  };
+
+  const persistMedicineSnapshot = (medicine) => {
+    try {
+      const routeId = getMedicineRouteId(medicine);
+      sessionStorage.setItem(`medicine_detail_${routeId}`, JSON.stringify(medicine));
+    } catch {
+      // ignore storage failures
+    }
+  };
+
+  const handleOpenDetail = (medicine) => {
+    const routeId = getMedicineRouteId(medicine);
+    persistMedicineSnapshot(medicine);
+
+    navigate(`/patient/medicine/${encodeURIComponent(routeId)}`, {
+      state: { medicine },
+    });
+  };
+
+  const handleAddToCart = (medicine) => {
+    addToCart(medicine)
+      .then(() => {
+        persistMedicineSnapshot(medicine);
+        toast.success("✅ Added to cart!");
+      })
+      .catch(async (error) => {
+        if (!isPharmacyMismatchError(error)) {
+          toast.error("Failed to add item to cart");
+          return;
+        }
+
+        const shouldReplace = window.confirm(
+          "Your cart has items from another pharmacy. Clear current cart and add this medicine instead?"
+        );
+
+        if (!shouldReplace) return;
+
+        try {
+          await clearCart();
+          await addToCart(medicine);
+          persistMedicineSnapshot(medicine);
+          toast.success("✅ Added to cart!");
+        } catch {
+          toast.error("Unable to replace cart items right now");
+        }
+      });
+  };
+
+  const handlePlaceOrder = (medicine) => {
+    const routeId = getMedicineRouteId(medicine);
+    persistMedicineSnapshot(medicine);
+    navigate("/patient/checkout", {
+      state: {
+        mode: "buy-now",
+        items: [
+          {
+            id: routeId,
+            medicineId: routeId,
+            medicineName: medicine?.medicine || medicine?.brandName || "Medicine",
+            genericName: medicine?.genericName || null,
+            quantity: 1,
+            price: Number(medicine?.price || 0),
+            pharmacyName: medicine?.pharmacy?.name || "Unknown Pharmacy",
+            pharmacyAddress: medicine?.pharmacy?.address || null,
+            pharmacyContact: medicine?.pharmacy?.contactNumber || null,
+          },
+        ],
+      },
+    });
+  };
 
   // Get user's location on mount (with fallback to Kathmandu)
   useEffect(() => {
@@ -315,8 +392,17 @@ export default function MedicineSearch() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {medicines.map((medicine) => (
                 <div
-                  key={medicine.id}
-                  className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow relative"
+                  key={getMedicineRouteId(medicine)}
+                  onClick={() => handleOpenDetail(medicine)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleOpenDetail(medicine);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow relative cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {/* Favorite Heart Button */}
                   <button
@@ -403,17 +489,22 @@ export default function MedicineSearch() {
                   {/* Action Buttons */}
                   <div className="space-y-2">
                     <button
-                      onClick={() =>
-                        navigate(`/search?q=${encodeURIComponent(medicine.medicine || medicine.brandName)}`)
-                      }
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleAddToCart(medicine);
+                      }}
                       className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
                     >
-                      View All Stores
+                      Add to Cart
                     </button>
                     <button
-                      className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-900 font-medium rounded-lg transition-colors"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handlePlaceOrder(medicine);
+                      }}
+                      className="w-full px-4 py-2 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-medium rounded-lg transition-colors"
                     >
-                      Add to Cart
+                      Place Order
                     </button>
                   </div>
                 </div>

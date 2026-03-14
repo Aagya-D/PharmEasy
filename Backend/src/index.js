@@ -19,6 +19,8 @@ import authRoutes from "./modules/auth/auth.routes.js";
 import pharmacyRoutes from "./modules/pharmacy/pharmacy.routes.js";
 import inventoryRoutes from "./modules/inventory/inventory.routes.js";
 import patientRoutes from "./modules/patient/patient.routes.js";
+import cartRoutes from "./modules/cart/cart.routes.js";
+import orderRoutes from "./modules/order/order.routes.js";
 import searchRoutes from "./modules/search/search.routes.js";
 import notificationRoutes from "./modules/notifications/notification.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
@@ -197,6 +199,12 @@ app.use("/api", searchRoutes);
 // Patient routes (dashboard, orders, prescriptions, medications, SOS)
 // Routes include: /patient/dashboard, /patient/orders, /patient/prescriptions, /patient/sos/request, etc.
 app.use("/api/patient", patientRoutes);
+
+// Cart routes (persistent patient cart operations)
+app.use("/api/cart", cartRoutes);
+
+// Order routes (checkout + pharmacy order status transitions)
+app.use("/api/orders", orderRoutes);
 
 // Notification routes (user notifications, real-time alerts)
 // Routes include: /notifications, /notifications/unread-count, /notifications/:id/read, etc.
@@ -390,9 +398,9 @@ const startServer = async () => {
   • Auth:      POST /api/auth/verify-otp
 
 🔐 Authentication:
-  • Access Token expiry:  15 minutes
+  • Access Token expiry:  30 minutes
   • Refresh Token expiry: 7 days
-  • OTP expiry:          10 minutes
+  • OTP expiry:           5 minutes
   • Reset Token expiry:   1 hour
 
 📖 API Documentation:

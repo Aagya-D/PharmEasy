@@ -930,11 +930,11 @@ export const getDashboardStats = async (req, res, next) => {
       }),
       // 7. Pending orders
       prisma.order.count({
-        where: { pharmacyId, status: 'pending' },
+        where: { pharmacyId, status: 'PENDING' },
       }),
       // 8. Fulfilled/delivered orders
       prisma.order.count({
-        where: { pharmacyId, status: { in: ['delivered', 'fulfilled', 'confirmed'] } },
+        where: { pharmacyId, status: { in: ['COMPLETED'] } },
       }),
       // 9. Pending SOS requests (global pending, pharmacy can see nearby)
       prisma.sOSRequest.count({
@@ -1021,7 +1021,7 @@ export const getPharmacyOrders = async (req, res, next) => {
 
     const where = { pharmacyId: pharmacy.id };
     if (status && status !== 'all') {
-      where.status = status;
+      where.status = String(status).toUpperCase();
     }
 
     const [orders, totalCount] = await Promise.all([
@@ -1036,6 +1036,16 @@ export const getPharmacyOrders = async (req, res, next) => {
               phone: true,
             },
           },
+          items: {
+            select: {
+              id: true,
+              medicineName: true,
+              genericName: true,
+              quantity: true,
+              unitPrice: true,
+              lineTotal: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: (parseInt(page) - 1) * parseInt(limit),
@@ -1048,7 +1058,7 @@ export const getPharmacyOrders = async (req, res, next) => {
     const revenueAgg = await prisma.order.aggregate({
       where: {
         pharmacyId: pharmacy.id,
-        status: { in: ['delivered', 'fulfilled', 'confirmed'] },
+        status: { in: ['COMPLETED'] },
       },
       _sum: { totalAmount: true },
     });
@@ -1059,8 +1069,11 @@ export const getPharmacyOrders = async (req, res, next) => {
         orders,
         stats: {
           total: totalCount,
-          pending: await prisma.order.count({ where: { pharmacyId: pharmacy.id, status: 'pending' } }),
-          fulfilled: await prisma.order.count({ where: { pharmacyId: pharmacy.id, status: { in: ['delivered', 'fulfilled', 'confirmed'] } } }),
+          pending: await prisma.order.count({ where: { pharmacyId: pharmacy.id, status: 'PENDING' } }),
+          accepted: await prisma.order.count({ where: { pharmacyId: pharmacy.id, status: 'ACCEPTED' } }),
+          preparing: await prisma.order.count({ where: { pharmacyId: pharmacy.id, status: 'PREPARING' } }),
+          ready: await prisma.order.count({ where: { pharmacyId: pharmacy.id, status: 'READY' } }),
+          fulfilled: await prisma.order.count({ where: { pharmacyId: pharmacy.id, status: 'COMPLETED' } }),
           revenue: revenueAgg._sum.totalAmount || 0,
         },
         pagination: {
@@ -1216,7 +1229,7 @@ export const getAnalyticsData = async (req, res, next) => {
         where: {
           pharmacyId,
           createdAt: { gte: thirtyDaysAgo },
-          status: { in: ['delivered', 'fulfilled', 'confirmed', 'pending'] },
+          status: { in: ['COMPLETED', 'READY', 'PREPARING', 'ACCEPTED', 'PENDING'] },
         },
         select: { totalAmount: true, createdAt: true, status: true },
         orderBy: { createdAt: 'asc' },
@@ -1226,7 +1239,7 @@ export const getAnalyticsData = async (req, res, next) => {
         where: {
           pharmacyId,
           createdAt: { gte: currentMonthStart },
-          status: { in: ['delivered', 'fulfilled', 'confirmed'] },
+          status: { in: ['COMPLETED'] },
         },
         select: { totalAmount: true },
       }),
@@ -1235,7 +1248,7 @@ export const getAnalyticsData = async (req, res, next) => {
         where: {
           pharmacyId,
           createdAt: { gte: prevMonthStart, lte: prevMonthEnd },
-          status: { in: ['delivered', 'fulfilled', 'confirmed'] },
+          status: { in: ['COMPLETED'] },
         },
         select: { totalAmount: true },
       }),

@@ -35,7 +35,7 @@ import logger from "../../utils/logger.js";
 
 // Constants
 const VALID_REGISTRATION_ROLES = [2, 3]; // Pharmacy Admin, Patient
-const OTP_EXPIRE_SECONDS = Number(process.env.OTP_EXPIRY_MINUTES || 10) * 60;
+const OTP_EXPIRE_SECONDS = Number(process.env.OTP_EXPIRY_MINUTES || 5) * 60;
 
 /**
  * ============================================
@@ -525,7 +525,7 @@ export const login = async (
     isOnboarded,
     accessToken,
     refreshToken,
-    expiresIn: 900, // 15 minutes
+    expiresIn: 1800, // 30 minutes
   };
 };
 
@@ -598,7 +598,7 @@ export const refreshAccessToken = async (refreshToken) => {
 
   console.log(`[REFRESH] New access token issued for user: ${userId}`);
 
-  return { userId: user.id, accessToken: newAccessToken, expiresIn: 900 };
+  return { userId: user.id, accessToken: newAccessToken, expiresIn: 1800 };
 };
 
 /**

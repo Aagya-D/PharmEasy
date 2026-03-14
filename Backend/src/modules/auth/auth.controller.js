@@ -147,7 +147,7 @@ export const verifyEmailOTP = async (req, res, next) => {
 
     res.cookie("access_token", accessToken, {
       ...COOKIE_OPTIONS,
-      maxAge: 1000 * 60 * 15,
+      maxAge: 1000 * 60 * 30,
     });
     res.cookie("refresh_token", refreshToken, {
       ...COOKIE_OPTIONS,
@@ -225,7 +225,7 @@ export const login = async (req, res, next) => {
     // 3. SET SECURE COOKIES
     res.cookie("access_token", result.accessToken, {
       ...COOKIE_OPTIONS,
-      maxAge: 1000 * 60 * 15,
+      maxAge: 1000 * 60 * 30,
     });
     res.cookie("refresh_token", result.refreshToken, {
       ...COOKIE_OPTIONS,
@@ -372,11 +372,9 @@ export const refreshTokens = async (req, res, next) => {
     // GENERATE NEW TOKENS
     // ============================================
     const user = await userService.getUserById(payload.userId);
-    const newAccess = generateAccessToken({
-      userId: payload.userId,
-      roleId: user.role_type_id,
-    });
-    const newRefresh = generateRefreshToken({ userId: payload.userId });
+    const pharmacyStatus = user?.pharmacy?.verificationStatus || null;
+    const newAccess = generateAccessToken(payload.userId, user?.role?.name, pharmacyStatus);
+    const newRefresh = generateRefreshToken(payload.userId);
 
     // ROTATE REFRESH TOKEN (preserves original expiry)
     await userService.rotateRefreshToken(payload.userId, token, newRefresh);
@@ -384,7 +382,7 @@ export const refreshTokens = async (req, res, next) => {
     // SET NEW COOKIES (secure, httpOnly)
     res.cookie("access_token", newAccess, {
       ...COOKIE_OPTIONS,
-      maxAge: 1000 * 60 * 15, // 15 minutes
+      maxAge: 1000 * 60 * 30, // 30 minutes
     });
     res.cookie("refresh_token", newRefresh, {
       ...COOKIE_OPTIONS,
@@ -395,7 +393,7 @@ export const refreshTokens = async (req, res, next) => {
       success: true,
       message: "Tokens refreshed successfully",
       data: { accessToken: newAccess },
-      expiresIn: "15m",
+      expiresIn: "30m",
     });
   } catch (err) {
     next(err);

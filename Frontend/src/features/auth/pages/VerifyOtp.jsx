@@ -32,7 +32,8 @@ export function VerifyOtp() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(stateMessage ? "" : ""); // Clear if state message exists
-  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes
+  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes — matches OTP_EXPIRY_MINUTES on backend
+  const [resendCooldown, setResendCooldown] = useState(60); // 60-second lock before first resend
   const [canResend, setCanResend] = useState(false);
   const [successMessage, setSuccessMessage] = useState(stateMessage || ""); // Show state message
 
@@ -44,19 +45,29 @@ export function VerifyOtp() {
     }
   }, [email, navigate, isFromLogin]);
 
-  // Countdown timer
+  // Main OTP expiry countdown — auto-clears fields when the code expires
   useEffect(() => {
     if (timeLeft <= 0) {
-      setCanResend(true);
+      setOtp(["", "", "", "", "", ""]);
       return;
     }
-
     const timer = setInterval(() => {
       setTimeLeft((prev) => prev - 1);
     }, 1000);
-
     return () => clearInterval(timer);
   }, [timeLeft]);
+
+  // 60-second resend cooldown — independent of the main expiry timer
+  useEffect(() => {
+    if (resendCooldown <= 0) {
+      setCanResend(true);
+      return;
+    }
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -134,10 +145,10 @@ export function VerifyOtp() {
 
     try {
       await authService.resendOTP({ email });
-      setTimeLeft(600);
+      setTimeLeft(300);     // Reset 5-minute expiry
+      setResendCooldown(60); // Lock resend for another 60 seconds
       setCanResend(false);
       setOtp(["", "", "", "", "", ""]);
-      // Show success message
       const firstInput = document.getElementById("otp-0");
       firstInput?.focus();
     } catch (err) {
@@ -221,13 +232,25 @@ export function VerifyOtp() {
         <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Clock className="w-5 h-5 text-slate-600" />
-            <p className="text-sm text-slate-600 font-medium">Code expires in</p>
+            <p className="text-sm text-slate-600 font-medium">
+              {timeLeft <= 0 ? "Code expired" : "Code expires in"}
+            </p>
           </div>
-          <p className={`text-3xl font-bold text-center ${timeLeft < 120 ? "text-red-600" : "text-cyan-600"}`}>
-            {formatTime(timeLeft)}
-          </p>
-          {timeLeft < 120 && (
-            <p className="text-xs text-red-600 text-center mt-2">Code expiring soon!</p>
+          {timeLeft > 0 ? (
+            <>
+              <p className={`text-3xl font-bold text-center ${
+                timeLeft < 60 ? "text-red-600" : timeLeft < 120 ? "text-orange-500" : "text-cyan-600"
+              }`}>
+                {formatTime(timeLeft)}
+              </p>
+              {timeLeft < 60 && (
+                <p className="text-xs text-red-600 text-center mt-2">Code expiring soon!</p>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-red-600 text-center font-medium mt-1">
+              Your code has expired. Please request a new one.
+            </p>
           )}
         </div>
 
@@ -253,11 +276,12 @@ export function VerifyOtp() {
               className="inline-flex items-center gap-2 text-sm font-medium text-cyan-600 hover:text-cyan-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <RefreshCw size={16} />
-              Didn't receive the code? Resend
+              {timeLeft <= 0 ? "Request new code" : "Didn't receive the code? Resend"}
             </button>
           ) : (
             <p className="text-sm text-slate-500">
-              Resend available in {formatTime(timeLeft)}
+              Resend available in{" "}
+              <span className="font-semibold text-slate-700">{resendCooldown}s</span>
             </p>
           )}
         </div>
