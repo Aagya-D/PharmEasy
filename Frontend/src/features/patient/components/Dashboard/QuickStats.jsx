@@ -1,11 +1,11 @@
 import React from "react";
-import { Heart, MapPin, Package, Clock, Pill, FileText } from "lucide-react";
+import { MapPin, Clock, Pill, Activity } from "lucide-react";
 
 export function QuickStats({ stats }) {
   const defaultStats = [
-    { label: "Active Prescriptions", value: "3", icon: FileText, color: "#2563eb", bgColor: "#dbeafe" },
     { label: "Pending Orders", value: "2", icon: Clock, color: "#f59e0b", bgColor: "#fef3c7" },
-    { label: "Medications", value: "8", icon: Pill, color: "#0d9488", bgColor: "#ccfbf1" },
+    { label: "Purchased Medicines", value: "8", icon: Pill, color: "#0d9488", bgColor: "#ccfbf1" },
+    { label: "Total Orders", value: "6", icon: Activity, color: "#16a34a", bgColor: "#dcfce7" },
     { label: "Nearby Pharmacies", value: "12", icon: MapPin, color: "#10b981", bgColor: "#d1fae5" },
   ];
 

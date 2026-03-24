@@ -59,6 +59,7 @@ export default function PharmacyInventory() {
     totalItems: 0,
   });
   const [confirmDelete, setConfirmDelete] = useState({ open: false, itemId: null, itemName: "" });
+  const [confirmEdit, setConfirmEdit] = useState({ open: false, itemId: null, itemName: "" });
 
   // Statistics calculated from inventory
   const stats = React.useMemo(() => {
@@ -149,10 +150,23 @@ export default function PharmacyInventory() {
 
   // Handle save edit
   const handleSaveEdit = async (itemId) => {
+    const item = inventory.find((invItem) => invItem.id === itemId);
+    setConfirmEdit({
+      open: true,
+      itemId,
+      itemName: item?.name || "this medicine",
+    });
+  };
+
+  const handleEditConfirm = async () => {
+    const { itemId, itemName } = confirmEdit;
+    setConfirmEdit({ open: false, itemId: null, itemName: "" });
+
     try {
       logger.info("INVENTORY", "Updating inventory item", { itemId });
       await inventoryService.updateInventoryItem(itemId, editValues);
       logger.success("INVENTORY", "Item updated successfully");
+      toast.success(`✅ ${itemName} updated successfully!`);
       
       // Refresh inventory
       await fetchInventory(pagination.currentPage);
@@ -163,6 +177,11 @@ export default function PharmacyInventory() {
       const errorMessage = err?.message || "Failed to update item";
       toast.error(`❌ ${errorMessage}`);
     }
+  };
+
+  const handleEditCancel = () => {
+    setConfirmEdit({ open: false, itemId: null, itemName: "" });
+    toast("Edit cancelled", { icon: "ℹ️" });
   };
 
   // Handle delete — opens ConfirmModal
@@ -453,6 +472,17 @@ export default function PharmacyInventory() {
         confirmLabel="Yes, Remove"
         variant="danger"
       />
+
+      {/* Confirm Edit Modal */}
+      <ConfirmModal
+        isOpen={confirmEdit.open}
+        onClose={handleEditCancel}
+        onConfirm={handleEditConfirm}
+        title="Save Changes"
+        message={`Do you want to save changes to "${confirmEdit.itemName}"?`}
+        confirmLabel="Yes, Save"
+        variant="warning"
+      />
     </div>
   );
 }
@@ -470,6 +500,7 @@ function AddMedicineModal({ isOpen, onClose, onSuccess }) {
   const [submitting, setSubmitting] = useState(false);
   const [filteredGenericNames, setFilteredGenericNames] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [confirmAdd, setConfirmAdd] = useState(false);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -544,6 +575,12 @@ function AddMedicineModal({ isOpen, onClose, onSuccess }) {
       return;
     }
 
+    setConfirmAdd(true);
+  };
+
+  const handleAddConfirm = async () => {
+    setConfirmAdd(false);
+
     try {
       setSubmitting(true);
       logger.info("INVENTORY", "Adding new medicine", { name: formData.name });
@@ -557,6 +594,7 @@ function AddMedicineModal({ isOpen, onClose, onSuccess }) {
       });
 
       logger.success("INVENTORY", "Medicine added successfully");
+      toast.success(`✅ ${formData.name.trim()} added to inventory!`);
       onSuccess();
     } catch (err) {
       logger.error("INVENTORY", "Failed to add medicine", err);
@@ -565,6 +603,11 @@ function AddMedicineModal({ isOpen, onClose, onSuccess }) {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleAddCancel = () => {
+    setConfirmAdd(false);
+    toast("Add medicine cancelled", { icon: "ℹ️" });
   };
 
   return (
@@ -677,6 +720,17 @@ function AddMedicineModal({ isOpen, onClose, onSuccess }) {
           </button>
         </div>
       </form>
+
+      <ConfirmModal
+        isOpen={confirmAdd}
+        onClose={handleAddCancel}
+        onConfirm={handleAddConfirm}
+        title="Add Medicine"
+        message={`Do you want to add "${formData.name.trim()}" to your inventory?`}
+        confirmLabel="Yes, Add"
+        variant="warning"
+        isLoading={submitting}
+      />
     </Modal>
   );
 }

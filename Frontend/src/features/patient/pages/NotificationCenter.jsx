@@ -58,7 +58,7 @@ export default function NotificationCenter() {
     {
       id: "sos",
       label: "SOS Updates",
-      count: notifications.filter((n) => n.type === "SOS_UPDATE").length,
+      count: notifications.filter((n) => n.type === "SOS_UPDATE" || n.type === "SOS_COMPLETED").length,
     },
     {
       id: "announcements",
@@ -75,7 +75,7 @@ export default function NotificationCenter() {
 
     const matchesTab =
       activeTab === "all" ||
-      (activeTab === "sos" && notification.type === "SOS_UPDATE") ||
+      (activeTab === "sos" && (notification.type === "SOS_UPDATE" || notification.type === "SOS_COMPLETED")) ||
       (activeTab === "announcements" && notification.type === "CMS_ALERT") ||
       (activeTab === "unread" && !notification.isRead);
 
@@ -85,6 +85,7 @@ export default function NotificationCenter() {
   const getNotificationIcon = (type) => {
     switch (type) {
       case "SOS_UPDATE":
+      case "SOS_COMPLETED":
         return (
           <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
             <Heart className="text-red-600" size={20} />
@@ -120,6 +121,7 @@ export default function NotificationCenter() {
   const getNotificationBorderColor = (type) => {
     switch (type) {
       case "SOS_UPDATE":
+      case "SOS_COMPLETED":
         return "border-l-red-500";
       case "CMS_ALERT":
         return "border-l-blue-500";
@@ -206,7 +208,7 @@ export default function NotificationCenter() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
             <Link
-              to="/"
+              to="/patient"
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <ArrowLeft size={24} className="text-gray-600" />
@@ -382,6 +384,7 @@ export default function NotificationCenter() {
                               </span>
                               <span className="text-xs text-gray-500">
                                 {notification.type === "SOS_UPDATE" && "SOS Update"}
+                                {notification.type === "SOS_COMPLETED" && "SOS Completed"}
                                 {notification.type === "CMS_ALERT" && "Announcement"}
                                 {notification.type === "MEDICINE_ALERT" && "Medicine Alert"}
                                 {notification.type === "SYSTEM_MESSAGE" && "System"}
@@ -485,7 +488,7 @@ export default function NotificationCenter() {
                     )}
 
                     {/* View SOS Details Button */}
-                    {selectedNotification.type === "SOS_UPDATE" && selectedNotification.metadata?.link && (
+                    {(selectedNotification.type === "SOS_UPDATE" || selectedNotification.type === "SOS_COMPLETED") && selectedNotification.metadata?.link && (
                       <Link
                         to={selectedNotification.metadata.link}
                         className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"

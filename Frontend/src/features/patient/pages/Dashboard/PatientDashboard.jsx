@@ -8,10 +8,8 @@ import contentService from "../../../../core/services/content.service";
 import { 
   Package, 
   MapPin, 
-  FileText, 
   Pill, 
   Lightbulb, 
-  Heart, 
   Clock, 
   Activity,
   TrendingUp,
@@ -177,9 +175,8 @@ export function PatientDashboard() {
 
   // Extract stats from dashboard data
   const stats = {
-    activePrescriptions: dashboardData?.stats?.prescriptions || 0,
     pendingOrders: orders?.filter(order => order?.status === 'PENDING')?.length || 0,
-    medications: dashboardData?.stats?.medications || 0,
+    purchasedMedicines: dashboardData?.stats?.purchasedMedicines || 0,
     totalOrders: dashboardData?.stats?.totalOrders || 0,
   };
 
@@ -224,29 +221,15 @@ export function PatientDashboard() {
         )}
 
         {/* Classy Stats Cards - Soft UI with Gradients */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6 mb-8">
           {statsLoading ? (
             <>
-              <StatCardSkeleton />
               <StatCardSkeleton />
               <StatCardSkeleton />
               <StatCardSkeleton />
             </>
           ) : (
             <>
-              {/* Active Prescriptions */}
-              <div className="group bg-gradient-to-br from-blue-50 to-white rounded-2xl shadow-sm hover:shadow-lg border border-blue-100 p-6 transition-all duration-300 hover:-translate-y-1">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-md group-hover:shadow-xl transition-all">
-                    <FileText className="text-white" size={28} />
-                  </div>
-                  <div className="flex flex-col">
-                    <p className="text-sm text-slate-600 font-semibold mb-1">Active Prescriptions</p>
-                    <p className="text-4xl font-bold text-slate-900">{stats.activePrescriptions}</p>
-                  </div>
-                </div>
-              </div>
-
               {/* Pending Orders */}
               <div className="group bg-gradient-to-br from-amber-50 to-white rounded-2xl shadow-sm hover:shadow-lg border border-amber-100 p-6 transition-all duration-300 hover:-translate-y-1">
                 <div className="flex items-center gap-4">
@@ -260,15 +243,15 @@ export function PatientDashboard() {
                 </div>
               </div>
 
-              {/* Active Medications */}
+              {/* Purchased Medicines */}
               <div className="group bg-gradient-to-br from-teal-50 to-white rounded-2xl shadow-sm hover:shadow-lg border border-teal-100 p-6 transition-all duration-300 hover:-translate-y-1">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-teal-500 to-teal-600 rounded-2xl shadow-md group-hover:shadow-xl transition-all">
                     <Pill className="text-white" size={28} />
                   </div>
                   <div className="flex flex-col">
-                    <p className="text-sm text-slate-600 font-semibold mb-1">Medications</p>
-                    <p className="text-4xl font-bold text-slate-900">{stats.medications}</p>
+                    <p className="text-sm text-slate-600 font-semibold mb-1">Purchased Medicines</p>
+                    <p className="text-4xl font-bold text-slate-900">{stats.purchasedMedicines}</p>
                   </div>
                 </div>
               </div>
@@ -328,13 +311,22 @@ export function PatientDashboard() {
                 </div>
               ) : orders?.length > 0 ? (
                 <div className="space-y-3">
-                  {orders.map((order) => (
+                  {orders.slice(0, 2).map((order) => (
                     <OrderCard
                       key={order?.id}
                       order={order}
                       onViewDetails={(id) => navigate(`/patient/orders/${id}`)}
                     />
                   ))}
+                  
+                  {orders.length > 2 && (
+                    <button
+                      onClick={() => navigate("/patient/orders")}
+                      className="w-full mt-4 p-3 text-center text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl font-semibold transition-all border border-blue-200 hover:border-blue-300"
+                    >
+                      See More Orders →
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-16 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 rounded-2xl border-2 border-dashed border-slate-300">
@@ -396,16 +388,6 @@ export function PatientDashboard() {
                     <MapPin size={24} className="text-orange-600" />
                   </div>
                   <span className="text-base">Nearby Pharmacies</span>
-                </button>
-                
-                <button
-                  onClick={() => navigate("/patient/prescriptions")}
-                  className="group w-full p-5 bg-gradient-to-br from-purple-50 via-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 text-purple-700 font-semibold rounded-2xl transition-all flex items-center gap-4 text-left shadow-sm hover:shadow-md hover:-translate-y-0.5"
-                >
-                  <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all">
-                    <FileText size={24} className="text-purple-600" />
-                  </div>
-                  <span className="text-base">My Prescriptions</span>
                 </button>
                 
                 <button

@@ -13,8 +13,9 @@ import chatService from "../services/chat.service";
  * @param {string} props.sosRequestId - The SOS request ID (links chat to the emergency)
  * @param {Object} props.currentUser  - { id: string, name: string } – the logged-in user
  * @param {Function} [props.onClose]  - Optional callback to close/hide the chat panel
+ * @param {boolean} [props.readOnly]  - If true, render read-only chat history (no message input)
  */
-export default function ChatWindow({ sosRequestId, currentUser, onClose }) {
+export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnly = false }) {
   const [roomId, setRoomId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
@@ -176,7 +177,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose }) {
   // ── Send a message ───────────────────────────────────────
   const handleSend = useCallback(() => {
     const trimmed = newMessage.trim();
-    if (!trimmed || !socketRef.current || isSending || !roomId) return;
+    if (readOnly || !trimmed || !socketRef.current || isSending || !roomId) return;
 
     setIsSending(true);
     socketRef.current.emit("send_message", {
@@ -188,7 +189,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose }) {
     setNewMessage("");
     setIsSending(false);
     inputRef.current?.focus();
-  }, [newMessage, roomId, currentUser?.id, isSending]);
+  }, [newMessage, roomId, currentUser?.id, isSending, readOnly]);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -235,7 +236,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose }) {
         <div className="flex items-center gap-3">
           <MessageCircle size={20} />
           <div>
-            <h3 className="font-semibold text-sm">SOS Chat</h3>
+            <h3 className="font-semibold text-sm">{readOnly ? "SOS Chat History" : "SOS Chat"}</h3>
             <div className="flex items-center gap-1.5 text-xs text-green-100">
               <span
                 className={`w-2 h-2 rounded-full ${
@@ -354,37 +355,48 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose }) {
       </div>
 
       {/* ── Input area ── */}
-      <div className="px-4 py-3 bg-white border-t border-gray-200">
-        <div className="flex items-end gap-2">
-          <textarea
-            ref={inputRef}
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
-            rows={1}
-            className="flex-1 resize-none px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent max-h-24"
-            style={{ minHeight: "40px" }}
-            onInput={(e) => {
-              e.target.style.height = "auto";
-              e.target.style.height =
-                Math.min(e.target.scrollHeight, 96) + "px";
-            }}
-          />
-          <button
-            onClick={handleSend}
-            disabled={!newMessage.trim() || isSending || !isConnected || roomStatus !== "ready"}
-            className="flex items-center justify-center w-10 h-10 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-            aria-label="Send message"
-          >
-            {isSending ? (
-              <Loader className="animate-spin" size={18} />
-            ) : (
-              <Send size={18} />
-            )}
-          </button>
+      {!readOnly && (
+        <div className="px-4 py-3 bg-white border-t border-gray-200">
+          <div className="flex items-end gap-2">
+            <textarea
+              ref={inputRef}
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message..."
+              rows={1}
+              className="flex-1 resize-none px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent max-h-24"
+              style={{ minHeight: "40px" }}
+              onInput={(e) => {
+                e.target.style.height = "auto";
+                e.target.style.height =
+                  Math.min(e.target.scrollHeight, 96) + "px";
+              }}
+            />
+            <button
+              onClick={handleSend}
+              disabled={!newMessage.trim() || isSending || !isConnected || roomStatus !== "ready"}
+              className="flex items-center justify-center w-10 h-10 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+              aria-label="Send message"
+            >
+              {isSending ? (
+                <Loader className="animate-spin" size={18} />
+              ) : (
+                <Send size={18} />
+              )}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {readOnly && (
+        <div className="px-4 py-3 bg-amber-50 border-t border-amber-200">
+          <p className="text-sm font-semibold text-amber-700">Case Closed</p>
+          <p className="text-xs text-amber-600 mt-0.5">
+            This SOS case has been archived. Chat is available in read-only mode.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

@@ -31,44 +31,9 @@ const patientService = {
     return response.data;
   },
 
-  // Get patient prescriptions
-  getPrescriptions: async () => {
-    const response = await httpClient.get("/patient/prescriptions");
-    return response.data;
-  },
-
-  // Upload prescription
-  uploadPrescription: async (formData) => {
-    const response = await httpClient.post("/patient/prescriptions/upload", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-    return response.data;
-  },
-
-  // Delete prescription
-  deletePrescription: async (prescriptionId) => {
-    const response = await httpClient.delete(`/patient/prescriptions/${prescriptionId}`);
-    return response.data;
-  },
-
-  // Download prescription
-  downloadPrescription: async (prescriptionId) => {
-    const response = await httpClient.get(
-      `/patient/prescriptions/${prescriptionId}/download`,
-      { responseType: "blob" }
-    );
-    return response;
-  },
-
-  // Get medications
+  // Get purchased medicines history
   getMedications: async (filters = {}) => {
     const response = await httpClient.get("/patient/medications", { params: filters });
-    return response.data;
-  },
-
-  // Remove medication
-  removeMedication: async (medicationId) => {
-    const response = await httpClient.delete(`/patient/medications/${medicationId}`);
     return response.data;
   },
 
@@ -213,6 +178,24 @@ const patientService = {
     return response.data;
   },
 
+  // Get favorite medicines
+  getFavorites: async () => {
+    const response = await httpClient.get("/patient/favorites");
+    return response.data;
+  },
+
+  // Add medicine to favorites
+  addToFavorites: async (favoriteData) => {
+    const response = await httpClient.post("/patient/favorites", favoriteData);
+    return response.data;
+  },
+
+  // Remove medicine from favorites
+  removeFromFavorites: async (favoriteId) => {
+    const response = await httpClient.delete(`/patient/favorites/${favoriteId}`);
+    return response.data;
+  },
+
   // Search medicines with real-time pharmacy availability
   searchMedicinesWithAvailability: async (query, latitude = null, longitude = null) => {
     const params = { query };
@@ -221,24 +204,6 @@ const patientService = {
       params.longitude = longitude;
     }
     const response = await httpClient.get("/medicines/search", { params });
-    return response.data;
-  },
-
-  // Add medicine to favorites
-  addToFavorites: async (data) => {
-    const response = await httpClient.post("/patient/favorites", data);
-    return response.data;
-  },
-
-  // Remove medicine from favorites
-  removeFromFavorites: async (id) => {
-    const response = await httpClient.delete(`/patient/favorites/${id}`);
-    return response.data;
-  },
-
-  // Get favorite medicines
-  getFavorites: async () => {
-    const response = await httpClient.get("/patient/favorites");
     return response.data;
   },
 

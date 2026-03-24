@@ -22,11 +22,19 @@ import patientService from "../services/patient.service";
 
 // ─── Status Badge Component ──────────────────────────
 function StatusBadge({ status }) {
+  const normalizedStatus = String(status || "").toLowerCase();
+
   const configs = {
     accepted: {
       label: "Accepted",
       bg: "bg-emerald-100",
       text: "text-emerald-700",
+      icon: CheckCircle,
+    },
+    completed: {
+      label: "Completed",
+      bg: "bg-green-100",
+      text: "text-green-700",
       icon: CheckCircle,
     },
     pending: {
@@ -47,9 +55,21 @@ function StatusBadge({ status }) {
       text: "text-red-600",
       icon: XCircle,
     },
+    declined: {
+      label: "Declined",
+      bg: "bg-red-100",
+      text: "text-red-600",
+      icon: XCircle,
+    },
+    unknown: {
+      label: "Unknown",
+      bg: "bg-slate-100",
+      text: "text-slate-600",
+      icon: AlertTriangle,
+    },
   };
 
-  const config = configs[status] || configs.expired;
+  const config = configs[normalizedStatus] || configs.unknown;
   const Icon = config.icon;
 
   return (
@@ -89,6 +109,8 @@ export default function PatientHistory() {
   const [favError, setFavError] = useState(null);
   const [removingId, setRemovingId] = useState(null);
 
+
+
   // ─── Data Fetch ────────────────────────────────────
   const loadSOSHistory = useCallback(async () => {
     setSOSLoading(true);
@@ -124,6 +146,27 @@ export default function PatientHistory() {
     loadFavorites();
   }, [loadFavorites]);
 
+  const handleQuickReorder = (favorite) => {
+    navigate("/patient/checkout", {
+      state: {
+        mode: "direct",
+        medicine: {
+          id: favorite.id,
+          brandName: favorite.medicineName,
+          medicine: favorite.medicineName,
+          genericName: favorite.genericName,
+          price: favorite.lastPrice || 0,
+          pharmacy: {
+            id: null,
+            name: favorite.lastPharmacy || "Unknown Pharmacy",
+          },
+          pharmacyName: favorite.lastPharmacy || "Unknown Pharmacy",
+        },
+        medicineId: favorite.id,
+      },
+    });
+  };
+
   const handleRemoveFavorite = async (id) => {
     setRemovingId(id);
     try {
@@ -134,10 +177,6 @@ export default function PatientHistory() {
     } finally {
       setRemovingId(null);
     }
-  };
-
-  const handleQuickReorder = (medicineName) => {
-    navigate(`/medicine-search?q=${encodeURIComponent(medicineName)}`);
   };
 
   return (
@@ -391,7 +430,7 @@ export default function PatientHistory() {
 
                       {/* Quick Re-order button */}
                       <button
-                        onClick={() => handleQuickReorder(fav.medicineName)}
+                        onClick={() => handleQuickReorder(fav)}
                         className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold text-xs rounded-xl transition-all shadow-sm hover:shadow-md"
                       >
                         <ShoppingCart size={14} />

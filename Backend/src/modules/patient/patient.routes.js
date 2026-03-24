@@ -81,15 +81,8 @@ router.delete("/cart/items/:itemId", cartController.removeItem);
 router.post("/orders/checkout", placeOrderFromCart);
 
 /**
- * @route   GET /api/patient/prescriptions
- * @desc    Get patient prescriptions
- * @access  Private (Patient only)
- */
-router.get("/prescriptions", patientController.getPrescriptions);
-
-/**
  * @route   GET /api/patient/medications
- * @desc    Get patient medications
+ * @desc    Get patient's purchased medicines summary
  * @access  Private (Patient only)
  */
 router.get("/medications", patientController.getMedications);

@@ -94,6 +94,41 @@ router.post(
   pharmacyController.respondToSOS
 );
 
+/**
+ * PATCH /api/pharmacy/sos/:id/reject
+ * Reject an SOS request with an optional note
+ * Body: { note?: string }
+ */
+router.patch(
+  "/pharmacy/sos/:id/reject",
+  authenticate(),
+  requirePharmacyAdmin,
+  pharmacyController.rejectSOS
+);
+
+/**
+ * PATCH /api/pharmacy/sos/:id/status
+ * Update SOS status for accepted cases (currently supports completed)
+ * Body: { status: 'completed' }
+ */
+router.patch(
+  "/pharmacy/sos/:id/status",
+  authenticate(),
+  requirePharmacyAdmin,
+  pharmacyController.updateSOSStatus
+);
+
+/**
+ * PATCH /api/pharmacy/sos/:id/complete
+ * Mark an accepted SOS case as completed
+ */
+router.patch(
+  "/pharmacy/sos/:id/complete",
+  authenticate(),
+  requirePharmacyAdmin,
+  pharmacyController.completeSOS
+);
+
 // ============================================
 // SYSTEM ADMIN ROUTES
 // ============================================

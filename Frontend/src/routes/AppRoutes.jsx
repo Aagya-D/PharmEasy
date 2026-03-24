@@ -29,7 +29,6 @@ import Cart from "../features/patient/pages/Cart";
 import MedicineDetail from "../features/patient/pages/MedicineDetail";
 import PatientHistory from "../features/patient/pages/PatientHistory";
 import ProfilePage from "../features/patient/pages/Profile/ProfilePage";
-import PrescriptionsPage from "../features/patient/pages/Prescriptions/PrescriptionsPage";
 import PatientSettings from "../features/patient/pages/PatientSettings";
 import PatientChat from "../features/patient/pages/PatientChat";
 import OrderSuccess from "../features/patient/pages/OrderSuccess";
@@ -389,10 +388,6 @@ export const routes = [
       {
         path: "history",
         element: <PatientHistory />,
-      },
-      {
-        path: "prescriptions",
-        element: <PrescriptionsPage />,
       },
       {
         path: "profile",

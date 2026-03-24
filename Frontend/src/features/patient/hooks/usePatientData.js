@@ -4,7 +4,7 @@ import patientService from "../services/patient.service";
 export const usePatientData = () => {
   const [profile, setProfile] = useState(null);
   const [orders, setOrders] = useState([]);
-  const [prescriptions, setPrescriptions] = useState([]);
+  const [medications, setMedications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -34,14 +34,14 @@ export const usePatientData = () => {
     }
   }, []);
 
-  const fetchPrescriptions = useCallback(async () => {
+  const fetchMedications = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await patientService.getPrescriptions();
-      setPrescriptions(response.data);
+      const response = await patientService.getMedications();
+      setMedications(response.data?.medications || []);
       setError(null);
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to fetch prescriptions");
+      setError(err.response?.data?.message || "Failed to fetch medications");
     } finally {
       setLoading(false);
     }
@@ -50,11 +50,11 @@ export const usePatientData = () => {
   return {
     profile,
     orders,
-    prescriptions,
+    medications,
     loading,
     error,
     fetchProfile,
     fetchOrders,
-    fetchPrescriptions,
+    fetchMedications,
   };
 };

@@ -154,7 +154,7 @@ const WaitingApproval = () => {
               {isRefreshing ? "Checking..." : "Check Status"}
             </button>
             <button
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/dashboard")}
               className="px-6 py-3 rounded-xl border border-slate-200 text-slate-700 font-medium hover:bg-slate-50 transition-colors"
             >
               Back to Home

@@ -58,18 +58,26 @@ export const getDashboard = async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Get prescriptions count
-    const prescriptionsCount = await prisma.prescription.count({
-      where: { patientId }
+    // Count unique medicines bought so far (exclude cancelled orders)
+    const purchasedItems = await prisma.orderItem.findMany({
+      where: {
+        order: {
+          patientId,
+          status: { not: "CANCELLED" },
+        },
+      },
+      select: {
+        medicineName: true,
+        genericName: true,
+      },
     });
 
-    // Get active medications count
-    const medicationsCount = await prisma.medication.count({
-      where: { 
-        patientId,
-        isActive: true 
-      }
-    });
+    const purchasedMedicinesSet = new Set(
+      purchasedItems.map((item) =>
+        `${String(item.medicineName || "").trim().toLowerCase()}|${String(item.genericName || "").trim().toLowerCase()}`
+      )
+    );
+    const purchasedMedicinesCount = purchasedMedicinesSet.size;
 
     const responseTime = Date.now() - startTime;
     logger.info(`[PATIENT] Dashboard loaded for patient ${patientId}`, {
@@ -83,8 +91,7 @@ export const getDashboard = async (req, res) => {
         orders: orders || [],
         stats: {
           totalOrders: orders.length,
-          prescriptions: prescriptionsCount,
-          medications: medicationsCount,
+          purchasedMedicines: purchasedMedicinesCount,
         }
       },
       message: "Dashboard data retrieved successfully"
@@ -292,47 +299,7 @@ export const getOrders = async (req, res) => {
 };
 
 /**
- * Get patient prescriptions
- */
-export const getPrescriptions = async (req, res) => {
-  const startTime = Date.now();
-  const patientId = req.user?.userId;
-
-  // Validate user identity
-  if (!patientId) {
-    return res.status(401).json({
-      success: false,
-      message: "Authentication required"
-    });
-  }
-
-  try {
-    const prescriptions = await prisma.prescription.findMany({
-      where: { patientId },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    logger.info("[PATIENT] Prescriptions retrieved", { userId: patientId, count: prescriptions.length });
-
-    return res.status(200).json({
-      success: true,
-      data: { prescriptions: prescriptions || [] },
-      message: "Prescriptions retrieved successfully"
-    });
-  } catch (error) {
-    console.error('[PATIENT] Get prescriptions error:', error.message, error.stack);
-    logger.error("[PATIENT] Get prescriptions error", { error: error.message, userId: patientId });
-    return res.status(500).json({
-      success: false,
-      message: "Failed to get prescriptions",
-      data: { prescriptions: [] },
-      error: process.env.NODE_ENV === "development" ? error.message : undefined
-    });
-  }
-};
-
-/**
- * Get patient medications
+ * Get patient's purchased medicines summary
  */
 export const getMedications = async (req, res) => {
   const startTime = Date.now();
@@ -347,10 +314,66 @@ export const getMedications = async (req, res) => {
   }
 
   try {
-    const medications = await prisma.medication.findMany({
-      where: { patientId },
-      orderBy: { createdAt: 'desc' }
+    const items = await prisma.orderItem.findMany({
+      where: {
+        order: {
+          patientId,
+          status: { not: "CANCELLED" },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      include: {
+        order: {
+          select: {
+            id: true,
+            createdAt: true,
+            pharmacy: {
+              select: {
+                pharmacyName: true,
+              },
+            },
+          },
+        },
+      },
     });
+
+    const grouped = new Map();
+
+    items.forEach((item) => {
+      const key = `${String(item.medicineName || "").trim().toLowerCase()}|${String(item.genericName || "").trim().toLowerCase()}`;
+      const existing = grouped.get(key);
+
+      if (!existing) {
+        grouped.set(key, {
+          id: key,
+          medicineName: item.medicineName,
+          genericName: item.genericName || null,
+          purchaseCount: 1,
+          totalQuantity: item.quantity,
+          totalSpent: item.lineTotal,
+          lastPurchasedAt: item.order?.createdAt || item.createdAt,
+          lastOrderId: item.order?.id || null,
+          lastPharmacyName: item.order?.pharmacy?.pharmacyName || null,
+        });
+        return;
+      }
+
+      existing.purchaseCount += 1;
+      existing.totalQuantity += item.quantity;
+      existing.totalSpent += item.lineTotal;
+
+      const itemDate = new Date(item.order?.createdAt || item.createdAt).getTime();
+      const existingDate = new Date(existing.lastPurchasedAt).getTime();
+      if (itemDate > existingDate) {
+        existing.lastPurchasedAt = item.order?.createdAt || item.createdAt;
+        existing.lastOrderId = item.order?.id || null;
+        existing.lastPharmacyName = item.order?.pharmacy?.pharmacyName || null;
+      }
+    });
+
+    const medications = Array.from(grouped.values()).sort(
+      (a, b) => new Date(b.lastPurchasedAt).getTime() - new Date(a.lastPurchasedAt).getTime()
+    );
 
     logger.info("[PATIENT] Medications retrieved", { userId: patientId, count: medications.length });
 

@@ -433,7 +433,22 @@ export const getNearbySOS = async (req, res, next) => {
         longitude: { not: null },
         id: { notIn: rejectedIds } // Exclude rejected requests
       },
-      include: {
+      select: {
+        id: true,
+        patientId: true,
+        patientName: true,
+        contactNumber: true,
+        address: true,
+        latitude: true,
+        longitude: true,
+        medicineName: true,
+        quantity: true,
+        urgencyLevel: true,
+        additionalNotes: true,
+        prescriptionUrl: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
         patient: {
           select: {
             id: true,
@@ -466,7 +481,16 @@ export const getNearbySOS = async (req, res, next) => {
           sos.latitude,
           sos.longitude
         );
-        return { ...sos, distance };
+
+        // Keep legacy fields and add normalized aliases expected by emergency cards.
+        return {
+          ...sos,
+          distance,
+          urgency: sos.urgencyLevel,
+          description: sos.additionalNotes,
+          prescription: sos.prescriptionUrl,
+          contactNumber: sos.contactNumber || sos.patient?.phone || null,
+        };
       })
       .filter(sos => sos.distance <= parseFloat(radius))
       .sort((a, b) => a.distance - b.distance);
@@ -754,6 +778,134 @@ export const respondToSOS = async (req, res, next) => {
     logger.error('[PHARMACY] Respond to SOS error', { error: error.message });
     next(error);
   }
+};
+
+/**
+ * PATCH /api/pharmacy/sos/:id/status
+ * Update an accepted SOS request status to completed
+ * Body: { status: 'completed' }
+ */
+export const rejectSOS = async (req, res, next) => {
+  req.body = {
+    ...req.body,
+    response: "rejected",
+  };
+
+  return respondToSOS(req, res, next);
+};
+
+export const completeSOS = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { id: sosId } = req.params;
+
+    const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
+    if (!pharmacy) {
+      return res.status(404).json({
+        success: false,
+        message: "Pharmacy not found",
+      });
+    }
+
+    const sosRequest = await prisma.sOSRequest.findUnique({
+      where: { id: sosId },
+      select: {
+        id: true,
+        status: true,
+        acceptedBy: true,
+        patientId: true,
+        medicineName: true,
+      },
+    });
+
+    if (!sosRequest) {
+      return res.status(404).json({
+        success: false,
+        message: "SOS request not found",
+      });
+    }
+
+    if (sosRequest.status !== "accepted") {
+      return res.status(400).json({
+        success: false,
+        message: "Only accepted SOS requests can be marked as completed",
+      });
+    }
+
+    if (sosRequest.acceptedBy !== pharmacy.id) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only complete cases accepted by your pharmacy",
+      });
+    }
+
+    const updatedSOS = await prisma.sOSRequest.update({
+      where: { id: sosId },
+      data: { status: "COMPLETED" },
+    });
+
+    const chatRoom = await prisma.chatRoom.findFirst({
+      where: { sosRequestId: sosId },
+      select: { id: true, patientId: true, pharmacyId: true },
+    });
+
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("sos_case_status_updated", {
+        sosRequestId: sosId,
+        chatRoomId: chatRoom?.id || null,
+        status: "COMPLETED",
+        patientId: chatRoom?.patientId || sosRequest.patientId,
+        pharmacyUserId: chatRoom?.pharmacyId || userId,
+      });
+    }
+
+    try {
+      await notificationService.createNotification(
+        sosRequest.patientId,
+        "✅ SOS Request Completed",
+        `${pharmacy.pharmacyName} has successfully fulfilled your request for ${sosRequest.medicineName}.`,
+        "SOS_COMPLETED",
+        {
+          status: "completed",
+          pharmacyName: pharmacy.pharmacyName,
+          medicineName: sosRequest.medicineName,
+          sosId,
+          link: `/sos/${sosId}`,
+        },
+        "PATIENT",
+        "high"
+      );
+    } catch (notificationError) {
+      console.error("[PHARMACY] Failed to send SOS completion notification:", notificationError);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "SOS case marked as completed",
+      data: { sos: updatedSOS },
+    });
+  } catch (error) {
+    logger.error("[PHARMACY] Update SOS status error", { error: error.message });
+    next(error);
+  }
+};
+
+/**
+ * PATCH /api/pharmacy/sos/:id/status
+ * Backward-compatible alias for completion route.
+ * Body: { status: 'completed' }
+ */
+export const updateSOSStatus = async (req, res, next) => {
+  const requestedStatus = String(req.body?.status || "").trim().toLowerCase();
+  if (requestedStatus !== "completed") {
+    return res.status(400).json({
+      success: false,
+      message: "Only status 'completed' is allowed for this endpoint",
+    });
+  }
+
+  return completeSOS(req, res, next);
 };
 
 /**
@@ -1429,6 +1581,9 @@ export default {
   resetOnboarding,
   getNearbySOS,
   respondToSOS,
+  rejectSOS,
+  completeSOS,
+  updateSOSStatus,
   updateLocation,
   getDashboardStats,
   getPharmacyOrders,

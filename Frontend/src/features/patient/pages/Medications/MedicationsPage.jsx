@@ -1,16 +1,12 @@
 import React, { useState, useEffect } from "react";
-import toast from "react-hot-toast";
-import { Button } from "../../../../shared/components/ui";
-import ConfirmModal from "../../../../shared/components/ui/ConfirmModal";
 import patientService from "../../services/patient.service";
 import {
   Pill,
   Search,
   Calendar,
-  Trash2,
   AlertCircle,
-  Plus,
-  Heart,
+  ShoppingBag,
+  Wallet,
 } from "lucide-react";
 
 export function MedicationsPage() {
@@ -19,14 +15,6 @@ export function MedicationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
-  const [confirmRemove, setConfirmRemove] = useState({ open: false, medicationId: null });
-
-  const tabs = [
-    { id: "all", label: "All Medications" },
-    { id: "active", label: "Active" },
-    { id: "favorites", label: "Favorites" },
-  ];
 
   useEffect(() => {
     loadMedications();
@@ -34,7 +22,7 @@ export function MedicationsPage() {
 
   useEffect(() => {
     filterMedications();
-  }, [medications, searchTerm, activeTab]);
+  }, [medications, searchTerm]);
 
   const loadMedications = async () => {
     try {
@@ -56,64 +44,25 @@ export function MedicationsPage() {
     if (searchTerm) {
       filtered = filtered.filter(
         (med) =>
-          med.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          med.medicineName.toLowerCase().includes(searchTerm.toLowerCase()) ||
           med.genericName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          med.manufacturer?.toLowerCase().includes(searchTerm.toLowerCase())
+          med.lastPharmacyName?.toLowerCase().includes(searchTerm.toLowerCase())
       );
-    }
-
-    if (activeTab === "active") {
-      filtered = filtered.filter((med) => med.isActive);
-    } else if (activeTab === "favorites") {
-      filtered = filtered.filter((med) => med.isFavorite);
     }
 
     setFilteredMedications(filtered);
   };
 
-  const handleAddFavorite = async (medicationId) => {
-    try {
-      await patientService.addToFavorites(medicationId);
-      setMedications((prev) =>
-        prev.map((med) =>
-          med.id === medicationId ? { ...med, isFavorite: true } : med
-        )
-      );
-    } catch (err) {
-      console.error("[ADD FAVORITE]", err);
-    }
-  };
-
-  const handleRemoveMedication = (medicationId) => {
-    setConfirmRemove({ open: true, medicationId });
-  };
-
-  const handleRemoveConfirm = async () => {
-    const { medicationId } = confirmRemove;
-    setConfirmRemove({ open: false, medicationId: null });
-    try {
-      await patientService.removeMedication(medicationId);
-      setMedications((prev) =>
-        prev.filter((med) => med.id !== medicationId)
-      );
-      toast.success('✅ Medication removed from your list.');
-    } catch (err) {
-      console.error("[REMOVE MEDICATION]", err);
-      toast.error('❌ Failed to remove medication. Please try again.');
-    }
-  };
-
   return (
-    <>
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-6 mb-6 sticky top-0 z-10">
           <div className="max-w-7xl mx-auto">
             <h1 className="text-3xl font-bold text-gray-900 mb-1 flex items-center gap-2">
               <Pill size={32} />
-              My Medications
+              Purchased Medicines
             </h1>
-            <p className="text-gray-600">Track your medication history</p>
+            <p className="text-gray-600">All medicines you have ordered so far</p>
           </div>
         </div>
 
@@ -127,29 +76,12 @@ export function MedicationsPage() {
               />
               <input
                 type="text"
-                placeholder="Search medications by name or generic name..."
+                placeholder="Search purchased medicines by name, generic name, or pharmacy..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
               />
             </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="mb-6 border-b border-gray-200 flex gap-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-3 font-medium text-sm transition-colors border-b-2 ${
-                  activeTab === tab.id
-                    ? "text-blue-600 border-blue-600"
-                    : "text-gray-600 border-transparent hover:text-gray-900"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
           </div>
 
           {/* Error Alert */}
@@ -182,10 +114,10 @@ export function MedicationsPage() {
                     className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
                   >
                     {/* Header */}
-                    <div className="flex justify-between items-start mb-4">
+                    <div className="mb-4">
                       <div>
                         <h3 className="font-bold text-gray-900 text-lg">
-                          {medication.name}
+                          {medication.medicineName}
                         </h3>
                         {medication.genericName && (
                           <p className="text-sm text-gray-600">
@@ -193,79 +125,49 @@ export function MedicationsPage() {
                           </p>
                         )}
                       </div>
-                      <button
-                        onClick={() => handleAddFavorite(medication.id)}
-                        className={`p-2 rounded-lg transition-colors ${
-                          medication.isFavorite
-                            ? "bg-red-100 text-red-600"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        }`}
-                      >
-                        <Heart
-                          size={18}
-                          fill={medication.isFavorite ? "currentColor" : "none"}
-                        />
-                      </button>
                     </div>
 
                     {/* Details */}
                     <div className="space-y-3 mb-4 text-sm">
-                      {medication.dosage && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Dosage:</span>
-                          <span className="font-medium text-gray-900">
-                            {medication.dosage}
-                          </span>
-                        </div>
-                      )}
-                      {medication.frequency && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Frequency:</span>
-                          <span className="font-medium text-gray-900">
-                            {medication.frequency}
-                          </span>
-                        </div>
-                      )}
-                      {medication.manufacturer && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Manufacturer:</span>
-                          <span className="font-medium text-gray-900">
-                            {medication.manufacturer}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Status Badge */}
-                    <div className="mb-4 flex gap-2">
-                      {medication.isActive && (
-                        <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                          Active
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 flex items-center gap-1">
+                          <ShoppingBag size={14} /> Purchases:
                         </span>
-                      )}
-                      {medication.isPrescription && (
-                        <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                          Prescription
+                        <span className="font-medium text-gray-900">
+                          {medication.purchaseCount}
                         </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Total Quantity:</span>
+                        <span className="font-medium text-gray-900">
+                          {medication.totalQuantity}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 flex items-center gap-1">
+                          <Wallet size={14} /> Total Spend:
+                        </span>
+                        <span className="font-medium text-gray-900">
+                          Rs. {Number(medication.totalSpent || 0).toFixed(2)}
+                        </span>
+                      </div>
+                      {medication.lastPharmacyName && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Last Pharmacy:</span>
+                          <span className="font-medium text-gray-900">
+                            {medication.lastPharmacyName}
+                          </span>
+                        </div>
                       )}
                     </div>
 
                     {/* Added Date */}
-                    {medication.dateAdded && (
+                    {medication.lastPurchasedAt && (
                       <div className="mb-4 text-xs text-gray-500 flex items-center gap-1">
                         <Calendar size={14} />
-                        Added {new Date(medication.dateAdded).toLocaleDateString()}
+                        Last purchased {new Date(medication.lastPurchasedAt).toLocaleDateString()}
                       </div>
                     )}
-
-                    {/* Actions */}
-                    <button
-                      onClick={() => handleRemoveMedication(medication.id)}
-                      className="w-full p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-medium"
-                    >
-                      <Trash2 size={16} />
-                      Remove from List
-                    </button>
                   </div>
                 ))}
               </div>
@@ -277,7 +179,7 @@ export function MedicationsPage() {
                 </h3>
                 <p className="text-gray-600">
                   {medications.length === 0
-                    ? "You haven't added any medications yet."
+                    ? "You have not purchased any medicines yet."
                     : "No medications match your search."}
                 </p>
               </div>
@@ -285,17 +187,6 @@ export function MedicationsPage() {
           </div>
         </div>
       </div>
-
-      <ConfirmModal
-        isOpen={confirmRemove.open}
-        onClose={() => setConfirmRemove({ open: false, medicationId: null })}
-        onConfirm={handleRemoveConfirm}
-        title="Remove Medication"
-        message="Are you sure you want to remove this medication from your list? You can always add it back later."
-        confirmLabel="Yes, Remove"
-        variant="danger"
-      />
-    </>
   );
 }
 

@@ -196,8 +196,8 @@ app.use("/api/auth", authRoutes);
 // Routes include: /api/search, /api/search/nearby, /api/search/stats
 app.use("/api", searchRoutes);
 
-// Patient routes (dashboard, orders, prescriptions, medications, SOS)
-// Routes include: /patient/dashboard, /patient/orders, /patient/prescriptions, /patient/sos/request, etc.
+// Patient routes (dashboard, orders, medications, SOS)
+// Routes include: /patient/dashboard, /patient/orders, /patient/medications, /patient/sos/request, etc.
 app.use("/api/patient", patientRoutes);
 
 // Cart routes (persistent patient cart operations)

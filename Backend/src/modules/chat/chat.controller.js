@@ -21,6 +21,25 @@ import { AppError } from "../../middlewares/errorHandler.js";
 export const getChatRooms = async (req, res, next) => {
   try {
     const userId = req.user?.userId;
+    const statusFilter = String(req.query?.status || "").trim().toLowerCase();
+
+    const ACTIVE_STATUSES = ["pending", "accepted", "PENDING", "ACCEPTED"];
+    const COMPLETED_STATUSES = [
+      "completed",
+      "expired",
+      "rejected",
+      "declined",
+      "COMPLETED",
+      "EXPIRED",
+      "REJECTED",
+      "DECLINED",
+    ];
+
+    const allowedFilters = new Set(["", "all", "active", "completed", "archive"]);
+    if (!allowedFilters.has(statusFilter)) {
+      return next(new AppError("status must be one of: active, completed, archive, all", 400));
+    }
+
     if (!userId) return next(new AppError("Authentication required", 401));
 
     const user = await prisma.user.findUnique({
@@ -41,6 +60,20 @@ export const getChatRooms = async (req, res, next) => {
     const whereClause = isPatient
       ? { patientId: userId }
       : { pharmacyId: userId };
+
+    if (statusFilter === "active") {
+      whereClause.sosRequest = {
+        is: {
+          status: { in: ACTIVE_STATUSES },
+        },
+      };
+    } else if (statusFilter === "completed" || statusFilter === "archive") {
+      whereClause.sosRequest = {
+        is: {
+          status: { in: COMPLETED_STATUSES },
+        },
+      };
+    }
 
     // Single query — fetch rooms with all data needed in one round-trip
     const rooms = await prisma.chatRoom.findMany({

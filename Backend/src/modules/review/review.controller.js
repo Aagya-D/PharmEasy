@@ -45,40 +45,50 @@ export const submitReview = async (req, res, next) => {
       return next(new AppError("Pharmacy not found", 404));
     }
 
-    // Prevent duplicate reviews (unique constraint will also catch this)
-    const existing = await prisma.review.findUnique({
-      where: { pharmacyId_patientId: { pharmacyId, patientId } },
-    });
-    if (existing) {
-      return next(new AppError("You have already reviewed this pharmacy", 409));
-    }
-
-    // ── Transaction: create review + recalculate average + complete SOS ──
+    // ── Transaction: upsert review + recalculate average + complete SOS ──
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Create the review
-      const review = await tx.review.create({
-        data: {
-          rating: numRating,
-          comment: comment?.trim() || null,
-          pharmacyId,
-          patientId,
-        },
-        include: {
-          patient: { select: { id: true, name: true } },
-        },
+      const existing = await tx.review.findUnique({
+        where: { pharmacyId_patientId: { pharmacyId, patientId } },
       });
 
-      // 2. Recalculate average:  (OldAvg * OldCount + NewRating) / (OldCount + 1)
-      const oldAvg = pharmacy.averageRating || 0;
-      const oldCount = pharmacy.totalReviews || 0;
-      const newCount = oldCount + 1;
-      const newAvg = (oldAvg * oldCount + numRating) / newCount;
+      // 1. Create new review or update an existing one for this patient+pharmacy
+      const review = existing
+        ? await tx.review.update({
+            where: { pharmacyId_patientId: { pharmacyId, patientId } },
+            data: {
+              rating: numRating,
+              comment: comment?.trim() || null,
+            },
+            include: {
+              patient: { select: { id: true, name: true } },
+            },
+          })
+        : await tx.review.create({
+            data: {
+              rating: numRating,
+              comment: comment?.trim() || null,
+              pharmacyId,
+              patientId,
+            },
+            include: {
+              patient: { select: { id: true, name: true } },
+            },
+          });
 
-      // 3. Update pharmacy rating
+      // 2. Recalculate aggregate rating from source-of-truth reviews
+      const aggregate = await tx.review.aggregate({
+        where: { pharmacyId },
+        _avg: { rating: true },
+        _count: { _all: true },
+      });
+      const newAvg = Math.round(((aggregate._avg.rating || 0) * 100)) / 100;
+      const newCount = aggregate._count._all || 0;
+
+      // 3. Update pharmacy rating snapshot
       await tx.pharmacy.update({
         where: { id: pharmacyId },
         data: {
-          averageRating: Math.round(newAvg * 100) / 100, // 2 decimal places
+          averageRating: newAvg,
           totalReviews: newCount,
         },
       });
@@ -91,10 +101,10 @@ export const submitReview = async (req, res, next) => {
         });
       }
 
-      return { review, newAvg: Math.round(newAvg * 100) / 100, newCount };
+      return { review, newAvg, newCount, wasUpdate: Boolean(existing) };
     });
 
-    return res.status(201).json({
+    return res.status(result.wasUpdate ? 200 : 201).json({
       success: true,
       data: {
         review: {
@@ -111,12 +121,44 @@ export const submitReview = async (req, res, next) => {
           totalReviews: result.newCount,
         },
       },
-      message: "Review submitted successfully",
+      message: result.wasUpdate
+        ? "Review updated successfully"
+        : "Review submitted successfully",
     });
   } catch (error) {
-    // Prisma unique constraint violation
+    // Handle race condition on first write, then treat as update.
     if (error.code === "P2002") {
-      return next(new AppError("You have already reviewed this pharmacy", 409));
+      const existingReview = await prisma.review.findUnique({
+        where: {
+          pharmacyId_patientId: {
+            pharmacyId: req.body?.pharmacyId,
+            patientId: req.user?.userId,
+          },
+        },
+        include: {
+          patient: { select: { id: true, name: true } },
+        },
+      });
+
+      if (existingReview) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            review: {
+              id: existingReview.id,
+              rating: existingReview.rating,
+              comment: existingReview.comment,
+              pharmacyId: existingReview.pharmacyId,
+              patientId: existingReview.patientId,
+              patientName: existingReview.patient?.name || "Anonymous",
+              createdAt: existingReview.createdAt,
+            },
+          },
+          message: "Review already exists",
+        });
+      }
+
+      return next(new AppError("Could not submit review right now. Please retry.", 409));
     }
     next(error);
   }

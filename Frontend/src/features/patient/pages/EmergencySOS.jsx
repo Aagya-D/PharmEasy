@@ -243,10 +243,10 @@ export default function EmergencySOS()
               </Link>
             )}
             <Link
-              to="/"
+              to="/patient"
               className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-colors text-center"
             >
-              Go Home
+              Go to Dashboard
             </Link>
             <button
               onClick={() => {
@@ -373,12 +373,13 @@ export default function EmergencySOS()
               </div>
 
               <div className="flex gap-3 p-6 border-t border-gray-100">
-                <Link
-                  to="/"
+                <button
+                  type="button"
+                  onClick={() => navigate("/patient")}
                   className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-gray-700 font-medium hover:bg-gray-50 transition-colors text-center"
                 >
                   Go Back
-                </Link>
+                </button>
                 <button
                   onClick={() => setShowDisclaimer(false)}
                   disabled={!disclaimerAccepted}
@@ -401,11 +402,11 @@ export default function EmergencySOS()
         {/* Header */}
         <div className="mb-8">
           <Link
-            to="/"
+            to="/patient"
             className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft size={20} />
-            <span>Back to Home</span>
+            <span>Back to Dashboard</span>
           </Link>
 
           <div className="flex items-center gap-4">

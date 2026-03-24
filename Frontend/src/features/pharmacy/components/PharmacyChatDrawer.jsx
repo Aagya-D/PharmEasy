@@ -1,14 +1,14 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   MessageSquare,
   X,
+  Search,
   Pill,
-  Clock,
   ChevronRight,
   Loader,
   MessageCircle,
-  Bell,
+  CheckCircle2,
 } from "lucide-react";
 import httpClient from "../../../core/services/httpClient";
 import ChatWindow from "../../chat/components/ChatWindow";
@@ -27,6 +27,15 @@ const URGENCY_COLORS = {
   high: "bg-orange-100 text-orange-700",
   medium: "bg-yellow-100 text-yellow-700",
 };
+
+function normalizeSOSStatus(status) {
+  return String(status || "").trim().toUpperCase();
+}
+
+function isArchivedStatus(status) {
+  const value = normalizeSOSStatus(status);
+  return value === "COMPLETED" || value === "EXPIRED" || value === "REJECTED" || value === "DECLINED";
+}
 
 /** Soft two-tone chime using Web Audio API — no audio file required */
 function playChime() {
@@ -53,14 +62,27 @@ export default function PharmacyChatDrawer({ isOpen, onClose, currentUser }) {
   const [loading, setLoading] = useState(false);
   const [activeChatSOS, setActiveChatSOS] = useState(null);
   const [activeChatPatient, setActiveChatPatient] = useState("");
+  const [activeTab, setActiveTab] = useState("active");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeChatRoom, setActiveChatRoom] = useState(null);
 
   // ── Fetch rooms from the correct /chat/rooms endpoint ──────────────
   const fetchConversations = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await httpClient.get("/chat/rooms");
-      // API returns { success, data: { chatRooms: [...] } }
-      setConversations(res.data?.data?.chatRooms || []);
+      const [activeRes, archiveRes] = await Promise.all([
+        httpClient.get("/chat/rooms", { params: { status: "active" } }),
+        httpClient.get("/chat/rooms", { params: { status: "completed" } }),
+      ]);
+
+      const activeRooms = activeRes.data?.data?.chatRooms || [];
+      const archiveRooms = archiveRes.data?.data?.chatRooms || [];
+      const combined = [...activeRooms, ...archiveRooms];
+
+      const uniqueRooms = Array.from(
+        new Map(combined.map((room) => [room.id, room])).values()
+      );
+      setConversations(uniqueRooms);
     } catch {
       setConversations([]);
     } finally {
@@ -118,21 +140,81 @@ export default function PharmacyChatDrawer({ isOpen, onClose, currentUser }) {
       playChime();
     };
 
+    const handleCaseStatusUpdated = (payload = {}) => {
+      const roomId = payload?.chatRoomId;
+      const sosRequestId = payload?.sosRequestId;
+      const nextStatus = payload?.status;
+      if (!nextStatus) return;
+
+      setConversations((prev) =>
+        prev.map((room) => {
+          const shouldUpdate = (roomId && room.id === roomId)
+            || (sosRequestId && room.sosRequestId === sosRequestId);
+          if (!shouldUpdate) return room;
+
+          return {
+            ...room,
+            sosRequest: {
+              ...(room.sosRequest || {}),
+              status: nextStatus,
+            },
+          };
+        })
+      );
+
+      if (sosRequestId && activeChatSOS === sosRequestId && isArchivedStatus(nextStatus)) {
+        setActiveTab("archive");
+      }
+    };
+
     socket.on("new_message_notification", handleNewMessage);
     socket.on("new_chat_available", handleNewChat);
+    socket.on("sos_case_status_updated", handleCaseStatusUpdated);
 
     return () => {
       socket.off("new_message_notification", handleNewMessage);
       socket.off("new_chat_available", handleNewChat);
+      socket.off("sos_case_status_updated", handleCaseStatusUpdated);
     };
   }, [isOpen, currentUser?.id, activeChatSOS, conversations]);
 
   const handleBack = () => {
     setActiveChatSOS(null);
     setActiveChatPatient("");
+    setActiveChatRoom(null);
     // Re-fetch so unread counts are cleared after reading
     fetchConversations();
   };
+
+  const activeConversations = useMemo(
+    () => conversations.filter((room) => !isArchivedStatus(room?.sosRequest?.status)),
+    [conversations]
+  );
+
+  const archivedConversations = useMemo(
+    () => conversations.filter((room) => isArchivedStatus(room?.sosRequest?.status)),
+    [conversations]
+  );
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const visibleConversations = useMemo(() => {
+    const source = activeTab === "archive" ? archivedConversations : activeConversations;
+    if (!normalizedQuery) return source;
+
+    return source.filter((room) => {
+      const patientName = String(room.patient?.name || "").toLowerCase();
+      const medicineName = String(room.sosRequest?.medicineName || "").toLowerCase();
+      const lastMessage = String(room.lastMessage?.content || "").toLowerCase();
+      return patientName.includes(normalizedQuery)
+        || medicineName.includes(normalizedQuery)
+        || lastMessage.includes(normalizedQuery);
+    });
+  }, [activeTab, activeConversations, archivedConversations, normalizedQuery]);
+
+  const resolvedActiveChatRoom = useMemo(() => {
+    if (!activeChatSOS) return null;
+    return conversations.find((room) => room.sosRequestId === activeChatSOS) || activeChatRoom;
+  }, [activeChatSOS, conversations, activeChatRoom]);
 
   if (!isOpen) return null;
 
@@ -175,7 +257,7 @@ export default function PharmacyChatDrawer({ isOpen, onClose, currentUser }) {
               <p className="text-xs text-blue-100">
                 {activeChatSOS
                   ? "SOS Emergency Chat"
-                  : `${conversations.length} active conversation${conversations.length !== 1 ? "s" : ""}`}
+                  : `${activeConversations.length} active conversation${activeConversations.length !== 1 ? "s" : ""}`}
               </p>
             </div>
           </div>
@@ -194,27 +276,67 @@ export default function PharmacyChatDrawer({ isOpen, onClose, currentUser }) {
               sosRequestId={activeChatSOS}
               currentUser={currentUser}
               onClose={handleBack}
+              readOnly={isArchivedStatus(resolvedActiveChatRoom?.sosRequest?.status)}
             />
           ) : (
             <div className="h-full overflow-y-auto">
+              <div className="px-4 pt-4 pb-3 border-b border-gray-100 space-y-3">
+                <div className="grid grid-cols-2 border-b border-gray-200">
+                  <button
+                    onClick={() => setActiveTab("active")}
+                    className={`px-1 py-2 text-sm font-semibold border-b-2 transition-colors ${
+                      activeTab === "active"
+                        ? "text-gray-900 border-gray-900"
+                        : "text-gray-500 border-transparent hover:text-gray-700"
+                    }`}
+                  >
+                    Active ({activeConversations.length})
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("archive")}
+                    className={`px-1 py-2 text-sm font-semibold border-b-2 transition-colors ${
+                      activeTab === "archive"
+                        ? "text-gray-900 border-gray-900"
+                        : "text-gray-500 border-transparent hover:text-gray-700"
+                    }`}
+                  >
+                    Archive ({archivedConversations.length})
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={activeTab === "active" ? "Search active conversations" : "Search archive"}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-9 pr-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-300"
+                  />
+                </div>
+              </div>
+
               {loading ? (
                 <div className="flex items-center justify-center py-16">
                   <Loader className="animate-spin text-blue-600" size={28} />
                   <span className="ml-2 text-gray-500 text-sm">Loading conversations...</span>
                 </div>
-              ) : conversations.length === 0 ? (
+              ) : visibleConversations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
                   <div className="p-4 bg-blue-50 rounded-2xl mb-4">
                     <MessageCircle size={36} className="text-blue-300" />
                   </div>
-                  <p className="text-gray-700 font-semibold">No conversations yet</p>
+                  <p className="text-gray-700 font-semibold">
+                    {activeTab === "active" ? "No active conversations" : "Your archive is empty"}
+                  </p>
                   <p className="text-gray-400 text-sm mt-1">
-                    Accept an SOS request to start chatting with patients
+                    {activeTab === "active"
+                      ? "Accept an SOS request to start chatting with patients"
+                      : "Completed or closed SOS chats will appear here"}
                   </p>
                 </div>
               ) : (
                 <ul className="divide-y divide-gray-50">
-                  {conversations.map((room) => {
+                  {visibleConversations.map((room) => {
                     const patientName = room.patient?.name || "Patient";
                     const initials = patientName
                       .split(" ")
@@ -232,6 +354,7 @@ export default function PharmacyChatDrawer({ isOpen, onClose, currentUser }) {
                         onClick={() => {
                           setActiveChatSOS(room.sosRequestId);
                           setActiveChatPatient(patientName);
+                          setActiveChatRoom(room);
                         }}
                         className="flex items-center gap-3 px-5 py-4 hover:bg-blue-50/50 cursor-pointer transition-colors"
                       >
@@ -258,6 +381,11 @@ export default function PharmacyChatDrawer({ isOpen, onClose, currentUser }) {
                           <div className="flex items-center gap-2 mt-0.5">
                             <Pill size={12} className="text-gray-400 flex-shrink-0" />
                             <span className="text-xs text-gray-500 truncate">{medicine}</span>
+                            {isArchivedStatus(room?.sosRequest?.status) && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 flex-shrink-0 inline-flex items-center gap-1">
+                                <CheckCircle2 size={10} /> Closed
+                              </span>
+                            )}
                             {urgency && (
                               <span
                                 className={`text-[10px] font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${

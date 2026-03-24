@@ -11,7 +11,7 @@ import {
   Map as MapIcon,
   List,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import searchService from "../../../core/services/search.service";
 import useGeoLocation from "../../../shared/hooks/useGeoLocation";
 import { useLocation } from "../../../context/LocationContext";
@@ -24,6 +24,8 @@ import StarRating from "../../../shared/components/StarRating";
  * Includes map view and list view with pharmacy details
  */
 export default function NearbyPharmacies() {
+  const navigate = useNavigate();
+
   // State management
   const [pharmacies, setPharmacies] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -132,12 +134,13 @@ export default function NearbyPharmacies() {
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-4 mb-4">
-            <Link
-              to="/patient/dashboard"
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <ArrowLeft size={24} className="text-gray-600" />
-            </Link>
+            </button>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Nearby Pharmacies</h1>
               <p className="text-sm text-gray-600 mt-1">Find verified pharmacies near you</p>

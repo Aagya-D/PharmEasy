@@ -380,6 +380,14 @@ model SOSRequest {
   @@index([createdAt])
 }
 
+enum SOSStatus {
+  PENDING
+  ACCEPTED
+  COMPLETED
+  DECLINED
+  EXPIRED
+}
+
 /// *
 /// * PharmacyResponse Model - Tracks pharmacy responses to SOS requests
 /// * 
@@ -450,6 +458,7 @@ enum NotificationType {
   NEW_ORDER
   SOS_ALERT         /// NEW: pharmacy-targeted emergency SOS broadcast (replaces SOS_UPDATE for pharmacy alerts)
   SOS_UPDATE
+  SOS_COMPLETED
   MEDICINE_ALERT
   SYSTEM_MESSAGE
   LOW_STOCK_WARNING

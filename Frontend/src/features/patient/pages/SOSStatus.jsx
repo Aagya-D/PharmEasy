@@ -137,7 +137,9 @@ export default function SOSStatus() {
   }, [sosId]);
 
   const getStatusConfig = (status) => {
-    switch (status) {
+    const normalizedStatus = String(status || "").toLowerCase();
+
+    switch (normalizedStatus) {
       case "pending":
         return {
           icon: Clock,
@@ -153,11 +155,19 @@ export default function SOSStatus() {
           label: "Accepted – Pharmacy is preparing your medicine",
         };
       case "rejected":
+      case "declined":
         return {
           icon: XCircle,
           color: "text-red-600",
           bg: "bg-red-100",
-          label: "Rejected",
+          label: "Declined",
+        };
+      case "completed":
+        return {
+          icon: CheckCircle,
+          color: "text-green-700",
+          bg: "bg-green-100",
+          label: "Completed – Your SOS request was fulfilled",
         };
       case "expired":
         return {

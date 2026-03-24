@@ -210,7 +210,7 @@ export default function SearchResults() {
             {/* Back and Search */}
             <div className="flex items-center gap-4 w-full md:w-auto">
               <Link
-                to="/patient/dashboard"
+                to="/patient"
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 <ArrowLeft size={24} className="text-gray-600" />
@@ -620,7 +620,7 @@ export default function SearchResults() {
           <button
             onClick={() => {
               setSearchQuery("");
-              navigate("/patient/dashboard");
+              navigate("/patient");
             }}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >

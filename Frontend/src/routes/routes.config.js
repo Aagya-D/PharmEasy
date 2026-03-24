@@ -59,14 +59,8 @@ export const patientRoutes = [
   },
   {
     path: "/patient/medications",
-    name: "My Medications",
+    name: "Purchased Medicines",
     component: "features/patient/pages/Medications/MedicationsPage",
-    roleId: 3,
-  },
-  {
-    path: "/patient/prescriptions",
-    name: "My Prescriptions",
-    component: "features/patient/pages/Prescriptions/PrescriptionsPage",
     roleId: 3,
   },
   {

@@ -1,41 +1,49 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { 
-  AlertTriangle, 
-  Loader, 
-  CheckCircle, 
-  XCircle, 
-  Phone, 
-  MapPin, 
+import {
+  AlertCircle,
+  AlertTriangle,
+  Activity,
+  CheckCircle2,
   Clock,
   Eye,
-  User,
   FileText,
+  Loader,
   Navigation,
-  Map as MapIcon,
-  MessageCircle
+  Phone,
+  Pill,
+  Search,
+  User,
+  XCircle,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 import httpClient from "../../../core/services/httpClient";
+import { connectSocket } from "../../../core/services/socket";
+import { playNotificationSound } from "../../../utils/notificationSound";
 import { useSOSContext } from "../../../context/SOSContext";
-import SOSMapModal from "../components/SOSMapModal";
 import ChatWindow from "../../chat/components/ChatWindow";
+import ConfirmationModal from "../components/ConfirmationModal";
 
 export default function PharmacySOSRequests() {
   const { updateSOSCount } = useSOSContext();
   const [sosRequests, setSosRequests] = useState([]);
-  const [acceptedRequests, setAcceptedRequests] = useState([]);
+  const [caseRooms, setCaseRooms] = useState([]);
+  const [activeFilterTab, setActiveFilterTab] = useState("active");
+  const [highlightedRoomId, setHighlightedRoomId] = useState(null);
+  const [activeChatSOS, setActiveChatSOS] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [respondingTo, setRespondingTo] = useState(null);
+  const [completingCaseId, setCompletingCaseId] = useState(null);
+  const [rejectingCaseId, setRejectingCaseId] = useState(null);
   const [selectedPrescription, setSelectedPrescription] = useState(null);
-  const [selectedSOSForMap, setSelectedSOSForMap] = useState(null);
-  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
-  const [pharmacyLocation, setPharmacyLocation] = useState(null);
-  const [activeChatSOS, setActiveChatSOS] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [rejectModal, setRejectModal] = useState({ open: false, sosId: null, patientName: "" });
+  const [rejectionNote, setRejectionNote] = useState("");
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [caseToComplete, setCaseToComplete] = useState(null);
+  const [isCompletingConfirmed, setIsCompletingConfirmed] = useState(false);
+  const [caseSearch, setCaseSearch] = useState("");
 
-  // Retrieve current user info for chat
   useEffect(() => {
     try {
       const stored = localStorage.getItem("user");
@@ -51,23 +59,86 @@ export default function PharmacySOSRequests() {
     }
   }, []);
 
-  // Fetch SOS requests on mount and set up polling every 30 seconds
   useEffect(() => {
-    fetchSOSRequests();
-    fetchAcceptedRequests();
-    
-    // Poll every 30 seconds for real-time updates
+    const loadAll = async () => {
+      await fetchSOSRequests();
+      await fetchCaseRooms();
+    };
+
+    loadAll();
+
     const interval = setInterval(() => {
-      fetchSOSRequests(true); // Silent refresh
-      fetchAcceptedRequests();
-    }, 30000);
+      fetchSOSRequests(true);
+      fetchCaseRooms();
+    }, 60000);
 
     return () => clearInterval(interval);
   }, []);
 
-  /**
-   * Fetch nearby SOS requests from backend
-   */
+  useEffect(() => {
+    const socket = connectSocket();
+
+    const onNewSosAlert = () => {
+      fetchSOSRequests(true);
+      playNotificationSound("urgent");
+      toast.success("🚨 New SOS request received.");
+    };
+
+    const onChatAvailability = () => {
+      fetchCaseRooms();
+    };
+
+    const onNewMessage = (payload = {}) => {
+      const recipientId = payload?.recipientId;
+      if (recipientId && currentUser?.id && recipientId !== currentUser.id) return;
+      fetchCaseRooms();
+      playNotificationSound("urgent");
+      toast.success("💬 New message received in SOS chat.");
+    };
+
+    const onCaseStatusUpdated = (payload = {}) => {
+      const status = String(payload?.status || "").toUpperCase();
+      const sosId = payload?.sosRequestId;
+      const roomId = payload?.chatRoomId;
+
+      if (!status || (!sosId && !roomId)) return;
+
+      setCaseRooms((prev) =>
+        prev.map((room) => {
+          const shouldUpdate = (roomId && room.id === roomId)
+            || (sosId && room.sosRequestId === sosId);
+          if (!shouldUpdate) return room;
+
+          return {
+            ...room,
+            sosRequest: {
+              ...(room.sosRequest || {}),
+              status,
+            },
+          };
+        })
+      );
+
+      if (status === "COMPLETED") {
+        setActiveFilterTab("completed");
+      }
+    };
+
+    socket.on("NEW_SOS_ALERT", onNewSosAlert);
+    socket.on("new_chat_available", onChatAvailability);
+    socket.on("NEW_MESSAGE", onNewMessage);
+    socket.on("new_message_notification", onNewMessage);
+    socket.on("sos_case_status_updated", onCaseStatusUpdated);
+
+    return () => {
+      socket.off("NEW_SOS_ALERT", onNewSosAlert);
+      socket.off("new_chat_available", onChatAvailability);
+      socket.off("NEW_MESSAGE", onNewMessage);
+      socket.off("new_message_notification", onNewMessage);
+      socket.off("sos_case_status_updated", onCaseStatusUpdated);
+    };
+  }, [currentUser?.id]);
+
   const fetchSOSRequests = async (silent = false) => {
     if (!silent) {
       setLoading(true);
@@ -76,24 +147,20 @@ export default function PharmacySOSRequests() {
 
     try {
       const response = await httpClient.get("/pharmacy/sos/nearby", {
-        params: { radius: 50 } // 50km radius for broader visibility
+        params: { radius: 50 },
       });
 
       if (response.data.success) {
         const sosData = response.data.data.sosRequests || [];
         setSosRequests(sosData);
-        // Store pharmacy location for map modal
-        if (response.data.data.pharmacy) {
-          setPharmacyLocation(response.data.data.pharmacy);
-        }
-        // Update global SOS count
         updateSOSCount(sosData);
+
       }
     } catch (err) {
       console.error("Error fetching SOS requests:", err);
       if (!silent) {
         setError(
-          err.response?.data?.error?.message || 
+          err.response?.data?.error?.message ||
           "Failed to load SOS requests. Please try again."
         );
       }
@@ -104,411 +171,633 @@ export default function PharmacySOSRequests() {
     }
   };
 
-  /**
-   * Fetch accepted (active) SOS cases via chat rooms endpoint
-   */
-  const fetchAcceptedRequests = async () => {
+  const fetchCaseRooms = async () => {
     try {
-      const response = await httpClient.get("/chat/rooms");
-      if (response.data.success) {
-        setAcceptedRequests(response.data.data?.chatRooms || []);
-      }
+      const [activeResponse, archivedResponse] = await Promise.all([
+        httpClient.get("/chat/rooms", { params: { status: "active" } }),
+        httpClient.get("/chat/rooms", { params: { status: "completed" } }),
+      ]);
+
+      const activeRooms = activeResponse.data?.data?.chatRooms || [];
+      const archivedRooms = archivedResponse.data?.data?.chatRooms || [];
+      const merged = [...activeRooms, ...archivedRooms];
+      const deduped = Array.from(new Map(merged.map((room) => [room.id, room])).values());
+      setCaseRooms(deduped);
     } catch (err) {
-      console.error("Error fetching accepted requests:", err);
+      console.error("Error fetching SOS case rooms:", err);
     }
   };
 
-  /**
-   * Respond to SOS request (accept or reject)
-   */
   const handleRespond = async (sosId, response, note = "") => {
     setRespondingTo(sosId);
 
     try {
-      await httpClient.post(
-        `/pharmacy/sos/${sosId}/respond`,
-        { response, note }
-      );
+      await httpClient.post(`/pharmacy/sos/${sosId}/respond`, { response, note });
 
-      // Refresh the list after responding
-      await fetchSOSRequests();
-      await fetchAcceptedRequests();
+      await fetchSOSRequests(true);
+      await fetchCaseRooms();
 
-      // Show success message
-      if (response === 'accepted') {
-        toast.success('✅ SOS request accepted! The patient has been notified.');
-      } else {
-        toast('🟡 SOS request declined. The patient will be notified.', { icon: '🔔' });
+      if (response === "accepted") {
+        setActiveFilterTab("active");
+        playNotificationSound("standard");
+        toast.success("✅ SOS request accepted! The patient has been notified.");
       }
     } catch (err) {
       console.error("Error responding to SOS:", err);
       toast.error(
         err.response?.data?.error?.message ||
-        '❌ Failed to respond to SOS request. Please check your connection.'
+          "❌ Failed to respond to SOS request. Please check your connection."
       );
     } finally {
       setRespondingTo(null);
     }
   };
 
-  /**
-   * Format time ago
-   */
-  const formatTimeAgo = (date) => {
-    const seconds = Math.floor((new Date() - new Date(date)) / 1000);
-    
-    if (seconds < 60) return `${seconds}s ago`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    return `${Math.floor(seconds / 86400)}d ago`;
+  const handleCompleteCase = (room) => {
+    setCaseToComplete(room);
+    setIsConfirmModalOpen(true);
   };
 
-  /**
-   * Stats calculation with defensive coding
-   */
-  const safeSOSRequests = Array.isArray(sosRequests) ? sosRequests : [];
-  
-  const stats = [
-    { 
-      title: "Pending Requests", 
-      value: safeSOSRequests.filter(r => r.status === 'pending').length,
-      icon: AlertTriangle,
-      color: "orange"
-    },
-    { 
-      title: "Nearby (< 5km)", 
-      value: safeSOSRequests.filter(r => r.distance < 5).length,
-      icon: Navigation,
-      color: "blue"
-    },
-    { 
-      title: "With Prescription", 
-      value: safeSOSRequests.filter(r => r.prescriptionUrl).length,
-      icon: FileText,
-      color: "green"
-    },
-  ];
+  const handleConfirmCompletion = async () => {
+    if (!caseToComplete) return;
 
-  if (loading) {
+    const sosId = caseToComplete.sosRequestId;
+    setIsCompletingConfirmed(true);
+    setCompletingCaseId(sosId);
+
+    try {
+      await httpClient.patch(`/pharmacy/sos/${sosId}/complete`);
+
+      let movedCase = null;
+      setCaseRooms((prev) => {
+        const updated = prev.map((entry) =>
+          entry.sosRequestId === sosId
+            ? {
+                ...entry,
+                sosRequest: {
+                  ...entry.sosRequest,
+                  status: "COMPLETED",
+                },
+              }
+            : entry
+        );
+
+        movedCase = updated.find((entry) => entry.sosRequestId === sosId) || null;
+        return updated;
+      });
+
+      if (movedCase) {
+        setActiveFilterTab("completed");
+        setHighlightedRoomId(movedCase.id);
+      }
+
+      playNotificationSound("standard");
+      toast.success(`✅ SOS Case #${sosId} has been successfully completed and archived.`);
+      setIsConfirmModalOpen(false);
+      setCaseToComplete(null);
+    } catch (err) {
+      console.error("Error completing SOS case:", err);
+      toast.error(
+        err.response?.data?.message ||
+          err.response?.data?.error?.message ||
+          "❌ Failed to complete case. Please try again."
+      );
+    } finally {
+      setIsCompletingConfirmed(false);
+      setCompletingCaseId(null);
+    }
+  };
+
+  const handleCancelCompletion = () => {
+    setIsConfirmModalOpen(false);
+    setCaseToComplete(null);
+  };
+
+  const openRejectModal = (request) => {
+    setRejectModal({
+      open: true,
+      sosId: request.id,
+      patientName: request.patient?.name || request.patientName || "Patient",
+    });
+    setRejectionNote("");
+  };
+
+  const closeRejectModal = () => {
+    setRejectModal({ open: false, sosId: null, patientName: "" });
+    setRejectionNote("");
+  };
+
+  const handleRejectSubmit = async () => {
+    if (!rejectModal.sosId) return;
+
+    setRejectingCaseId(rejectModal.sosId);
+    try {
+      await httpClient.patch(`/pharmacy/sos/${rejectModal.sosId}/reject`, {
+        note: rejectionNote.trim(),
+      });
+
+      await fetchSOSRequests(true);
+      await fetchCaseRooms();
+
+      playNotificationSound("urgent");
+      toast.success("❌ Request has been declined.");
+      closeRejectModal();
+    } catch (err) {
+      console.error("Error rejecting SOS:", err);
+      toast.error(
+        err.response?.data?.message ||
+          err.response?.data?.error?.message ||
+          "❌ Failed to reject SOS request. Please try again."
+      );
+    } finally {
+      setRejectingCaseId(null);
+    }
+  };
+
+  const formatRelativeTime = (date) => {
+    if (!date) return "now";
+    const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+
+    if (seconds < 60) return `${Math.max(seconds, 1)}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+    return `${Math.floor(seconds / 86400)}d`;
+  };
+
+  const getInitials = (name) => {
+    if (!name) return "PT";
+    const words = String(name).trim().split(/\s+/);
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return `${words[0][0] || ""}${words[1][0] || ""}`.toUpperCase();
+  };
+
+  const getStatusSnippet = (room) => {
+    const lastMessage = room?.lastMessage?.content;
+    if (lastMessage) return lastMessage;
+
+    const status = String(room?.sosRequest?.status || "").toUpperCase();
+    if (status === "ACCEPTED") return "Awaiting response...";
+    if (status === "COMPLETED") return "Case completed successfully.";
+    return "Emergency coordination in progress.";
+  };
+
+  const normalizeStatus = (value) => String(value || "").toUpperCase();
+  const isArchivedStatus = (value) => {
+    const status = normalizeStatus(value);
+    return status === "COMPLETED" || status === "EXPIRED" || status === "REJECTED" || status === "DECLINED";
+  };
+
+  const pendingCount = useMemo(
+    () => (Array.isArray(sosRequests) ? sosRequests : []).filter((r) => normalizeStatus(r.status) === "PENDING").length,
+    [sosRequests]
+  );
+
+  const pendingRequests = useMemo(
+    () => (Array.isArray(sosRequests) ? sosRequests : []).filter((r) => normalizeStatus(r.status) === "PENDING"),
+    [sosRequests]
+  );
+
+  const activeCases = useMemo(
+    () => (Array.isArray(caseRooms) ? caseRooms : []).filter((room) => {
+      const status = normalizeStatus(room?.sosRequest?.status);
+      return status === "ACCEPTED" || status === "PENDING";
+    }),
+    [caseRooms]
+  );
+
+  const completedCases = useMemo(
+    () => (Array.isArray(caseRooms) ? caseRooms : []).filter((room) => isArchivedStatus(room?.sosRequest?.status)),
+    [caseRooms]
+  );
+
+  const currentList = useMemo(() => {
+    const source = activeFilterTab === "active" ? activeCases : completedCases;
+    const query = caseSearch.trim().toLowerCase();
+    if (!query) return source;
+
+    return source.filter((room) => {
+      const patientName = String(room?.patient?.name || room?.sosRequest?.patientName || "").toLowerCase();
+      const medicineName = String(room?.sosRequest?.medicineName || "").toLowerCase();
+      const lastMessage = String(room?.lastMessage?.content || "").toLowerCase();
+      return patientName.includes(query) || medicineName.includes(query) || lastMessage.includes(query);
+    });
+  }, [activeFilterTab, activeCases, completedCases, caseSearch]);
+
+  const activeChatCase = useMemo(
+    () => (Array.isArray(caseRooms) ? caseRooms : []).find((room) => room?.sosRequestId === activeChatSOS) || null,
+    [caseRooms, activeChatSOS]
+  );
+
+  const getUrgencyBadgeClasses = (rawUrgency) => {
+    const urgency = String(rawUrgency || "").toLowerCase();
+    if (urgency === "critical") {
+      return "bg-red-100 text-red-700 border-red-200";
+    }
+    if (urgency === "medium") {
+      return "bg-amber-100 text-amber-700 border-amber-200";
+    }
+    return "bg-orange-100 text-orange-700 border-orange-200";
+  };
+
+  if (loading && !caseRooms.length) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="h-[calc(100vh-80px)] bg-white flex items-center justify-center">
         <div className="text-center">
-          <Loader className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
-          <p className="text-gray-600">Loading SOS requests...</p>
+          <Loader className="animate-spin text-slate-700 mx-auto mb-3" size={34} />
+          <p className="text-slate-500 text-sm">Loading communication center...</p>
         </div>
       </div>
     );
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white border-b border-gray-200 px-6 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Emergency SOS Requests</h1>
-            <p className="text-sm text-gray-500">Respond quickly to urgent patient medical needs</p>
-          </div>
-          <button
-            onClick={() => fetchSOSRequests()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Refresh
-          </button>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gray-100 p-6 space-y-6">
+      <h1 className="text-2xl font-bold text-gray-900">SOS Requests</h1>
 
-      <main className="p-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <div key={stat.title} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">{stat.title}</p>
-                    <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
-                  </div>
-                  <div className={`p-3 rounded-xl bg-${stat.color}-50`}>
-                    <Icon size={24} className={`text-${stat.color}-600`} />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm">
+          {error}
         </div>
+      )}
 
-        {/* Error Message */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-            <div className="flex items-center gap-2">
-              <AlertTriangle size={20} />
-              <span>{error}</span>
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Pending Requests Card */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-500">Pending Requests</p>
+              <p className="text-3xl font-bold text-slate-900">{pendingCount}</p>
+            </div>
+            <div className="flex items-center justify-center w-16 h-16 rounded-full bg-amber-50">
+              <AlertCircle size={32} className="text-amber-600" />
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Active (Accepted) Cases */}
-        {acceptedRequests.length > 0 && (
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-              <CheckCircle size={20} className="text-green-600" />
-              My Active Cases ({acceptedRequests.length})
-            </h2>
-            <div className="space-y-3">
-              {acceptedRequests.map((room) => (
-                <motion.div
-                  key={room.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white rounded-xl px-5 py-4 shadow-sm border border-green-100 flex items-center justify-between gap-4"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 flex items-center gap-2">
-                      <User size={15} className="text-gray-400 flex-shrink-0" />
-                      {room.patient?.name || room.sosRequest?.patientName || "Patient"}
+        {/* Active Cases Card */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-500">Active Cases</p>
+              <p className="text-3xl font-bold text-slate-900">{activeCases.length}</p>
+            </div>
+            <div className="flex items-center justify-center w-16 h-16 rounded-full bg-blue-50">
+              <Activity size={32} className="text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        {/* Completed Cases Card */}
+        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-slate-500">Completed Cases</p>
+              <p className="text-3xl font-bold text-slate-900">{completedCases.length}</p>
+            </div>
+            <div className="flex items-center justify-center w-16 h-16 rounded-full bg-emerald-50">
+              <CheckCircle2 size={32} className="text-emerald-600" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white rounded-2xl border border-slate-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+            <AlertTriangle size={18} className="text-orange-600" />
+            New SOS Requests ({pendingRequests.length})
+          </h2>
+        </div>
+
+        {pendingRequests.length === 0 ? (
+          <p className="text-sm text-slate-500">No pending SOS requests right now.</p>
+        ) : (
+          <div className="space-y-3">
+            {pendingRequests.map((request) => (
+              <div key={request.id} className="rounded-xl border border-slate-200 p-4 bg-slate-50/60">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 truncate flex items-center gap-2">
+                      <User size={14} className="text-slate-400" />
+                      {request.patient?.name || request.patientName || "Anonymous Patient"}
                     </p>
-                    {room.sosRequest?.medicineName && (
-                      <p className="text-sm text-gray-500 mt-0.5 truncate">
-                        💊 {room.sosRequest.medicineName}
-                      </p>
-                    )}
-                    {room.sosRequest?.contactNumber && (
-                      <p className="text-sm text-gray-400 mt-0.5 flex items-center gap-1">
-                        <Phone size={13} />
-                        {room.sosRequest.contactNumber}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setActiveChatSOS(room.sosRequestId)}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex-shrink-0"
-                  >
-                    <MessageCircle size={16} />
-                    Message Patient
-                  </button>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        )}
+                    <p className="text-sm font-bold text-slate-800 truncate mt-2 flex items-center gap-2">
+                      <Pill size={14} className="text-blue-600" />
+                      {request.medicineName || "Medicine"}
+                    </p>
 
-        {/* SOS Requests List */}
-        <div className="space-y-4">
-          {safeSOSRequests.length === 0 ? (
-            <div className="bg-white rounded-xl p-12 text-center shadow-sm border border-gray-100">
-              <AlertTriangle className="text-gray-400 mx-auto mb-4" size={48} />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No SOS Requests</h3>
-              <p className="text-gray-500">There are currently no pending emergency requests in your area.</p>
-            </div>
-          ) : (
-            safeSOSRequests.map((request) => (
-              <motion.div
-                key={request.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start justify-between gap-6">
-                  {/* Left Section - Patient Info */}
-                  <div className="flex-1 space-y-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-semibold">
-                            URGENT
-                          </span>
-                          <span className="text-xs text-gray-500 flex items-center gap-1">
-                            <Clock size={14} />
-                            {formatTimeAgo(request.createdAt)}
-                          </span>
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                          <User size={18} />
-                          {request.patient?.name || request.patientName || 'Anonymous Patient'}
-                        </h3>
-                        {request.medicineName && (
-                          <p className="text-sm text-red-600 font-medium mt-1">
-                            💊 Needs: {request.medicineName}{request.genericName ? ` (${request.genericName})` : ''} × {request.quantity || 1}
-                          </p>
-                        )}
-                      </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="text-xs px-2.5 py-1 rounded-md border border-slate-200 bg-white text-slate-700">
+                        Qty: {request.quantity || 1} units
+                      </span>
+                      <span className={`text-xs px-2.5 py-1 rounded-md border font-semibold ${getUrgencyBadgeClasses(request.urgency || request.urgencyLevel)}`}>
+                        {String(request.urgency || request.urgencyLevel || "high").toUpperCase()}
+                      </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <Phone size={16} className="text-blue-600" />
-                        <span className="text-sm">{request.contactNumber || request.patient?.phone || 'N/A'}</span>
-                      </div>
-                      
-                      <button
-                        onClick={() => {
-                          setSelectedSOSForMap(request);
-                          setIsMapModalOpen(true);
-                        }}
-                        className="flex items-center gap-2 text-gray-600 hover:text-purple-700 hover:bg-purple-50 rounded-lg px-2 py-1 -mx-2 -my-1 transition-colors group"
-                        title="Click to view on map"
-                      >
-                        <MapPin size={16} className="text-purple-600" />
-                        <span className="text-sm truncate">{request.address || 'Address not provided'}</span>
-                        <MapIcon size={14} className="text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                      </button>
-                      
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <MapPin size={16} className="text-green-600" />
-                        <span className="text-sm">{request.distance ? request.distance.toFixed(1) : '0.0'} km away</span>
-                      </div>
+                    <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
+                      <Clock size={12} /> {formatRelativeTime(request.createdAt)} ago
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                      <Phone size={12} /> {request.contactNumber || request.patient?.phone || "No contact"}
+                    </p>
 
-                      <div className="flex items-center gap-2 text-gray-600 col-span-2">
-                        <AlertTriangle size={16} className="text-orange-600" />
-                        <span className="text-sm font-medium">{request.additionalNotes || "No additional notes"}</span>
-                      </div>
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-white p-2.5">
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1 inline-flex items-center gap-1">
+                        <FileText size={12} /> Additional Notes
+                      </p>
+                      <p className="text-xs text-slate-700 whitespace-pre-wrap break-words">
+                        {request.description || request.additionalNotes || "No additional notes provided."}
+                      </p>
                     </div>
-
-                    {/* Prescription */}
-                    {request.prescriptionUrl && (
-                      <div className="mt-4">
-                        <button
-                          onClick={() => {
-                            // Construct full URL if it's a relative path
-                            const prescriptionUrl = request.prescriptionUrl.startsWith('http')
-                              ? request.prescriptionUrl
-                              : `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${request.prescriptionUrl}`;
-                            setSelectedPrescription(prescriptionUrl);
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
-                        >
-                          <Eye size={16} />
-                          View Prescription
-                        </button>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Right Section - Actions */}
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-2 w-40">
                     <button
-                      onClick={() => handleRespond(request.id, 'accepted')}
+                      onClick={() => handleRespond(request.id, "accepted")}
                       disabled={respondingTo === request.id}
-                      className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-60"
                     >
-                      {respondingTo === request.id ? (
-                        <Loader className="animate-spin" size={18} />
-                      ) : (
-                        <CheckCircle size={18} />
-                      )}
-                      Accept
+                      {respondingTo === request.id ? "..." : "Accept"}
                     </button>
-
                     <button
-                      onClick={() => {
-                        const note = prompt("Why are you rejecting this request? (Optional)");
-                        if (note !== null) {
-                          handleRespond(request.id, 'rejected', note);
-                        }
-                      }}
+                      onClick={() => openRejectModal(request)}
                       disabled={respondingTo === request.id}
-                      className="flex items-center gap-2 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-2 rounded-lg bg-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-300 disabled:opacity-60"
                     >
-                      <XCircle size={18} />
                       Reject
                     </button>
+                    {(request.prescription || request.prescriptionUrl) && (
+                      <button
+                        onClick={() => {
+                          const rawPrescription = request.prescription || request.prescriptionUrl;
+                          const prescriptionUrl = rawPrescription.startsWith("http")
+                            ? rawPrescription
+                            : `${process.env.REACT_APP_API_URL || "http://localhost:5000"}${rawPrescription}`;
+                          setSelectedPrescription(prescriptionUrl);
+                        }}
+                        className="px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium hover:bg-blue-100 inline-flex items-center justify-center gap-1"
+                      >
+                        <Eye size={14} />
+                        View Prescription
+                      </button>
+                    )}
                   </div>
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
-                {/* Chat button for accepted requests */}
-                {request.status === 'accepted' && (
-                  <div className="mt-3 pt-3 border-t border-gray-100">
+      <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-900">Communication Command Center</h2>
+          <span className="text-xs text-slate-500 inline-flex items-center gap-1">
+            <Navigation size={12} /> Messaging workflow
+          </span>
+        </div>
+
+        <div className="h-[calc(100vh-430px)] min-h-[520px] flex">
+      {/* Left Panel */}
+      <aside className="w-[360px] border-r border-slate-200 flex flex-col bg-white">
+        <div className="px-5 py-4 border-b border-slate-200">
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-lg font-semibold text-slate-900">Direct</h1>
+          </div>
+
+          <div className="grid grid-cols-2 border-b border-slate-200">
+            <button
+              onClick={() => setActiveFilterTab("active")}
+              className={`px-2 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                activeFilterTab === "active"
+                  ? "text-slate-900 border-slate-900"
+                  : "text-slate-500 border-transparent hover:text-slate-700"
+              }`}
+            >
+              Active ({activeCases.length})
+            </button>
+            <button
+              onClick={() => setActiveFilterTab("completed")}
+              className={`px-2 py-2.5 text-sm font-semibold border-b-2 transition-colors ${
+                activeFilterTab === "completed"
+                  ? "text-slate-900 border-slate-900"
+                  : "text-slate-500 border-transparent hover:text-slate-700"
+              }`}
+            >
+              Archive ({completedCases.length})
+            </button>
+          </div>
+
+          <div className="mt-3 relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={caseSearch}
+              onChange={(e) => setCaseSearch(e.target.value)}
+              placeholder={activeFilterTab === "active" ? "Search active cases" : "Search archive"}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300/50 focus:border-slate-400"
+            />
+          </div>
+
+          <p className="mt-3 text-xs text-slate-500">
+            Incoming pending alerts: <span className="font-semibold text-slate-700">{pendingCount}</span>
+          </p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {!currentList.length ? (
+            <div className="h-full px-6 py-12 text-center text-slate-500 text-sm">
+              {activeFilterTab === "active" ? "No active conversations" : "Your archive is empty"}
+            </div>
+          ) : (
+            <ul className="py-2">
+              {currentList.map((room) => {
+                const patientName =
+                  room.patient?.name ||
+                  room.sosRequest?.patientName ||
+                  "Patient";
+                const medicineName = room.sosRequest?.medicineName || "Medicine";
+                const timestamp = room.lastMessage?.createdAt || room.sosRequest?.updatedAt || room.sosRequest?.createdAt;
+                const isSelected = highlightedRoomId === room.id;
+
+                return (
+                  <li key={room.id} className="px-2">
                     <button
-                      onClick={() => setActiveChatSOS(request.id)}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium"
+                      onClick={() => {
+                        setHighlightedRoomId(room.id);
+                        setActiveChatSOS(room.sosRequestId);
+                      }}
+                      className={`w-full rounded-xl px-3 py-3 text-left transition-colors ${
+                        isSelected
+                          ? "bg-slate-100"
+                          : "hover:bg-slate-50"
+                      }`}
                     >
-                      <MessageCircle size={16} />
-                      Chat with Patient
+                      <div className="flex items-start gap-3">
+                        <div className="w-11 h-11 rounded-full bg-slate-200 text-slate-700 font-semibold text-sm flex items-center justify-center flex-shrink-0">
+                          {getInitials(patientName)}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-semibold text-slate-900 truncate">{patientName}</p>
+                            <span className="text-xs text-slate-400 flex-shrink-0">{formatRelativeTime(timestamp)}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 min-w-0">
+                            <Pill size={12} className="text-blue-600 flex-shrink-0" />
+                            <p className="text-sm font-semibold text-slate-700 truncate">{medicineName}</p>
+                            {room?.sosRequest?.urgency && (
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${getUrgencyBadgeClasses(room.sosRequest.urgency)}`}>
+                                {String(room.sosRequest.urgency).toUpperCase()}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 truncate mt-0.5">{getStatusSnippet(room)}</p>
+                        </div>
+
+                        {normalizeStatus(room?.sosRequest?.status) === "ACCEPTED" && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCompleteCase(room);
+                            }}
+                            disabled={completingCaseId === room.sosRequestId}
+                            className="text-[11px] px-2 py-1 rounded-md border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-60"
+                          >
+                            Done
+                          </button>
+                        )}
+                      </div>
                     </button>
-                  </div>
-                )}
-              </motion.div>
-            ))
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
-      </main>
+      </aside>
 
-      {/* Prescription Modal */}
-      <AnimatePresence>
-        {selectedPrescription && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-            onClick={() => setSelectedPrescription(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
-              className="bg-white rounded-xl max-w-4xl max-h-[90vh] overflow-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="p-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
-                <h3 className="text-lg font-semibold text-gray-900">Prescription</h3>
-                <button
-                  onClick={() => setSelectedPrescription(null)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <XCircle size={24} className="text-gray-600" />
-                </button>
-              </div>
-              <div className="p-4">
-                <img
-                  src={selectedPrescription}
-                  alt="Prescription"
-                  className="w-full h-auto rounded-lg"
-                />
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* SOS Map Modal */}
-      <SOSMapModal
-        isOpen={isMapModalOpen}
-        onClose={() => {
-          setIsMapModalOpen(false);
-          setSelectedSOSForMap(null);
-        }}
-        sosRequest={selectedSOSForMap}
-        pharmacyLocation={pharmacyLocation}
-      />
-
-      {/* Chat Modal */}
-      <AnimatePresence>
-        {activeChatSOS && currentUser && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            onClick={() => setActiveChatSOS(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-lg h-[600px]"
-              onClick={(e) => e.stopPropagation()}
-            >
+      {/* Right Panel */}
+      <section className="flex-1 min-w-0 flex flex-col bg-slate-50">
+        {activeChatSOS && currentUser ? (
+          <div className="h-full p-3 md:p-4">
+            <div className="h-full">
               <ChatWindow
                 sosRequestId={activeChatSOS}
                 currentUser={currentUser}
                 onClose={() => setActiveChatSOS(null)}
+                readOnly={isArchivedStatus(activeChatCase?.sosRequest?.status)}
               />
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
+        ) : (
+          <div className="h-full flex items-center justify-center px-6">
+            <p className="text-sm text-slate-400">Select a conversation to start messaging</p>
+          </div>
         )}
-      </AnimatePresence>
+      </section>
+
+        </div>
+      </section>
+
+      <ConfirmationModal
+        isOpen={isConfirmModalOpen}
+        title="Mark SOS as Completed?"
+        message="Are you sure you want to finish this case? This will archive the conversation and notify the patient that their medicine needs have been met."
+        confirmLabel="Yes, Mark as Done"
+        cancelLabel="No, Keep Open"
+        isLoading={isCompletingConfirmed}
+        icon="check"
+        onConfirm={handleConfirmCompletion}
+        onCancel={handleCancelCompletion}
+      />
+
+      {rejectModal.open && (
+        <div
+          className="fixed inset-0 z-50 bg-black/45 flex items-center justify-center p-4"
+          onClick={closeRejectModal}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">Decline SOS Request</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Patient: {rejectModal.patientName}</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeRejectModal}
+                className="p-1.5 rounded-md hover:bg-slate-100"
+                aria-label="Close reject modal"
+              >
+                <XCircle size={18} className="text-slate-500" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3">
+              <label className="block text-sm font-medium text-slate-700" htmlFor="rejection-note">
+                Rejection reason (optional)
+              </label>
+              <textarea
+                id="rejection-note"
+                value={rejectionNote}
+                onChange={(e) => setRejectionNote(e.target.value)}
+                rows={4}
+                placeholder="Add context for the patient, e.g. medicine currently unavailable."
+                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400/30 focus:border-slate-400 resize-none"
+              />
+            </div>
+
+            <div className="px-5 py-4 border-t border-slate-200 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeRejectModal}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200"
+                disabled={rejectingCaseId === rejectModal.sosId}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRejectSubmit}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-60"
+                disabled={rejectingCaseId === rejectModal.sosId}
+              >
+                {rejectingCaseId === rejectModal.sosId ? "Declining..." : "Decline Request"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedPrescription && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setSelectedPrescription(null)}
+        >
+          <div
+            className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+              <p className="text-sm font-semibold text-slate-900">Prescription</p>
+              <button
+                type="button"
+                onClick={() => setSelectedPrescription(null)}
+                className="p-1.5 rounded-md hover:bg-slate-100"
+              >
+                <XCircle size={18} className="text-slate-500" />
+              </button>
+            </div>
+            <div className="p-4">
+              <img src={selectedPrescription} alt="Prescription" className="w-full h-auto rounded-lg" />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

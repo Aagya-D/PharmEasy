@@ -3,10 +3,13 @@ import httpClient from "../../../core/services/httpClient";
 const chatService = {
   /**
    * Fetch all chat rooms for the authenticated user
+   * @param {"active"|"completed"|"archive"|"all"} [status]
    * @returns {Promise<{ success: boolean, data: { rooms: Array } }>}
    */
-  getChatRooms: async () => {
-    const response = await httpClient.get("/chat/rooms");
+  getChatRooms: async (status) => {
+    const response = await httpClient.get("/chat/rooms", {
+      params: status ? { status } : undefined,
+    });
     return response.data;
   },
 

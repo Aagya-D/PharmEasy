@@ -272,21 +272,50 @@ class NotificationService {
    * SOS Update Trigger — pharmacy accepted/rejected a patient's SOS
    */
   async notifySosStatusChange(patientId, pharmacyName, status, medicineName, sosId) {
-    const title = status === "accepted"
-      ? `${pharmacyName} Accepted Your SOS Request`
-      : `${pharmacyName} Declined Your SOS Request`;
+    const normalizedStatus = String(status || "").toLowerCase();
 
-    const message = status === "accepted"
-      ? `Great news! ${pharmacyName} has confirmed they have ${medicineName} in stock and will prepare it for you.`
-      : `${pharmacyName} doesn't have ${medicineName} available at the moment.`;
+    const notificationMap = {
+      accepted: {
+        title: `${pharmacyName} Accepted Your SOS Request`,
+        message: `Great news! ${pharmacyName} has confirmed they have ${medicineName} in stock and will prepare it for you.`,
+        type: "SOS_UPDATE",
+        priority: "high",
+      },
+      declined: {
+        title: `${pharmacyName} Declined Your SOS Request`,
+        message: `${pharmacyName} doesn't have ${medicineName} available at the moment.`,
+        type: "SOS_UPDATE",
+        priority: "normal",
+      },
+      rejected: {
+        title: `${pharmacyName} Declined Your SOS Request`,
+        message: `${pharmacyName} doesn't have ${medicineName} available at the moment.`,
+        type: "SOS_UPDATE",
+        priority: "normal",
+      },
+      completed: {
+        title: "✅ SOS Request Completed",
+        message: `${pharmacyName} has successfully fulfilled your request for ${medicineName}.`,
+        type: "SOS_COMPLETED",
+        priority: "high",
+      },
+      expired: {
+        title: "SOS Request Expired",
+        message: `Your SOS request for ${medicineName} expired because no pharmacy could fulfill it in time.`,
+        type: "SOS_UPDATE",
+        priority: "normal",
+      },
+    };
 
-    return this.createNotification(patientId, title, message, "SOS_UPDATE", {
-      status,
+    const selected = notificationMap[normalizedStatus] || notificationMap.declined;
+
+    return this.createNotification(patientId, selected.title, selected.message, selected.type, {
+      status: normalizedStatus,
       pharmacyName,
       medicineName,
       sosId,
       link: `/patient/sos/${sosId}`,
-    }, "PATIENT", status === "accepted" ? "high" : "normal");
+    }, "PATIENT", selected.priority);
   }
 
   /**

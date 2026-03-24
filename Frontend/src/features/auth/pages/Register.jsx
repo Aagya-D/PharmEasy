@@ -17,7 +17,6 @@
 
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import toast from "react-hot-toast";
 import { AuthLayout } from "../components/AuthLayout";
 import { Input } from "../../../shared/components/ui";
 import { Button } from "../../../shared/components/ui";
@@ -120,7 +119,6 @@ export function Register() {
     }
 
     setIsLoading(true);
-    const loadingToast = toast.loading('📧 Creating your account...');
 
     try {
       const registrationData = {
@@ -135,17 +133,13 @@ export function Register() {
       const result = await register(registrationData);
 
       if (result.success) {
-        toast.dismiss(loadingToast);
-        toast.success('🎉 Account created! Please verify your email to continue.');
         // Redirect to OTP verification with userId and email
         navigate("/verify-otp", { state: { email, userId: result.userId } });
       } else {
-        toast.dismiss(loadingToast);
         // ✅ FIX: Safely extract error message
         setError(result.error || "Registration failed");
       }
     } catch (err) {
-      toast.dismiss(loadingToast);
       // ✅ FIX: Safely extract error message from caught exception
       const errorMessage = err?.message || err?.response?.data?.message || "An unexpected error occurred";
       setError(errorMessage);
