@@ -32,6 +32,7 @@ import ProfilePage from "../features/patient/pages/Profile/ProfilePage";
 import PatientSettings from "../features/patient/pages/PatientSettings";
 import PatientChat from "../features/patient/pages/PatientChat";
 import OrderSuccess from "../features/patient/pages/OrderSuccess";
+import KhaltiPaymentCallback from "../features/patient/pages/KhaltiPaymentCallback";
 
 // Pharmacy Pages
 import PharmacyDashboard from "../features/pharmacy/pages/PharmacyDashboard";
@@ -330,6 +331,10 @@ export const routes = [
   {
     path: "/unauthorized",
     element: <UnauthorizedPage />,
+  },
+  {
+    path: "/patient/payment/khalti/callback",
+    element: <KhaltiPaymentCallback />,
   },
 
   // --- PATIENT CHAT (Standalone — no Navbar/Footer for immersive UX) ---

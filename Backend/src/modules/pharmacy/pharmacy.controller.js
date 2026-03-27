@@ -9,6 +9,10 @@ import { createLog, createAuditLog, LOG_ACTIONS } from "../../utils/activityLogg
 import prisma from "../../database/prisma.js";
 import notificationService from "../notifications/notification.service.js";
 import { isValidNepaliPhone } from "../../utils/validation.js";
+import { encryptText } from "../../utils/encryption.js";
+
+const KHALTI_PUBLIC_KEY_REGEX = /^[a-zA-Z0-9]{20,80}$/;
+const MASKED_SECRET = "••••••••••••••••••••";
 
 /**
  * POST /api/pharmacy/onboard
@@ -115,6 +119,159 @@ export const getMyPharmacy = async (req, res, next) => {
     res.status(200).json({
       success: true,
       data: pharmacy,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/pharmacy/settings/khalti
+ * Get Khalti merchant connection status and safe display fields
+ */
+export const getKhaltiSettings = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+
+    const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
+    if (!pharmacy) {
+      return res.status(404).json({
+        success: false,
+        message: "No pharmacy found for this user. Please complete onboarding first.",
+      });
+    }
+
+    const paymentConfig = await prisma.pharmacyPaymentConfig.findUnique({
+      where: { pharmacyId: pharmacy.id },
+      select: {
+        khaltiPublicKey: true,
+        khaltiSecretKeyEncrypted: true,
+        isKhaltiConnected: true,
+        khaltiConnectedAt: true,
+        updatedAt: true,
+      },
+    });
+
+    const hasSecretKey = Boolean(paymentConfig?.khaltiSecretKeyEncrypted);
+    const isConnected = Boolean(paymentConfig?.isKhaltiConnected && paymentConfig?.khaltiPublicKey && hasSecretKey);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        status: isConnected ? "CONNECTED" : "NOT_CONNECTED",
+        isConnected,
+        merchantSignupUrl: "https://merchant.khalti.com/",
+        publicKey: paymentConfig?.khaltiPublicKey || "",
+        hasSecretKey,
+        secretKeyMasked: hasSecretKey ? MASKED_SECRET : "",
+        connectedAt: paymentConfig?.khaltiConnectedAt || null,
+        updatedAt: paymentConfig?.updatedAt || null,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PUT /api/pharmacy/settings/khalti
+ * Save/update Khalti merchant keys for the authenticated pharmacy admin
+ */
+export const updateKhaltiSettings = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const publicKeyInput = String(req.body?.publicKey || "").trim();
+    const secretKeyInput = String(req.body?.secretKey || "").trim();
+
+    const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
+    if (!pharmacy) {
+      return res.status(404).json({
+        success: false,
+        message: "No pharmacy found for this user. Please complete onboarding first.",
+      });
+    }
+
+    if (!publicKeyInput || !KHALTI_PUBLIC_KEY_REGEX.test(publicKeyInput)) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid Khalti public key is required",
+      });
+    }
+
+    if (secretKeyInput && secretKeyInput === publicKeyInput) {
+      return res.status(400).json({
+        success: false,
+        message: "Khalti secret key cannot be the same as public key",
+      });
+    }
+
+    const existing = await prisma.pharmacyPaymentConfig.findUnique({
+      where: { pharmacyId: pharmacy.id },
+      select: {
+        id: true,
+        khaltiSecretKeyEncrypted: true,
+      },
+    });
+
+    const encryptedSecret = secretKeyInput ? encryptText(secretKeyInput) : null;
+    const finalEncryptedSecret = encryptedSecret || existing?.khaltiSecretKeyEncrypted || null;
+
+    if (!finalEncryptedSecret) {
+      return res.status(400).json({
+        success: false,
+        message: "Khalti secret key is required for first-time connection",
+      });
+    }
+
+    const updated = await prisma.pharmacyPaymentConfig.upsert({
+      where: { pharmacyId: pharmacy.id },
+      create: {
+        pharmacyId: pharmacy.id,
+        khaltiPublicKey: publicKeyInput,
+        khaltiSecretKeyEncrypted: finalEncryptedSecret,
+        isKhaltiConnected: true,
+        khaltiConnectedAt: new Date(),
+      },
+      update: {
+        khaltiPublicKey: publicKeyInput,
+        ...(encryptedSecret ? { khaltiSecretKeyEncrypted: encryptedSecret } : {}),
+        isKhaltiConnected: true,
+        khaltiConnectedAt: existing?.id ? undefined : new Date(),
+      },
+      select: {
+        khaltiPublicKey: true,
+        khaltiSecretKeyEncrypted: true,
+        isKhaltiConnected: true,
+        khaltiConnectedAt: true,
+        updatedAt: true,
+      },
+    });
+
+    await createLog(
+      userId,
+      LOG_ACTIONS.PHARMACY_UPDATED,
+      `Updated Khalti merchant settings for pharmacy "${pharmacy.pharmacyName}"`,
+      "PHARMACY",
+      {
+        pharmacyId: pharmacy.id,
+        khaltiConnected: true,
+        secretUpdated: Boolean(secretKeyInput),
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Khalti merchant settings saved successfully",
+      data: {
+        status: updated.isKhaltiConnected ? "CONNECTED" : "NOT_CONNECTED",
+        isConnected: updated.isKhaltiConnected,
+        merchantSignupUrl: "https://merchant.khalti.com/",
+        publicKey: updated.khaltiPublicKey || "",
+        hasSecretKey: Boolean(updated.khaltiSecretKeyEncrypted),
+        secretKeyMasked: updated.khaltiSecretKeyEncrypted ? MASKED_SECRET : "",
+        connectedAt: updated.khaltiConnectedAt || null,
+        updatedAt: updated.updatedAt || null,
+      },
     });
   } catch (error) {
     next(error);
@@ -1572,6 +1729,8 @@ export const exportSalesCSV = async (req, res, next) => {
 export default {
   onboardPharmacy,
   getMyPharmacy,
+  getKhaltiSettings,
+  updateKhaltiSettings,
   getPendingPharmacies,
   getAllPharmacies,
   getPharmacyById,

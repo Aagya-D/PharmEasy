@@ -191,10 +191,31 @@ model Pharmacy {
   inventory          Inventory[]
   orders             Order[]
   reviews            Review[]       @relation("PharmacyReviews")
+  paymentConfig      PharmacyPaymentConfig?
 
   @@index([userId])
   @@index([verificationStatus])
   @@index([licenseNumber])
+}
+
+/// *
+/// * PharmacyPaymentConfig Model - Merchant payment gateway configuration
+/// *
+/// * Stores payment-provider keys and connection state per pharmacy.
+/// * Sensitive fields are encrypted before storage.
+model PharmacyPaymentConfig {
+  id                       String    @id @default(cuid())
+  pharmacyId               String    @unique
+  khaltiPublicKey          String?
+  khaltiSecretKeyEncrypted String?
+  isKhaltiConnected        Boolean   @default(false)
+  khaltiConnectedAt        DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+  pharmacy                 Pharmacy  @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@index([pharmacyId])
+  @@index([isKhaltiConnected])
 }
 
 /// *
@@ -258,6 +279,10 @@ model Order {
   pharmacyId  String
   status      OrderStatus @default(PENDING)
   inventoryDeducted Boolean @default(false)
+  paymentStatus String @default("NOT_REQUIRED")
+  khaltiPidx String? @unique
+  paymentTransactionId String?
+  paymentVerifiedAt DateTime?
   totalAmount Float       @default(0)
   deliveryAddress String
   paymentMethod String @default("CASH_ON_DELIVERY")
@@ -274,6 +299,8 @@ model Order {
   @@index([patientId])
   @@index([pharmacyId])
   @@index([status])
+  @@index([paymentStatus])
+  @@index([khaltiPidx])
   @@index([createdAt])
 }
 

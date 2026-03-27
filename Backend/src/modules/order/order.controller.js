@@ -2,6 +2,8 @@ import { prisma } from "../../database/prisma.js";
 import notificationService from "../notifications/notification.service.js";
 import { isValidNepaliPhone } from "../../utils/validation.js";
 import logger from "../../utils/logger.js";
+import { decryptText } from "../../utils/encryption.js";
+import config from "../../config/environment.js";
 
 const ORDER_STATUS_ENUM_VALUES = [
   "PENDING",
@@ -24,6 +26,9 @@ const STATUS_TRANSITIONS = {
 const normalizeStatus = (status) => String(status || "").trim().toUpperCase();
 const ALLOWED_PAYMENT_METHODS = ["CASH_ON_DELIVERY", "ESEWA", "KHALTI"];
 const STANDARD_DELIVERY_FEE = 40;
+const KHALTI_SUCCESS_STATUS = "COMPLETED";
+const KHALTI_HOLD_STATUSES = ["PENDING", "INITIATED"];
+const KHALTI_FAILED_STATUSES = ["EXPIRED", "USER CANCELED", "FAILED", "REFUNDED"];
 
 const normalizePhoneNumber = (value) => String(value || "").replace(/\D/g, "").trim();
 
@@ -84,6 +89,151 @@ const normalizePayloadItems = (items) => {
 
 const createHttpError = (statusCode, message, extra = {}) =>
   Object.assign(new Error(message), { statusCode, ...extra });
+
+const normalizeKhaltiStatus = (status) => String(status || "").trim().toUpperCase();
+
+const getKhaltiBaseUrl = () => {
+  const raw = String(
+    process.env.KHALTI_API_BASE_URL ||
+      (config.isProduction()
+        ? "https://khalti.com/api/v2"
+        : "https://dev.khalti.com/api/v2")
+  ).trim();
+
+  return raw.replace(/\/+$/, "");
+};
+
+const buildKhaltiAuthHeader = (secretKey) => `Key ${String(secretKey || "").trim()}`;
+
+const resolveKhaltiUrls = () => {
+  const frontendUrl = String(process.env.FRONTEND_URL || config.frontend.url || "").trim();
+
+  if (!frontendUrl) {
+    throw createHttpError(500, "FRONTEND_URL is not configured");
+  }
+
+  const base = frontendUrl.replace(/\/+$/, "");
+  return {
+    websiteUrl: base,
+    returnUrl: `${base}/patient/payment/khalti/callback`,
+  };
+};
+
+const parseKhaltiErrorBody = async (response) => {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+};
+
+const resolveKhaltiApiError = (body, fallbackMessage) => {
+  const detail = String(body?.detail || "").trim();
+
+  if (detail.toLowerCase() === "invalid token.") {
+    return createHttpError(
+      400,
+      "Invalid Khalti secret key configured for this pharmacy. Reconnect merchant settings using a valid live_secret_key.",
+      {
+        errorCode: "KHALTI_INVALID_SECRET",
+        data: body,
+      }
+    );
+  }
+
+  if (detail.toLowerCase() === "authentication credentials were not provided.") {
+    return createHttpError(
+      400,
+      "Khalti secret key is missing for this pharmacy. Please reconnect Khalti merchant settings.",
+      {
+        errorCode: "KHALTI_SECRET_MISSING",
+        data: body,
+      }
+    );
+  }
+
+  return createHttpError(400, detail || body?.error_key || fallbackMessage, { data: body });
+};
+
+const callKhaltiInitiate = async (payload, secretKey) => {
+  const response = await fetch(`${getKhaltiBaseUrl()}/epayment/initiate/`, {
+    method: "POST",
+    headers: {
+      Authorization: buildKhaltiAuthHeader(secretKey),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const body = await parseKhaltiErrorBody(response);
+
+  if (!response.ok) {
+    const err = resolveKhaltiApiError(body, "Failed to initiate Khalti payment");
+    err.statusCode = response.status;
+    throw err;
+  }
+
+  return body;
+};
+
+const callKhaltiLookup = async (pidx, secretKey) => {
+  const response = await fetch(`${getKhaltiBaseUrl()}/epayment/lookup/`, {
+    method: "POST",
+    headers: {
+      Authorization: buildKhaltiAuthHeader(secretKey),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ pidx }),
+  });
+
+  const body = await parseKhaltiErrorBody(response);
+
+  if (!response.ok && !body?.status) {
+    const err = resolveKhaltiApiError(body, "Failed to verify Khalti payment");
+    err.statusCode = response.status;
+    throw err;
+  }
+
+  return body;
+};
+
+const getPharmacyKhaltiSecret = async (pharmacyId) => {
+  const configEntry = await prisma.pharmacyPaymentConfig.findUnique({
+    where: { pharmacyId },
+    select: {
+      isKhaltiConnected: true,
+      khaltiPublicKey: true,
+      khaltiSecretKeyEncrypted: true,
+    },
+  });
+
+  if (!configEntry?.isKhaltiConnected || !configEntry.khaltiSecretKeyEncrypted) {
+    throw createHttpError(400, "Pharmacy Khalti merchant is not connected");
+  }
+
+  return {
+    publicKey: configEntry.khaltiPublicKey,
+    secretKey: decryptText(configEntry.khaltiSecretKeyEncrypted),
+  };
+};
+
+const mapKhaltiStatusToPaymentStatus = (status) => {
+  const normalized = normalizeKhaltiStatus(status);
+
+  if (normalized === KHALTI_SUCCESS_STATUS) {
+    return "COMPLETED";
+  }
+
+  if (KHALTI_HOLD_STATUSES.includes(normalized)) {
+    return normalized;
+  }
+
+  if (KHALTI_FAILED_STATUSES.includes(normalized)) {
+    return "FAILED";
+  }
+
+  return "HOLD";
+};
 
 const ORDER_STATUS_PATIENT_MESSAGES = {
   PENDING: "Your order is pending confirmation.",
@@ -352,12 +502,14 @@ export const placeOrderFromCart = async (req, res) => {
         throw createHttpError(409, "Order total changed. Please review your cart and try again.");
       }
 
+      const isKhaltiPayment = normalizedPaymentMethod === "KHALTI";
       const order = await tx.order.create({
         data: {
           patientId: userId,
           pharmacyId,
           status: "PENDING",
-          inventoryDeducted: true,
+          inventoryDeducted: !isKhaltiPayment,
+          paymentStatus: isKhaltiPayment ? "INITIATED" : "NOT_REQUIRED",
           totalAmount: persistedTotal,
           deliveryAddress: normalizedDeliveryAddress,
           paymentMethod: normalizedPaymentMethod,
@@ -385,22 +537,24 @@ export const placeOrderFromCart = async (req, res) => {
         }),
       });
 
-      for (const item of eligibleItems) {
-        const updated = await tx.inventory.updateMany({
-          where: {
-            id: item.medicineId,
-            pharmacyId,
-            quantity: { gte: item.quantity },
-          },
-          data: { quantity: { decrement: item.quantity } },
-        });
+      if (!isKhaltiPayment) {
+        for (const item of eligibleItems) {
+          const updated = await tx.inventory.updateMany({
+            where: {
+              id: item.medicineId,
+              pharmacyId,
+              quantity: { gte: item.quantity },
+            },
+            data: { quantity: { decrement: item.quantity } },
+          });
 
-        if (updated.count !== 1) {
-          throw createHttpError(409, "Inventory changed during checkout. Please try again.");
+          if (updated.count !== 1) {
+            throw createHttpError(409, "Inventory changed during checkout. Please try again.");
+          }
         }
       }
 
-      if (!isDirectPurchase && cart) {
+      if (!isDirectPurchase && cart && !isKhaltiPayment) {
         await tx.cartItem.deleteMany({
           where: {
             cartId: cart.id,
@@ -415,6 +569,88 @@ export const placeOrderFromCart = async (req, res) => {
       });
     });
 
+    let checkoutResponse = {
+      order: createdOrder,
+      payment: null,
+    };
+
+    if (normalizedPaymentMethod === "KHALTI") {
+      try {
+        const { websiteUrl, returnUrl } = resolveKhaltiUrls();
+        const { secretKey } = await getPharmacyKhaltiSecret(createdOrder.pharmacyId);
+        const amountInPaisa = Math.round(Number(createdOrder.totalAmount || 0) * 100);
+        const purchaseOrderId = `order-${createdOrder.id}`;
+
+        const khaltiInitPayload = {
+          return_url: returnUrl,
+          website_url: websiteUrl,
+          amount: amountInPaisa,
+          purchase_order_id: purchaseOrderId,
+          purchase_order_name: `PharmEasy Order ${createdOrder.id.slice(0, 8)}`,
+          customer_info: {
+            name: String(req.user?.name || "PharmEasy Customer").slice(0, 100),
+            email: String(req.user?.email || "customer@pharmeasy.app").slice(0, 120),
+            phone: finalContactNumber,
+          },
+          amount_breakdown: [
+            {
+              label: "Medicine Total",
+              amount: Math.round((Number(createdOrder.totalAmount || 0) - STANDARD_DELIVERY_FEE) * 100),
+            },
+            {
+              label: "Delivery Fee",
+              amount: STANDARD_DELIVERY_FEE * 100,
+            },
+          ],
+        };
+
+        const khaltiResponse = await callKhaltiInitiate(khaltiInitPayload, secretKey);
+
+        const updatedOrder = await prisma.order.update({
+          where: { id: createdOrder.id },
+          data: {
+            khaltiPidx: khaltiResponse.pidx,
+            paymentStatus: "PENDING",
+            notes: JSON.stringify({
+              ...(createdOrder.notes ? { previousNotes: createdOrder.notes } : {}),
+              purchaseOrderId,
+              paymentExpiresAt: khaltiResponse.expires_at,
+            }),
+          },
+          include: { items: true },
+        });
+
+        checkoutResponse = {
+          order: updatedOrder,
+          payment: {
+            provider: "KHALTI",
+            pidx: khaltiResponse.pidx,
+            paymentUrl: khaltiResponse.payment_url,
+            expiresAt: khaltiResponse.expires_at,
+            expiresIn: khaltiResponse.expires_in,
+            status: "PENDING",
+          },
+        };
+      } catch (khaltiError) {
+        await prisma.order.update({
+          where: { id: createdOrder.id },
+          data: {
+            paymentStatus: "FAILED",
+            notes: JSON.stringify({
+              initError: khaltiError?.message || "Khalti initiate failed",
+              failedAt: new Date().toISOString(),
+            }),
+          },
+        });
+
+        return res.status(400).json({
+          success: false,
+          message: khaltiError?.message || "Unable to start Khalti payment",
+          ...(khaltiError?.data ? { data: khaltiError.data } : {}),
+        });
+      }
+    }
+
     try {
       const pharmacy = await prisma.pharmacy.findUnique({
         where: { id: pharmacyId },
@@ -424,7 +660,7 @@ export const placeOrderFromCart = async (req, res) => {
         },
       });
 
-      if (pharmacy?.userId) {
+      if (pharmacy?.userId && normalizedPaymentMethod !== "KHALTI") {
         await notificationService.createNotification(
           pharmacy.userId,
           "New Order Received",
@@ -464,8 +700,11 @@ export const placeOrderFromCart = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      data: { order: createdOrder },
-      message: "Order placed successfully",
+      data: checkoutResponse,
+      message:
+        normalizedPaymentMethod === "KHALTI"
+          ? "Order created. Complete payment in Khalti to confirm."
+          : "Order placed successfully",
     });
   } catch (error) {
     console.error("[CHECKOUT CRASH]", error.message, error.stack);
@@ -475,6 +714,259 @@ export const placeOrderFromCart = async (req, res) => {
       success: false,
       message: error?.message || "Failed to place order",
       ...(error?.errorCode ? { errorCode: error.errorCode } : {}),
+      ...(error?.data ? { data: error.data } : {}),
+    });
+  }
+};
+
+export const verifyKhaltiPayment = async (req, res) => {
+  const userId = req.user?.userId || req.user?.id;
+  const pidx = String(req.body?.pidx || req.query?.pidx || "").trim();
+
+  if (!userId) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  if (!pidx) {
+    return res.status(400).json({ success: false, message: "pidx is required" });
+  }
+
+  try {
+    const result = await verifyKhaltiPaymentInternal({
+      pidx,
+      userId,
+      app: req.app,
+    });
+
+    return res.status(result.statusCode).json(result.payload);
+  } catch (error) {
+    const statusCode = Number(error?.statusCode || error?.status) || 500;
+    return res.status(statusCode).json({
+      success: false,
+      message: error?.message || "Failed to verify Khalti payment",
+      ...(error?.data ? { data: error.data } : {}),
+    });
+  }
+};
+
+const resolveOrderIdFromPurchaseOrderId = (purchaseOrderId) => {
+  const value = String(purchaseOrderId || "").trim();
+  if (!value) return null;
+  const prefix = "order-";
+  if (!value.startsWith(prefix)) return null;
+  const orderId = value.slice(prefix.length).trim();
+  return orderId || null;
+};
+
+const verifyKhaltiPaymentInternal = async ({ pidx, userId = null, purchaseOrderId = null, app }) => {
+  const orderIdFromPurchase = resolveOrderIdFromPurchaseOrderId(purchaseOrderId);
+
+  const whereClause = {
+    khaltiPidx: pidx,
+    ...(userId ? { patientId: userId } : {}),
+    ...(orderIdFromPurchase ? { id: orderIdFromPurchase } : {}),
+  };
+
+  const order = await prisma.order.findFirst({
+    where: whereClause,
+    include: {
+      items: {
+        select: {
+          inventoryId: true,
+          medicineName: true,
+          quantity: true,
+        },
+      },
+    },
+  });
+
+  if (!order) {
+    throw createHttpError(404, "Order not found for callback verification");
+  }
+
+  const { secretKey } = await getPharmacyKhaltiSecret(order.pharmacyId);
+  const lookup = await callKhaltiLookup(pidx, secretKey);
+  const normalizedKhaltiStatus = normalizeKhaltiStatus(lookup?.status);
+  const expectedTotalPaisa = Math.round(Number(order.totalAmount || 0) * 100);
+  const khaltiTotalPaisa = Number(lookup?.total_amount || 0);
+
+  if (!Number.isFinite(khaltiTotalPaisa) || khaltiTotalPaisa <= 0) {
+    throw createHttpError(400, "Invalid lookup amount returned by Khalti");
+  }
+
+  if (khaltiTotalPaisa !== expectedTotalPaisa) {
+    await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        paymentStatus: "HOLD",
+      },
+    });
+
+    throw createHttpError(409, "Payment amount mismatch detected. Order moved to hold state.", {
+      data: {
+        expectedTotalPaisa,
+        khaltiTotalPaisa,
+        pidx,
+      },
+    });
+  }
+
+  const internalPaymentStatus = mapKhaltiStatusToPaymentStatus(normalizedKhaltiStatus);
+  const isSuccess = normalizedKhaltiStatus === KHALTI_SUCCESS_STATUS;
+
+  let paymentJustCompleted = false;
+
+  const updatedOrder = await prisma.$transaction(async (tx) => {
+    const currentOrder = await tx.order.findUnique({
+      where: { id: order.id },
+      select: {
+        id: true,
+        patientId: true,
+        pharmacyId: true,
+        paymentStatus: true,
+        inventoryDeducted: true,
+        items: {
+          select: {
+            inventoryId: true,
+            medicineName: true,
+            quantity: true,
+          },
+        },
+      },
+    });
+
+    if (!currentOrder) {
+      throw createHttpError(404, "Order not found");
+    }
+
+    if (isSuccess && !currentOrder.inventoryDeducted) {
+      await deductOrderInventory(tx, currentOrder, currentOrder.pharmacyId);
+    }
+
+    paymentJustCompleted = isSuccess && currentOrder.paymentStatus !== "COMPLETED";
+
+    const nextOrder = await tx.order.update({
+      where: { id: order.id },
+      data: {
+        paymentStatus: internalPaymentStatus,
+        paymentTransactionId: lookup?.transaction_id || lookup?.tidx || null,
+        paymentVerifiedAt: isSuccess ? new Date() : null,
+        ...(isSuccess && !currentOrder.inventoryDeducted ? { inventoryDeducted: true } : {}),
+      },
+      include: { items: true },
+    });
+
+    if (isSuccess) {
+      await tx.cartItem.deleteMany({
+        where: {
+          cart: {
+            userId: currentOrder.patientId,
+          },
+          medicineId: {
+            in: currentOrder.items.map((item) => item.inventoryId),
+          },
+        },
+      });
+    }
+
+    return nextOrder;
+  });
+
+  if (paymentJustCompleted) {
+    try {
+      const pharmacy = await prisma.pharmacy.findUnique({
+        where: { id: updatedOrder.pharmacyId },
+        select: { userId: true, pharmacyName: true },
+      });
+
+      if (pharmacy?.userId) {
+        await notificationService.createNotification(
+          pharmacy.userId,
+          "New Paid Order Received",
+          `A Khalti-paid order is ready for processing at ${pharmacy.pharmacyName || "your pharmacy"}.`,
+          "NEW_ORDER",
+          {
+            orderId: updatedOrder.id,
+            link: "/pharmacy/orders",
+            sound: "standard",
+          },
+          "PHARMACY",
+          "high"
+        );
+
+        const io = app?.get?.("io");
+        if (io) {
+          io.emit("NEW_ORDER", {
+            orderId: updatedOrder.id,
+            recipientId: pharmacy.userId,
+            pharmacyId: updatedOrder.pharmacyId,
+            patientId: updatedOrder.patientId,
+          });
+        }
+      }
+    } catch (notificationError) {
+      logger.error("ORDER", "Khalti payment verified but pharmacy notification failed", {
+        orderId: updatedOrder.id,
+        error: notificationError?.message,
+      });
+    }
+  }
+
+  const statusCode = isSuccess ? 200 : 202;
+  return {
+    statusCode,
+    payload: {
+      success: isSuccess,
+      data: {
+        order: updatedOrder,
+        payment: {
+          provider: "KHALTI",
+          pidx,
+          status: normalizedKhaltiStatus,
+          transactionId: lookup?.transaction_id || lookup?.tidx || null,
+          totalAmountPaisa: Number(lookup?.total_amount || 0),
+          refunded: Boolean(lookup?.refunded),
+          feePaisa: Number(lookup?.fee || 0),
+          final: isSuccess,
+        },
+      },
+      message: isSuccess
+        ? "Payment verified and completed"
+        : "Payment not completed yet. Service is on hold until successful verification.",
+    },
+  };
+};
+
+export const verifyKhaltiPaymentFromCallback = async (req, res) => {
+  const pidx = String(req.body?.pidx || req.query?.pidx || "").trim();
+  const purchaseOrderId = String(
+    req.body?.purchaseOrderId || req.body?.purchase_order_id || req.query?.purchase_order_id || ""
+  ).trim();
+
+  if (!pidx) {
+    return res.status(400).json({ success: false, message: "pidx is required" });
+  }
+
+  if (!purchaseOrderId) {
+    return res.status(400).json({
+      success: false,
+      message: "purchase_order_id is required for callback verification",
+    });
+  }
+
+  try {
+    const result = await verifyKhaltiPaymentInternal({
+      pidx,
+      purchaseOrderId,
+      app: req.app,
+    });
+
+    return res.status(result.statusCode).json(result.payload);
+  } catch (error) {
+    const statusCode = Number(error?.statusCode || error?.status) || 500;
+    return res.status(statusCode).json({
+      success: false,
+      message: error?.message || "Failed to verify Khalti callback payment",
       ...(error?.data ? { data: error.data } : {}),
     });
   }
@@ -516,6 +1008,8 @@ export const updateOrderStatus = async (req, res) => {
         select: {
           id: true,
           status: true,
+          paymentMethod: true,
+          paymentStatus: true,
           pharmacyId: true,
           patientId: true,
           inventoryDeducted: true,
@@ -540,6 +1034,17 @@ export const updateOrderStatus = async (req, res) => {
         throw createHttpError(
           400,
           `Cannot transition order from ${currentStatus} to ${nextStatus}`
+        );
+      }
+
+      if (
+        order.paymentMethod === "KHALTI" &&
+        order.paymentStatus !== "COMPLETED" &&
+        nextStatus !== "CANCELLED"
+      ) {
+        throw createHttpError(
+          409,
+          "Khalti payment is not completed yet. This order cannot be processed."
         );
       }
 

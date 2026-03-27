@@ -104,6 +104,19 @@ const patientService = {
     return response.data;
   },
 
+  verifyKhaltiPayment: async (pidx) => {
+    const response = await httpClient.post("/patient/orders/payment/khalti/verify", { pidx });
+    return response.data;
+  },
+
+  verifyKhaltiCallbackPayment: async ({ pidx, purchaseOrderId }) => {
+    const response = await httpClient.post("/orders/payment/khalti/callback/verify", {
+      pidx,
+      purchaseOrderId,
+    });
+    return response.data;
+  },
+
   // Cancel order
   cancelOrder: async (orderId) => {
     const response = await httpClient.put(`/patient/orders/${orderId}/cancel`);

@@ -55,6 +55,20 @@ router.get(
   pharmacyController.getMyPharmacy
 );
 
+router.get(
+  "/pharmacy/settings/khalti",
+  authenticate(),
+  requirePharmacyAdmin,
+  pharmacyController.getKhaltiSettings
+);
+
+router.put(
+  "/pharmacy/settings/khalti",
+  authenticate(),
+  requirePharmacyAdmin,
+  pharmacyController.updateKhaltiSettings
+);
+
 /**
  * POST /api/pharmacy/reset-onboarding
  * Reset pharmacy onboarding status after rejection

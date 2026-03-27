@@ -15,6 +15,8 @@ import {
   Building,
   Navigation,
   Crosshair,
+  Key,
+  ExternalLink,
 } from "lucide-react";
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -110,10 +112,43 @@ export default function PharmacySettings() {
     confirm: false,
   });
 
+  const [khaltiLoading, setKhaltiLoading] = useState(false);
+  const [editingKhalti, setEditingKhalti] = useState(false);
+  const [showKhaltiSecret, setShowKhaltiSecret] = useState(false);
+  const [khaltiSettings, setKhaltiSettings] = useState({
+    status: "NOT_CONNECTED",
+    isConnected: false,
+    merchantSignupUrl: "https://merchant.khalti.com/",
+    publicKey: "",
+    hasSecretKey: false,
+    secretKeyMasked: "",
+  });
+  const [khaltiForm, setKhaltiForm] = useState({
+    publicKey: "",
+    secretKey: "",
+  });
+
   // Fetch pharmacy data on mount
   useEffect(() => {
     fetchPharmacyData();
+    fetchKhaltiSettings();
   }, []);
+
+  const fetchKhaltiSettings = async () => {
+    try {
+      const response = await httpClient.get("/pharmacy/settings/khalti");
+      if (response.data?.success) {
+        const data = response.data.data;
+        setKhaltiSettings(data);
+        setKhaltiForm({
+          publicKey: data.publicKey || "",
+          secretKey: "",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch Khalti settings:", error);
+    }
+  };
 
   const fetchPharmacyData = async () => {
     try {
@@ -322,6 +357,42 @@ export default function PharmacySettings() {
     }
   };
 
+  const handleSaveKhaltiSettings = async (e) => {
+    e.preventDefault();
+
+    if (!khaltiForm.publicKey.trim()) {
+      showNotification("error", "Khalti Public Key is required");
+      return;
+    }
+
+    setKhaltiLoading(true);
+    try {
+      const response = await httpClient.put("/pharmacy/settings/khalti", {
+        publicKey: khaltiForm.publicKey.trim(),
+        secretKey: khaltiForm.secretKey.trim() || undefined,
+      });
+
+      if (response.data?.success) {
+        setKhaltiSettings(response.data.data);
+        setKhaltiForm((prev) => ({
+          ...prev,
+          publicKey: response.data.data.publicKey || prev.publicKey,
+          secretKey: "",
+        }));
+        setEditingKhalti(false);
+        setShowKhaltiSecret(false);
+        showNotification("success", "Khalti merchant settings saved successfully");
+      }
+    } catch (error) {
+      showNotification(
+        "error",
+        error.response?.data?.message || "Failed to save Khalti merchant settings"
+      );
+    } finally {
+      setKhaltiLoading(false);
+    }
+  };
+
   // Password strength calculator
   const getPasswordStrength = (password) => {
     if (!password) return { strength: 0, label: "None", color: "gray" };
@@ -407,6 +478,17 @@ export default function PharmacySettings() {
             >
               <MapPin size={20} />
               Location
+            </button>
+            <button
+              onClick={() => setActiveTab("payment")}
+              className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors ${
+                activeTab === "payment"
+                  ? "text-blue-600 border-b-2 border-blue-600"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              <Key size={20} />
+              Payment
             </button>
           </div>
 
@@ -839,6 +921,117 @@ export default function PharmacySettings() {
                       Update Location
                     </button>
                   </div>
+                </form>
+              </motion.div>
+            )}
+
+            {/* Payment Tab */}
+            {activeTab === "payment" && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">Connect Khalti Merchant</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Configure Khalti merchant keys for online wallet payments.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingKhalti((prev) => !prev);
+                      setKhaltiForm((prev) => ({ ...prev, secretKey: "" }));
+                      setShowKhaltiSecret(false);
+                    }}
+                    className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    {editingKhalti ? "Cancel" : "Edit"}
+                  </button>
+                </div>
+
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Status</span>
+                    <span
+                      className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${
+                        khaltiSettings.isConnected
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-amber-100 text-amber-700"
+                      }`}
+                    >
+                      {khaltiSettings.isConnected ? "CONNECTED" : "NOT CONNECTED"}
+                    </span>
+                  </div>
+                </div>
+
+                <a
+                  href={khaltiSettings.merchantSignupUrl || "https://merchant.khalti.com/"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-purple-700 hover:text-purple-800 mb-6"
+                >
+                  Open Khalti Merchant Signup
+                  <ExternalLink size={16} />
+                </a>
+
+                <form onSubmit={handleSaveKhaltiSettings} className="space-y-5">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Khalti Public Key
+                    </label>
+                    <input
+                      type="text"
+                      value={khaltiForm.publicKey}
+                      onChange={(e) => setKhaltiForm((prev) => ({ ...prev, publicKey: e.target.value }))}
+                      disabled={!editingKhalti || khaltiLoading}
+                      placeholder="4179c2f390904c40a265a18a7f87d8cb"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Khalti Secret Key
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showKhaltiSecret ? "text" : "password"}
+                        value={khaltiForm.secretKey}
+                        onChange={(e) => setKhaltiForm((prev) => ({ ...prev, secretKey: e.target.value }))}
+                        disabled={!editingKhalti || khaltiLoading}
+                        placeholder={khaltiSettings.hasSecretKey ? khaltiSettings.secretKeyMasked || "••••••••••••••••••••" : "Enter Khalti Secret Key"}
+                        className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKhaltiSecret((prev) => !prev)}
+                        disabled={!editingKhalti || khaltiLoading}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                      >
+                        {showKhaltiSecret ? <EyeOff size={20} /> : <Eye size={20} />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Secret keys are encrypted at rest and are never returned by the API after save.
+                    </p>
+                  </div>
+
+                  {editingKhalti && (
+                    <div className="flex justify-end pt-2">
+                      <button
+                        type="submit"
+                        disabled={khaltiLoading}
+                        className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {khaltiLoading ? <Loader className="animate-spin" size={20} /> : <Save size={20} />}
+                        Save Khalti Settings
+                      </button>
+                    </div>
+                  )}
                 </form>
               </motion.div>
             )}

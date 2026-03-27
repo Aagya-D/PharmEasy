@@ -801,21 +801,126 @@ const userService = {
     return await register({ userId, type });
   },
   saveRefreshToken: async (userId, token) => {
-    // Placeholder for saving refresh token to database
+    if (!userId || !token) return;
+
+    const hashedRefreshToken = await hashPassword(token);
+    await prisma.refreshToken.create({
+      data: {
+        userId,
+        token: hashedRefreshToken,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
   },
   verifyRefreshToken: async (userId, token) => {
-    // Placeholder for verifying refresh token
-    return true;
+    if (!userId || !token) return false;
+
+    const candidateTokens = await prisma.refreshToken.findMany({
+      where: {
+        userId,
+        isRevoked: false,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    for (const record of candidateTokens) {
+      const isMatch = await comparePassword(token, record.token);
+      if (isMatch) {
+        return true;
+      }
+    }
+
+    return false;
   },
   verifyPreviousRefreshToken: async (userId, token) => {
-    // Placeholder for verifying previous refresh token with grace period
+    // Allow brief grace period to avoid race-condition logouts on concurrent requests.
+    if (!userId || !token) return false;
+
+    const gracePeriodMs = 2 * 60 * 1000;
+    const graceWindowStart = new Date(Date.now() - gracePeriodMs);
+
+    const recentlyRevoked = await prisma.refreshToken.findMany({
+      where: {
+        userId,
+        isRevoked: true,
+        revokedAt: { gte: graceWindowStart },
+      },
+      orderBy: { revokedAt: "desc" },
+      take: 3,
+    });
+
+    for (const record of recentlyRevoked) {
+      const isMatch = await comparePassword(token, record.token);
+      if (isMatch) {
+        return true;
+      }
+    }
+
     return false;
   },
   rotateRefreshToken: async (userId, oldToken, newToken) => {
-    // Placeholder for rotating refresh token
+    if (!userId || !oldToken || !newToken) {
+      throw new AppError("Missing token rotation parameters", 400);
+    }
+
+    const activeTokens = await prisma.refreshToken.findMany({
+      where: {
+        userId,
+        isRevoked: false,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    let matchedToken = null;
+    for (const record of activeTokens) {
+      const isMatch = await comparePassword(oldToken, record.token);
+      if (isMatch) {
+        matchedToken = record;
+        break;
+      }
+    }
+
+    if (!matchedToken) {
+      throw new AppError("Refresh token invalid or revoked", 401);
+    }
+
+    const oldExpiry = matchedToken.expiresAt;
+    const hashedNewToken = await hashPassword(newToken);
+
+    await prisma.$transaction([
+      prisma.refreshToken.update({
+        where: { id: matchedToken.id },
+        data: {
+          isRevoked: true,
+          revokedAt: new Date(),
+        },
+      }),
+      prisma.refreshToken.create({
+        data: {
+          userId,
+          token: hashedNewToken,
+          expiresAt: oldExpiry,
+          userAgent: matchedToken.userAgent,
+          ipAddress: matchedToken.ipAddress,
+        },
+      }),
+    ]);
   },
   clearRefreshToken: async (userId) => {
-    // Placeholder for clearing refresh token
+    if (!userId) return;
+
+    await prisma.refreshToken.updateMany({
+      where: {
+        userId,
+        isRevoked: false,
+      },
+      data: {
+        isRevoked: true,
+        revokedAt: new Date(),
+      },
+    });
   },
   setPassword: async (userId, password) => {
     const hashedPassword = await hashPassword(password);

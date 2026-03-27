@@ -9,7 +9,7 @@ import { requirePatient } from "../../middlewares/roleCheck.js";
 import { uploadPrescription } from "../../middlewares/upload.middleware.js";
 import * as patientController from "./patient.controller.js";
 import * as cartController from "../cart/cart.controller.js";
-import { placeOrderFromCart } from "../order/order.controller.js";
+import { placeOrderFromCart, verifyKhaltiPayment } from "../order/order.controller.js";
 
 const router = express.Router();
 
@@ -79,6 +79,13 @@ router.delete("/cart/items/:itemId", cartController.removeItem);
  * @access  Private (Patient only)
  */
 router.post("/orders/checkout", placeOrderFromCart);
+
+/**
+ * @route   POST /api/patient/orders/payment/khalti/verify
+ * @desc    Verify Khalti payment status using lookup API
+ * @access  Private (Patient only)
+ */
+router.post("/orders/payment/khalti/verify", verifyKhaltiPayment);
 
 /**
  * @route   GET /api/patient/medications

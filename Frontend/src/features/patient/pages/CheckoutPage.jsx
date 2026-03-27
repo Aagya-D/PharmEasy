@@ -164,11 +164,25 @@ export default function CheckoutPage() {
         longitude: savedAddress._lng ?? null,
       });
 
+      const order = response?.data?.order || null;
+      const payment = response?.data?.payment || null;
+
+      if (paymentMethod === "KHALTI") {
+        const paymentUrl = payment?.paymentUrl;
+        if (!paymentUrl) {
+          throw new Error("Khalti payment link was not received from server");
+        }
+
+        toast.success("Redirecting to Khalti payment page...");
+        window.location.href = paymentUrl;
+        return;
+      }
+
       await refreshCart();
       toast.success("Order placed successfully!");
       navigate("/patient/order-success", {
         state: {
-          order: response?.data?.order || null,
+          order,
           placedAt: new Date().toISOString(),
         },
       });
@@ -356,7 +370,36 @@ export default function CheckoutPage() {
                     )}
                   </button>
 
-                  {/* eSewa / Khalti — Coming Soon */}
+                  {/* Khalti */}
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("KHALTI")}
+                    className={`flex-1 flex items-center gap-3 rounded-xl border p-4 text-left transition ${
+                      paymentMethod === "KHALTI"
+                        ? "border-emerald-500 bg-emerald-50 ring-1 ring-emerald-400"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <div
+                      className={`w-10 h-10 rounded-full shrink-0 flex items-center justify-center ${
+                        paymentMethod === "KHALTI" ? "bg-emerald-600" : "bg-slate-200"
+                      }`}
+                    >
+                      <Wallet
+                        size={16}
+                        className={paymentMethod === "KHALTI" ? "text-white" : "text-slate-500"}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-900">Khalti</p>
+                      <p className="text-xs text-slate-500">Pay securely via Khalti Checkout</p>
+                    </div>
+                    {paymentMethod === "KHALTI" && (
+                      <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                    )}
+                  </button>
+
+                  {/* eSewa — Coming Soon */}
                   <button
                     type="button"
                     disabled
@@ -366,7 +409,7 @@ export default function CheckoutPage() {
                       <Wallet size={16} className="text-slate-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-700">eSewa / Khalti</p>
+                      <p className="text-sm font-semibold text-slate-700">eSewa</p>
                       <p className="text-xs text-slate-400">Digital wallet</p>
                     </div>
                     <span className="text-[11px] font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0 whitespace-nowrap">

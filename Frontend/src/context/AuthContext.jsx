@@ -444,8 +444,11 @@ export function AuthProvider({ children }) {
             const response = await authService.refreshToken();
 
             // Backend returns { success, data: { accessToken }, ... }
-            const { accessToken } = response.data;
+            const { accessToken, refreshToken: rotatedRefreshToken } = response.data;
             localStorage.setItem("accessToken", accessToken);
+            if (rotatedRefreshToken) {
+              localStorage.setItem("refreshToken", rotatedRefreshToken);
+            }
             logger.authEvent("TOKEN_REFRESHED");
 
             dispatch({
@@ -492,8 +495,11 @@ export function AuthProvider({ children }) {
       try {
         logger.info("Silent token refresh triggered");
         const response = await authService.refreshToken();
-        const { accessToken } = response.data;
+        const { accessToken, refreshToken: rotatedRefreshToken } = response.data;
         localStorage.setItem("accessToken", accessToken);
+        if (rotatedRefreshToken) {
+          localStorage.setItem("refreshToken", rotatedRefreshToken);
+        }
         dispatch({ type: ACTIONS.REFRESH_TOKEN_SUCCESS, payload: accessToken });
         logger.authEvent("SILENT_REFRESH_SUCCESS");
       } catch (err) {

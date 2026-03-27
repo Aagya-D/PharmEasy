@@ -442,7 +442,10 @@ export const refreshTokens = async (req, res, next) => {
     res.json({
       success: true,
       message: "Tokens refreshed successfully",
-      data: { accessToken: newAccess },
+      data: {
+        accessToken: newAccess,
+        refreshToken: newRefresh,
+      },
       expiresIn: "30m",
     });
   } catch (err) {
