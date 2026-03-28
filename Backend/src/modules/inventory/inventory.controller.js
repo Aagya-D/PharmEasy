@@ -26,6 +26,18 @@ export const addMedicine = async (req, res, next) => {
       quantity: parseInt(req.body.quantity),
       price: parseFloat(req.body.price),
       expiryDate: req.body.expiryDate,
+      sideEffects: req.body.sideEffects,
+      contraindications: req.body.contraindications,
+      warnings: req.body.warnings,
+      isPrescriptionRequired:
+        req.body.isPrescriptionRequired === true || req.body.isPrescriptionRequired === "true",
+      dosageInstructions: req.body.dosageInstructions,
+      route: req.body.route,
+      timing: req.body.timing,
+      strength: req.body.strength,
+      form: req.body.form,
+      manufacturer: req.body.manufacturer,
+      batchNumber: req.body.batchNumber,
     };
 
     logger.debug('INVENTORY', '[ADD] Medicine data received', { 
@@ -116,6 +128,39 @@ export const getMyInventory = async (req, res, next) => {
 };
 
 /**
+ * GET /api/inventory/:id
+ * Get full medicine record by inventory ID
+ * Requires: Authentication, PHARMACY_ADMIN role, ownership validation
+ */
+export const getInventoryItem = async (req, res, next) => {
+  const startTime = Date.now();
+  try {
+    const inventoryId = req.params.id;
+    const pharmacyId = req.user.pharmacyId;
+
+    logger.operation("INVENTORY", "getInventoryItem", "START", {
+      inventoryId,
+      pharmacyId,
+    });
+
+    const item = await inventoryService.getInventoryItemById(inventoryId, pharmacyId);
+
+    const duration = Date.now() - startTime;
+    logger.timing("INVENTORY", "getInventoryItem", duration, "SUCCESS");
+
+    res.status(200).json({
+      success: true,
+      message: "Inventory item retrieved successfully",
+      data: item,
+    });
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    logger.timing("INVENTORY", "getInventoryItem", duration, "ERROR");
+    next(error);
+  }
+};
+
+/**
  * PATCH /api/inventory/:id
  * Update inventory item (price, quantity, etc.)
  * Requires: Authentication, PHARMACY_ADMIN role, ownership validation
@@ -134,7 +179,25 @@ export const updateInventoryItem = async (req, res, next) => {
     // ── Capture BEFORE state for audit delta ──
     const beforeItem = await prisma.inventory.findUnique({
       where: { id: inventoryId },
-      select: { id: true, name: true, genericName: true, quantity: true, price: true, expiryDate: true },
+      select: {
+        id: true,
+        name: true,
+        genericName: true,
+        quantity: true,
+        price: true,
+        expiryDate: true,
+        sideEffects: true,
+        contraindications: true,
+        warnings: true,
+        isPrescriptionRequired: true,
+        dosageInstructions: true,
+        route: true,
+        timing: true,
+        strength: true,
+        form: true,
+        manufacturer: true,
+        batchNumber: true,
+      },
     });
 
     const updateData = {
@@ -143,6 +206,20 @@ export const updateInventoryItem = async (req, res, next) => {
       quantity: req.body.quantity !== undefined ? parseInt(req.body.quantity) : undefined,
       price: req.body.price !== undefined ? parseFloat(req.body.price) : undefined,
       expiryDate: req.body.expiryDate,
+      sideEffects: req.body.sideEffects,
+      contraindications: req.body.contraindications,
+      warnings: req.body.warnings,
+      isPrescriptionRequired:
+        req.body.isPrescriptionRequired !== undefined
+          ? req.body.isPrescriptionRequired === true || req.body.isPrescriptionRequired === "true"
+          : undefined,
+      dosageInstructions: req.body.dosageInstructions,
+      route: req.body.route,
+      timing: req.body.timing,
+      strength: req.body.strength,
+      form: req.body.form,
+      manufacturer: req.body.manufacturer,
+      batchNumber: req.body.batchNumber,
     };
 
     // Remove undefined values
@@ -187,6 +264,17 @@ export const updateInventoryItem = async (req, res, next) => {
         quantity: updatedItem.quantity,
         price: updatedItem.price,
         expiryDate: updatedItem.expiryDate,
+        sideEffects: updatedItem.sideEffects,
+        contraindications: updatedItem.contraindications,
+        warnings: updatedItem.warnings,
+        isPrescriptionRequired: updatedItem.isPrescriptionRequired,
+        dosageInstructions: updatedItem.dosageInstructions,
+        route: updatedItem.route,
+        timing: updatedItem.timing,
+        strength: updatedItem.strength,
+        form: updatedItem.form,
+        manufacturer: updatedItem.manufacturer,
+        batchNumber: updatedItem.batchNumber,
       },
       metadata: { pharmacyId, changedFields },
       req,
@@ -263,6 +351,7 @@ export const deleteInventoryItem = async (req, res, next) => {
 export default {
   addMedicine,
   getMyInventory,
+  getInventoryItem,
   updateInventoryItem,
   deleteInventoryItem,
 };

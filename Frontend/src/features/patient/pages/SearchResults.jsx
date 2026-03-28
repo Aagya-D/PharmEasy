@@ -472,9 +472,15 @@ export default function SearchResults() {
                     }`}
                     onClick={() => setSelectedPharmacy(result)}
                   >
-                    <div className="flex justify-between items-start mb-4">
+                    <div
+                      className="flex justify-between items-start mb-4 rounded-lg p-2 -m-2 cursor-pointer hover:bg-blue-50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/patient/pharmacy/${result.pharmacy.id}`);
+                      }}
+                    >
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900">
+                        <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-700 hover:underline underline-offset-2">
                           {result.pharmacy.name}
                         </h3>
                         <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">

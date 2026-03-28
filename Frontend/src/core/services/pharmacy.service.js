@@ -259,6 +259,24 @@ export const getPharmacyByUserId = async (userId) => {
   return response.data;
 };
 
+/**
+ * Get public pharmacy catalog (storefront)
+ * Backend: GET /api/pharmacy/:id/catalog
+ */
+export const getPharmacyCatalog = async (pharmacyId) => {
+  const response = await httpClient.get(`/pharmacy/${pharmacyId}/catalog`);
+  return response.data;
+};
+
+/**
+ * Get public pharmacy inventory (storefront)
+ * Backend: GET /api/pharmacy/:id/inventory
+ */
+export const getPharmacyInventory = async (pharmacyId) => {
+  const response = await httpClient.get(`/pharmacy/${pharmacyId}/inventory`);
+  return response.data;
+};
+
 // Default export for backward compatibility
 const pharmacyService = {
   createPharmacy,
@@ -280,6 +298,7 @@ const pharmacyService = {
   getAnalyticsData,
   exportInventoryCSV,
   exportSalesCSV,
+  getPharmacyInventory,
 };
 
 export default pharmacyService;

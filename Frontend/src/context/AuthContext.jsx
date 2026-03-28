@@ -161,6 +161,30 @@ function isTokenExpired(token) {
   return payload.exp * 1000 < Date.now();
 }
 
+function extractRefreshPayload(response) {
+  // authService returns response.data, but keep this defensive for mixed callers
+  const payload = response?.data?.data || response?.data || response;
+  return {
+    accessToken: payload?.accessToken || null,
+    refreshToken: payload?.refreshToken || null,
+  };
+}
+
+function shouldForceLogoutOnRefreshFailure(refreshError) {
+  const status = refreshError?.response?.status;
+  const message = String(
+    refreshError?.response?.data?.message || refreshError?.message || ""
+  ).toLowerCase();
+
+  const tokenInvalidSignal =
+    message.includes("invalid") ||
+    message.includes("expired") ||
+    message.includes("revoked") ||
+    message.includes("no refresh token");
+
+  return (status === 401 || status === 403) && tokenInvalidSignal;
+}
+
 // ✅ TASK: Robust Initializer - read from localStorage on first mount
 // This runs BEFORE the component renders, ensuring state is hydrated immediately
 function initAuthState(initial) {
@@ -443,12 +467,51 @@ export function AuthProvider({ children }) {
             // authService.refreshToken reads from localStorage internally
             const response = await authService.refreshToken();
 
-            // Backend returns { success, data: { accessToken }, ... }
-            const { accessToken, refreshToken: rotatedRefreshToken } = response.data;
+            // Backend returns { success, data: { accessToken, refreshToken }, ... }
+            const { accessToken, refreshToken: rotatedRefreshToken } = extractRefreshPayload(response);
+            if (!accessToken) {
+              throw new Error("Refresh succeeded but accessToken was missing in response");
+            }
+
             localStorage.setItem("accessToken", accessToken);
             if (rotatedRefreshToken) {
               localStorage.setItem("refreshToken", rotatedRefreshToken);
             }
+
+            // Keep axios default auth header in sync immediately.
+            httpClient.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
+
+            // Refresh user snapshot so all app surfaces consume latest session context.
+            try {
+              const meResponse = await authService.getProfile();
+              const mePayload = meResponse?.data || meResponse;
+              const profileUser = mePayload?.user || mePayload;
+              const profilePharmacy = mePayload?.pharmacy || null;
+
+              if (profileUser?.id || profileUser?.userId) {
+                const refreshedUser = {
+                  id: profileUser.userId || profileUser.id,
+                  email: profileUser.email,
+                  name: profileUser.name,
+                  phone: profileUser.phone || state.user?.phone || null,
+                  role: profileUser.role,
+                  roleId: profileUser.roleId,
+                  status: profileUser.status,
+                  isVerified: profileUser.isVerified ?? true,
+                  shippingAddress: profileUser.shippingAddress || null,
+                  pharmacy: profilePharmacy,
+                  isOnboarded: profileUser.isOnboarded ?? state.user?.isOnboarded ?? true,
+                  needsOnboarding: profileUser.needsOnboarding ?? state.user?.needsOnboarding ?? false,
+                };
+                localStorage.setItem("user", JSON.stringify(refreshedUser));
+                dispatch({ type: ACTIONS.SET_USER, payload: refreshedUser });
+              }
+            } catch (meError) {
+              logger.warn("Failed to refresh /auth/me after token rotation", {
+                error: meError?.message,
+              });
+            }
+
             logger.authEvent("TOKEN_REFRESHED");
 
             dispatch({
@@ -460,12 +523,18 @@ export function AuthProvider({ children }) {
             originalRequest.headers.Authorization = `Bearer ${accessToken}`;
             return httpClient(originalRequest);
           } catch (refreshError) {
-            // Refresh failed — wipe auth state and go to login
-            logger.warn("Token refresh failed, redirecting to login", {
+            // Only force logout on definitive token failures; avoid kicking user out on transient network blips.
+            logger.warn("Token refresh failed", {
               error: refreshError.message,
+              status: refreshError?.response?.status,
             });
-            dispatch({ type: ACTIONS.LOGOUT });
-            clearAuth();
+
+            if (shouldForceLogoutOnRefreshFailure(refreshError)) {
+              dispatch({ type: ACTIONS.LOGOUT });
+              clearAuth();
+            }
+
+            return Promise.reject(refreshError);
           }
         }
 
@@ -495,19 +564,28 @@ export function AuthProvider({ children }) {
       try {
         logger.info("Silent token refresh triggered");
         const response = await authService.refreshToken();
-        const { accessToken, refreshToken: rotatedRefreshToken } = response.data;
+        const { accessToken, refreshToken: rotatedRefreshToken } = extractRefreshPayload(response);
+        if (!accessToken) {
+          throw new Error("Silent refresh succeeded but accessToken missing in response");
+        }
+
         localStorage.setItem("accessToken", accessToken);
         if (rotatedRefreshToken) {
           localStorage.setItem("refreshToken", rotatedRefreshToken);
         }
+        httpClient.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
         dispatch({ type: ACTIONS.REFRESH_TOKEN_SUCCESS, payload: accessToken });
         logger.authEvent("SILENT_REFRESH_SUCCESS");
       } catch (err) {
-        logger.warn("Silent token refresh failed, logging out", {
+        logger.warn("Silent token refresh failed", {
           error: err.message,
+          status: err?.response?.status,
         });
-        dispatch({ type: ACTIONS.LOGOUT });
-        clearAuth();
+
+        if (shouldForceLogoutOnRefreshFailure(err)) {
+          dispatch({ type: ACTIONS.LOGOUT });
+          clearAuth();
+        }
       }
     }, delay);
 

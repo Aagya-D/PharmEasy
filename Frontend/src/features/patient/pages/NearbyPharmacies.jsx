@@ -26,6 +26,15 @@ import StarRating from "../../../shared/components/StarRating";
 export default function NearbyPharmacies() {
   const navigate = useNavigate();
 
+  const openStorefront = (pharmacyId) => {
+    const normalizedId = String(pharmacyId || "").trim();
+    if (!normalizedId) {
+      console.warn("[NEARBY PHARMACIES] Missing pharmacy.id, navigation skipped", { pharmacyId });
+      return;
+    }
+    navigate(`/patient/pharmacy/${encodeURIComponent(normalizedId)}`);
+  };
+
   // State management
   const [pharmacies, setPharmacies] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -293,7 +302,7 @@ export default function NearbyPharmacies() {
               >
                 {pharmacies.map((pharmacy) => (
                   <motion.div
-                    key={pharmacy.id}
+                    key={pharmacy.id || pharmacy.name}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     whileHover={{ scale: 1.01 }}
@@ -302,11 +311,12 @@ export default function NearbyPharmacies() {
                         ? "border-blue-500 shadow-lg"
                         : "border-transparent shadow-sm hover:shadow-md hover:border-blue-200"
                     }`}
-                    onClick={() => setSelectedPharmacy(pharmacy)}
+                    onMouseEnter={() => setSelectedPharmacy(pharmacy)}
+                    onClick={() => openStorefront(pharmacy.id)}
                   >
-                    <div className="flex justify-between items-start mb-3">
+                    <div className="flex justify-between items-start mb-3 rounded-lg p-2 -m-2 hover:bg-blue-50">
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900">
+                        <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-700 underline-offset-2 hover:underline">
                           {pharmacy.name}
                         </h3>
                         <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
@@ -347,6 +357,7 @@ export default function NearbyPharmacies() {
                       {pharmacy.contactNumber && (
                         <a
                           href={`tel:${pharmacy.contactNumber}`}
+                          onClick={(e) => e.stopPropagation()}
                           className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-gray-600 text-sm font-medium"
                         >
                           <Phone size={16} />
@@ -357,6 +368,7 @@ export default function NearbyPharmacies() {
                         href={getDirectionsUrl(pharmacy)}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors text-white text-sm font-medium"
                       >
                         <Navigation size={16} />

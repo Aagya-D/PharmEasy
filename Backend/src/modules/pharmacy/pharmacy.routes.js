@@ -23,6 +23,16 @@ import { updateOrderStatus } from "../order/order.controller.js";
 
 const router = express.Router();
 
+router.get(
+  "/pharmacy/:id/catalog",
+  pharmacyController.getPharmacyCatalog
+);
+
+router.get(
+  "/pharmacy/:id/inventory",
+  pharmacyController.getPharmacyInventory
+);
+
 // ============================================
 // PHARMACY USER ROUTES
 // ============================================

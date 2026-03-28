@@ -5,9 +5,9 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
-    "prod": "NODE_ENV=production node src/index.js",
+    "start": "prisma generate && node src/index.js",
+    "dev": "prisma generate && nodemon src/index.js",
+    "prod": "prisma generate && NODE_ENV=production node src/index.js",
     "build:frontend": "cd ../Frontend && npm run build",
     "build:all": "npm run build:frontend && echo \"Backend ready for production\"",
     "test": "echo \"Error: no test specified\" && exit 1",

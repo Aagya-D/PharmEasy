@@ -73,6 +73,13 @@ router.get(
   inventoryController.getMyInventory
 );
 
+router.get(
+  "/inventory/:id",
+  authenticate(),
+  requireVerifiedPharmacy,
+  inventoryController.getInventoryItem
+);
+
 /**
  * PATCH /api/inventory/:id
  * Update inventory item (price, quantity, name, genericName, expiryDate)

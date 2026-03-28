@@ -138,16 +138,20 @@ httpClient.interceptors.response.use(
     }
 
     if (status === 401) {
-      // Circuit breaker: if a token-refresh or login call itself gets a 401
-      // there is nothing left to retry — clear auth state immediately.
-      const circuitBreakerEndpoints = ["/auth/refresh", "/auth/login"];
-      const isCircuitBreaker = circuitBreakerEndpoints.some(
-        (endpoint) => error.config?.url?.includes(endpoint)
-      );
+      // Circuit breaker for refresh endpoint only.
+      // Do NOT clear auth for transient failures; only for definitive token failures.
+      const isRefreshEndpoint = error.config?.url?.includes("/auth/refresh");
+      const normalizedMessage = String(message || "").toLowerCase();
+      const definitiveTokenFailure =
+        normalizedMessage.includes("invalid") ||
+        normalizedMessage.includes("expired") ||
+        normalizedMessage.includes("revoked") ||
+        normalizedMessage.includes("no refresh token");
 
-      if (isCircuitBreaker) {
-        // Mark as already retried so no downstream interceptor tries again
+      if (isRefreshEndpoint && definitiveTokenFailure) {
         if (error.config) error.config._retry = true;
+        // Explicit requirement: only clear all storage on definitive token failures.
+        localStorage.clear();
         clearAuth();
         return Promise.reject(error);
       }

@@ -79,6 +79,39 @@ export const getMyInventory = async (page = 1, limit = 20) => {
 };
 
 /**
+ * Get single inventory item by ID
+ * Backend: GET /api/inventory/:id
+ * @param {string} inventoryId - Inventory item ID
+ */
+export const getInventoryItemById = async (inventoryId) => {
+  try {
+    const response = await httpClient.get(`/inventory/${inventoryId}`);
+
+    if (!response.data) {
+      throw new Error("Invalid response format from server");
+    }
+
+    return response.data;
+  } catch (error) {
+    let errorMessage = "Failed to load medicine details";
+
+    if (error.response?.data?.error?.message) {
+      errorMessage = error.response.data.error.message;
+    } else if (error.response?.data?.error) {
+      errorMessage = error.response.data.error;
+    } else if (error.response?.data?.message) {
+      errorMessage = error.response.data.message;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    const err = new Error(errorMessage);
+    err.statusCode = error.response?.status;
+    throw err;
+  }
+};
+
+/**
  * Update inventory item
  * Backend: PATCH /api/inventory/:id
  * @param {string} inventoryId - Inventory item ID
@@ -147,6 +180,7 @@ export const deleteInventoryItem = async (inventoryId) => {
 const inventoryService = {
   addMedicine,
   getMyInventory,
+  getInventoryItemById,
   updateInventoryItem,
   deleteInventoryItem,
 };

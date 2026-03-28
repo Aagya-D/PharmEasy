@@ -1,15 +1,11 @@
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { 
-  TrendingUp, 
-  TrendingDown, 
   Package, 
   AlertTriangle, 
-  CheckCircle, 
   Search,
   Plus,
   Edit2,
-  Save,
   X,
   Trash2,
   Calendar
@@ -17,33 +13,9 @@ import {
 import inventoryService from "../../../core/services/inventory.service";
 import Modal from "../../../shared/components/ui/Modal";
 import ConfirmModal from "../../../shared/components/ui/ConfirmModal";
-import { Input } from "../../../shared/components/ui/Input";
 import LoadingSpinner from "../../../shared/components/ui/LoadingSpinner";
 import logger from "../../../utils/logger";
-
-// Common generic medicine names for autocomplete
-const COMMON_GENERIC_NAMES = [
-  "Paracetamol",
-  "Ibuprofen",
-  "Acetylsalicylic Acid",
-  "Amoxicillin",
-  "Azithromycin",
-  "Ciprofloxacin",
-  "Metformin",
-  "Omeprazole",
-  "Atorvastatin",
-  "Amlodipine",
-  "Losartan",
-  "Lisinopril",
-  "Metoprolol",
-  "Levothyroxine",
-  "Albuterol",
-  "Cetirizine",
-  "Loratadine",
-  "Ranitidine",
-  "Pantoprazole",
-  "Diclofenac",
-];
+import MedicineForm from "../components/MedicineForm";
 
 export default function PharmacyInventory() {
   const [inventory, setInventory] = useState([]);
@@ -51,15 +23,17 @@ export default function PharmacyInventory() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingItemId, setEditingItemId] = useState(null);
-  const [editValues, setEditValues] = useState({});
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [activeEditMedicine, setActiveEditMedicine] = useState(null);
+  const [addSubmitting, setAddSubmitting] = useState(false);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
     totalItems: 0,
   });
   const [confirmDelete, setConfirmDelete] = useState({ open: false, itemId: null, itemName: "" });
-  const [confirmEdit, setConfirmEdit] = useState({ open: false, itemId: null, itemName: "" });
 
   // Statistics calculated from inventory
   const stats = React.useMemo(() => {
@@ -133,55 +107,54 @@ export default function PharmacyInventory() {
     );
   });
 
-  // Handle edit mode toggle
-  const handleEdit = (item) => {
-    setEditingItemId(item.id);
-    setEditValues({
-      quantity: item.quantity,
-      price: item.price,
-    });
-  };
-
-  // Handle edit cancel
-  const handleCancelEdit = () => {
-    setEditingItemId(null);
-    setEditValues({});
-  };
-
-  // Handle save edit
-  const handleSaveEdit = async (itemId) => {
-    const item = inventory.find((invItem) => invItem.id === itemId);
-    setConfirmEdit({
-      open: true,
-      itemId,
-      itemName: item?.name || "this medicine",
-    });
-  };
-
-  const handleEditConfirm = async () => {
-    const { itemId, itemName } = confirmEdit;
-    setConfirmEdit({ open: false, itemId: null, itemName: "" });
-
+  const handleEdit = async (item) => {
     try {
-      logger.info("INVENTORY", "Updating inventory item", { itemId });
-      await inventoryService.updateInventoryItem(itemId, editValues);
-      logger.success("INVENTORY", "Item updated successfully");
-      toast.success(`✅ ${itemName} updated successfully!`);
-      
-      // Refresh inventory
-      await fetchInventory(pagination.currentPage);
-      setEditingItemId(null);
-      setEditValues({});
+      setEditLoading(true);
+      logger.info("INVENTORY", "Fetching medicine details for edit", { itemId: item.id });
+      const response = await inventoryService.getInventoryItemById(item.id);
+      setActiveEditMedicine(response?.data || item);
+      setIsEditModalOpen(true);
     } catch (err) {
-      logger.error("INVENTORY", "Failed to update item", err);
-      const errorMessage = err?.message || "Failed to update item";
-      toast.error(`❌ ${errorMessage}`);
+      logger.error("INVENTORY", "Failed to load medicine details", err);
+      toast.error(err?.message || "Failed to load medicine details");
+    } finally {
+      setEditLoading(false);
     }
   };
 
-  const handleEditCancel = () => {
-    setConfirmEdit({ open: false, itemId: null, itemName: "" });
-    toast("Edit cancelled", { icon: "ℹ️" });
+  const handleAddMedicine = async (payload) => {
+    try {
+      setAddSubmitting(true);
+      logger.info("INVENTORY", "Adding new medicine", { name: payload.name });
+      await inventoryService.addMedicine(payload);
+      toast.success(`✅ ${payload.name} added to inventory!`);
+      setIsAddModalOpen(false);
+      await fetchInventory(pagination.currentPage);
+    } catch (err) {
+      logger.error("INVENTORY", "Failed to add medicine", err);
+      toast.error(err?.message || "Failed to add medicine");
+    } finally {
+      setAddSubmitting(false);
+    }
+  };
+
+  const handleUpdateMedicine = async (payload) => {
+    if (!activeEditMedicine?.id) return;
+
+    try {
+      setEditSubmitting(true);
+      logger.info("INVENTORY", "Updating medicine", { itemId: activeEditMedicine.id });
+      await inventoryService.updateInventoryItem(activeEditMedicine.id, payload);
+      toast.success("✅ Medicine details updated successfully");
+      setIsEditModalOpen(false);
+      setActiveEditMedicine(null);
+      await fetchInventory(pagination.currentPage);
+    } catch (err) {
+      logger.error("INVENTORY", "Failed to update medicine", err);
+      toast.error(err?.message || "Failed to update medicine");
+    } finally {
+      setEditSubmitting(false);
+    }
   };
 
   // Handle delete — opens ConfirmModal
@@ -347,33 +320,8 @@ export default function PharmacyInventory() {
                     <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="px-6 py-4 font-medium text-gray-900">{item.name}</td>
                       <td className="px-6 py-4 text-gray-600">{item.genericName}</td>
-                      <td className="px-6 py-4">
-                        {editingItemId === item.id ? (
-                          <input
-                            type="number"
-                            min="0"
-                            value={editValues.quantity}
-                            onChange={(e) => setEditValues({ ...editValues, quantity: parseInt(e.target.value) || 0 })}
-                            className="w-20 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        ) : (
-                          <span className="text-gray-600">{item.quantity}</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        {editingItemId === item.id ? (
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={editValues.price}
-                            onChange={(e) => setEditValues({ ...editValues, price: parseFloat(e.target.value) || 0 })}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        ) : (
-                          <span className="text-gray-600">₹{item.price.toFixed(2)}</span>
-                        )}
-                      </td>
+                      <td className="px-6 py-4"><span className="text-gray-600">{item.quantity}</span></td>
+                      <td className="px-6 py-4"><span className="text-gray-600">₹{item.price.toFixed(2)}</span></td>
                       <td className="px-6 py-4">
                         {getExpiryBadge(item.expiryDate)}
                       </td>
@@ -382,41 +330,21 @@ export default function PharmacyInventory() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          {editingItemId === item.id ? (
-                            <>
-                              <button
-                                onClick={() => handleSaveEdit(item.id)}
-                                className="p-2 text-green-600 hover:bg-green-50 rounded transition-colors"
-                                title="Save changes"
-                              >
-                                <Save size={18} />
-                              </button>
-                              <button
-                                onClick={handleCancelEdit}
-                                className="p-2 text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                                title="Cancel"
-                              >
-                                <X size={18} />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => handleEdit(item)}
-                                className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                title="Edit"
-                              >
-                                <Edit2 size={18} />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(item.id, item.name)}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 size={18} />
-                              </button>
-                            </>
-                          )}
+                          <button
+                            onClick={() => handleEdit(item)}
+                            disabled={editLoading}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-50"
+                            title="Edit"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(item.id, item.name)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={18} />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -456,10 +384,19 @@ export default function PharmacyInventory() {
       <AddMedicineModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onSuccess={() => {
-          setIsAddModalOpen(false);
-          fetchInventory(pagination.currentPage);
+        onSubmit={handleAddMedicine}
+        submitting={addSubmitting}
+      />
+
+      <EditMedicineModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setActiveEditMedicine(null);
         }}
+        initialData={activeEditMedicine}
+        onSubmit={handleUpdateMedicine}
+        submitting={editSubmitting}
       />
 
       {/* Confirm Delete Modal */}
@@ -473,263 +410,31 @@ export default function PharmacyInventory() {
         variant="danger"
       />
 
-      {/* Confirm Edit Modal */}
-      <ConfirmModal
-        isOpen={confirmEdit.open}
-        onClose={handleEditCancel}
-        onConfirm={handleEditConfirm}
-        title="Save Changes"
-        message={`Do you want to save changes to "${confirmEdit.itemName}"?`}
-        confirmLabel="Yes, Save"
-        variant="warning"
-      />
     </div>
   );
 }
 
 // Add Medicine Modal Component
-function AddMedicineModal({ isOpen, onClose, onSuccess }) {
-  const [formData, setFormData] = useState({
-    name: "",
-    genericName: "",
-    quantity: "",
-    price: "",
-    expiryDate: "",
-  });
-  const [errors, setErrors] = useState({});
-  const [submitting, setSubmitting] = useState(false);
-  const [filteredGenericNames, setFilteredGenericNames] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [confirmAdd, setConfirmAdd] = useState(false);
-
-  // Reset form when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setFormData({
-        name: "",
-        genericName: "",
-        quantity: "",
-        price: "",
-        expiryDate: "",
-      });
-      setErrors({});
-    }
-  }, [isOpen]);
-
-  // Filter generic names based on input
-  const handleGenericNameChange = (value) => {
-    setFormData({ ...formData, genericName: value });
-    
-    if (value.length > 0) {
-      const filtered = COMMON_GENERIC_NAMES.filter(name =>
-        name.toLowerCase().includes(value.toLowerCase())
-      );
-      setFilteredGenericNames(filtered);
-      setShowSuggestions(true);
-    } else {
-      setFilteredGenericNames([]);
-      setShowSuggestions(false);
-    }
-  };
-
-  // Handle form validation
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = "Medicine name is required";
-    }
-
-    if (!formData.genericName.trim()) {
-      newErrors.genericName = "Generic name is required";
-    }
-
-    if (!formData.quantity || parseInt(formData.quantity) < 0) {
-      newErrors.quantity = "Quantity must be 0 or greater";
-    }
-
-    if (!formData.price || parseFloat(formData.price) <= 0) {
-      newErrors.price = "Price must be greater than 0";
-    }
-
-    if (!formData.expiryDate) {
-      newErrors.expiryDate = "Expiry date is required";
-    } else {
-      const expiryDate = new Date(formData.expiryDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (expiryDate < today) {
-        newErrors.expiryDate = "Expiry date must be in the future";
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
-
-    setConfirmAdd(true);
-  };
-
-  const handleAddConfirm = async () => {
-    setConfirmAdd(false);
-
-    try {
-      setSubmitting(true);
-      logger.info("INVENTORY", "Adding new medicine", { name: formData.name });
-
-      await inventoryService.addMedicine({
-        name: formData.name.trim(),
-        genericName: formData.genericName.trim(),
-        quantity: parseInt(formData.quantity),
-        price: parseFloat(formData.price),
-        expiryDate: formData.expiryDate,
-      });
-
-      logger.success("INVENTORY", "Medicine added successfully");
-      toast.success(`✅ ${formData.name.trim()} added to inventory!`);
-      onSuccess();
-    } catch (err) {
-      logger.error("INVENTORY", "Failed to add medicine", err);
-      const errorMessage = err?.message || "Failed to add medicine";
-      setErrors({ submit: errorMessage });
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleAddCancel = () => {
-    setConfirmAdd(false);
-    toast("Add medicine cancelled", { icon: "ℹ️" });
-  };
-
+function AddMedicineModal({ isOpen, onClose, onSubmit, submitting }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Add New Medicine" size="lg">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {errors.submit && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <p className="text-sm text-red-600">{errors.submit}</p>
-          </div>
-        )}
+      <MedicineForm
+        onSubmit={onSubmit}
+        onCancel={onClose}
+        submitting={submitting}
+      />
+    </Modal>
+  );
+}
 
-        <Input
-          label="Medicine Name"
-          placeholder="e.g., Cetamol 500mg"
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          error={errors.name}
-          required
-        />
-
-        <div className="relative">
-          <Input
-            label="Generic Name"
-            placeholder="e.g., Paracetamol"
-            value={formData.genericName}
-            onChange={(e) => handleGenericNameChange(e.target.value)}
-            onFocus={() => setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-            error={errors.genericName}
-            required
-          />
-          {showSuggestions && filteredGenericNames.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-              {filteredGenericNames.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => {
-                    setFormData({ ...formData, genericName: name });
-                    setShowSuggestions(false);
-                  }}
-                  className="w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors"
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Input
-            label="Quantity"
-            type="number"
-            min="0"
-            placeholder="e.g., 100"
-            value={formData.quantity}
-            onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
-            error={errors.quantity}
-            required
-          />
-
-          <Input
-            label="Price (₹)"
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="e.g., 5.99"
-            value={formData.price}
-            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-            error={errors.price}
-            required
-          />
-        </div>
-
-        <Input
-          label="Expiry Date"
-          type="date"
-          value={formData.expiryDate}
-          onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-          error={errors.expiryDate}
-          required
-        />
-
-        <div className="flex gap-3 justify-end pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            {submitting ? (
-              <>
-                <LoadingSpinner />
-                Adding...
-              </>
-            ) : (
-              <>
-                <Plus size={18} />
-                Add Medicine
-              </>
-            )}
-          </button>
-        </div>
-      </form>
-
-      <ConfirmModal
-        isOpen={confirmAdd}
-        onClose={handleAddCancel}
-        onConfirm={handleAddConfirm}
-        title="Add Medicine"
-        message={`Do you want to add "${formData.name.trim()}" to your inventory?`}
-        confirmLabel="Yes, Add"
-        variant="warning"
-        isLoading={submitting}
+function EditMedicineModal({ isOpen, onClose, initialData, onSubmit, submitting }) {
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Edit Medicine" size="lg">
+      <MedicineForm
+        initialData={initialData}
+        onSubmit={onSubmit}
+        onCancel={onClose}
+        submitting={submitting}
       />
     </Modal>
   );

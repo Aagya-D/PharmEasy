@@ -238,6 +238,17 @@ model Inventory {
   quantity    Int
   price       Float
   expiryDate  DateTime
+  sideEffects String   @default("")
+  contraindications String @default("")
+  warnings    String   @default("")
+  isPrescriptionRequired Boolean @default(false)
+  dosageInstructions String?
+  route       AdministrationRoute?
+  timing      MealTiming?
+  strength    String?
+  form        String?
+  manufacturer String?
+  batchNumber String?
   pharmacyId  String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -266,6 +277,16 @@ enum PharmacyStatus {
   PENDING_VERIFICATION
   VERIFIED
   REJECTED
+}
+
+enum AdministrationRoute {
+  ORAL
+  TOPICAL
+}
+
+enum MealTiming {
+  BEFORE_FOOD
+  AFTER_FOOD
 }
 
 /// *

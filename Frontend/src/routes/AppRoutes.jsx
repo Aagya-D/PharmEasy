@@ -27,6 +27,7 @@ import MedicationsPage from "../features/patient/pages/Medications/MedicationsPa
 import CheckoutPage from "../features/patient/pages/CheckoutPage";
 import Cart from "../features/patient/pages/Cart";
 import MedicineDetail from "../features/patient/pages/MedicineDetail";
+import PharmacyStorefront from "../features/patient/pages/PharmacyStorefront";
 import PatientHistory from "../features/patient/pages/PatientHistory";
 import ProfilePage from "../features/patient/pages/Profile/ProfilePage";
 import PatientSettings from "../features/patient/pages/PatientSettings";
@@ -385,6 +386,10 @@ export const routes = [
       {
         path: "medicine/:id",
         element: <MedicineDetail />,
+      },
+      {
+        path: "pharmacy/:id",
+        element: <PharmacyStorefront />,
       },
       {
         path: "medications",

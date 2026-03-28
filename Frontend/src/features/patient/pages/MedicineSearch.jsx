@@ -114,6 +114,11 @@ export default function MedicineSearch() {
     });
   };
 
+  const handleOpenStore = (pharmacyId) => {
+    if (!pharmacyId) return;
+    navigate(`/patient/pharmacy/${encodeURIComponent(pharmacyId)}`);
+  };
+
   const handleAddToCart = (medicine) => {
     addToCart(medicine)
       .then(() => {
@@ -451,9 +456,21 @@ export default function MedicineSearch() {
 
                   {/* Top Pharmacy */}
                   {medicine.pharmacy && (
-                    <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                    <div
+                      className="bg-gray-50 rounded-lg p-3 mb-4 cursor-pointer hover:bg-blue-50 transition-colors"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleOpenStore(medicine?.pharmacy?.id);
+                      }}
+                    >
                       <p className="text-xs text-gray-600 mb-1">Available at</p>
-                      <p className="text-sm font-medium text-gray-900">
+                      <p
+                        className="text-sm font-medium text-gray-900 hover:text-blue-700 hover:underline underline-offset-2"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleOpenStore(medicine?.pharmacy?.id);
+                        }}
+                      >
                         {medicine.pharmacy.name}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">{medicine.pharmacy.address}</p>

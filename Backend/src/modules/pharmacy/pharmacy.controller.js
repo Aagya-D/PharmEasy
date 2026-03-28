@@ -126,6 +126,175 @@ export const getMyPharmacy = async (req, res, next) => {
 };
 
 /**
+ * GET /api/pharmacy/:id/catalog
+ * Public storefront endpoint for patients
+ * Returns pharmacy profile + in-stock inventory only
+ */
+export const getPharmacyCatalog = async (req, res, next) => {
+  try {
+    const pharmacyId = req.params.id;
+
+    const pharmacy = await prisma.pharmacy.findFirst({
+      where: {
+        id: pharmacyId,
+        verificationStatus: "VERIFIED",
+      },
+      select: {
+        id: true,
+        pharmacyName: true,
+        address: true,
+        contactNumber: true,
+        latitude: true,
+        longitude: true,
+        averageRating: true,
+        totalReviews: true,
+        verificationStatus: true,
+        inventory: {
+          where: {
+            quantity: { gt: 0 },
+          },
+          orderBy: [
+            { name: "asc" },
+            { price: "asc" },
+          ],
+          select: {
+            id: true,
+            name: true,
+            genericName: true,
+            quantity: true,
+            price: true,
+            expiryDate: true,
+            sideEffects: true,
+            contraindications: true,
+            warnings: true,
+            isPrescriptionRequired: true,
+            dosageInstructions: true,
+            route: true,
+            timing: true,
+            strength: true,
+            form: true,
+            manufacturer: true,
+            batchNumber: true,
+          },
+        },
+      },
+    });
+
+    if (!pharmacy) {
+      return res.status(404).json({
+        success: false,
+        message: "Pharmacy store not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        pharmacy: {
+          id: pharmacy.id,
+          name: pharmacy.pharmacyName,
+          address: pharmacy.address,
+          contactNumber: pharmacy.contactNumber,
+          location: {
+            lat: pharmacy.latitude,
+            lng: pharmacy.longitude,
+          },
+          averageRating: pharmacy.averageRating || 0,
+          totalReviews: pharmacy.totalReviews || 0,
+          verified: pharmacy.verificationStatus === "VERIFIED",
+        },
+        medicines: pharmacy.inventory,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/pharmacy/:id/inventory
+ * Public storefront endpoint for patients
+ * Returns pharmacy profile + full inventory catalog (in-stock and out-of-stock)
+ */
+export const getPharmacyInventory = async (req, res, next) => {
+  try {
+    const pharmacyId = req.params.id;
+
+    const pharmacy = await prisma.pharmacy.findFirst({
+      where: {
+        id: pharmacyId,
+        verificationStatus: "VERIFIED",
+      },
+      select: {
+        id: true,
+        pharmacyName: true,
+        address: true,
+        contactNumber: true,
+        latitude: true,
+        longitude: true,
+        averageRating: true,
+        totalReviews: true,
+        verificationStatus: true,
+        inventory: {
+          orderBy: [
+            { name: "asc" },
+            { price: "asc" },
+          ],
+          select: {
+            id: true,
+            name: true,
+            genericName: true,
+            quantity: true,
+            price: true,
+            expiryDate: true,
+            sideEffects: true,
+            contraindications: true,
+            warnings: true,
+            isPrescriptionRequired: true,
+            dosageInstructions: true,
+            route: true,
+            timing: true,
+            strength: true,
+            form: true,
+            manufacturer: true,
+            batchNumber: true,
+          },
+        },
+      },
+    });
+
+    if (!pharmacy) {
+      return res.status(404).json({
+        success: false,
+        message: "Pharmacy store not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        pharmacy: {
+          id: pharmacy.id,
+          name: pharmacy.pharmacyName,
+          address: pharmacy.address,
+          contactNumber: pharmacy.contactNumber,
+          location: {
+            lat: pharmacy.latitude,
+            lng: pharmacy.longitude,
+          },
+          averageRating: pharmacy.averageRating || 0,
+          totalReviews: pharmacy.totalReviews || 0,
+          verified: pharmacy.verificationStatus === "VERIFIED",
+        },
+        medicines: pharmacy.inventory,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * GET /api/pharmacy/settings/khalti
  * Get Khalti merchant connection status and safe display fields
  */
@@ -1729,6 +1898,8 @@ export const exportSalesCSV = async (req, res, next) => {
 export default {
   onboardPharmacy,
   getMyPharmacy,
+  getPharmacyCatalog,
+  getPharmacyInventory,
   getKhaltiSettings,
   updateKhaltiSettings,
   getPendingPharmacies,

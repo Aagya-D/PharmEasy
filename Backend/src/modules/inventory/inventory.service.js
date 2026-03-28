@@ -13,6 +13,89 @@
 import { prisma } from "../../database/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 
+const ALLOWED_ROUTES = ["ORAL", "TOPICAL"];
+const ALLOWED_TIMINGS = ["BEFORE_FOOD", "AFTER_FOOD"];
+
+const sanitizeText = (value) => String(value || "").trim();
+
+const sanitizeOptionalText = (value) => {
+  if (value === undefined || value === null) return null;
+  const cleaned = String(value).trim();
+  return cleaned || null;
+};
+
+const normalizeMedicineData = (medicineData) => ({
+  name: sanitizeText(medicineData.name),
+  genericName: sanitizeText(medicineData.genericName),
+  quantity: Number(medicineData.quantity),
+  price: Number(medicineData.price),
+  expiryDate: medicineData.expiryDate,
+  sideEffects: sanitizeText(medicineData.sideEffects),
+  contraindications: sanitizeText(medicineData.contraindications),
+  warnings: sanitizeText(medicineData.warnings),
+  isPrescriptionRequired: medicineData.isPrescriptionRequired,
+  dosageInstructions: sanitizeText(medicineData.dosageInstructions),
+  route: medicineData.route || null,
+  timing: medicineData.timing || null,
+  strength: sanitizeOptionalText(medicineData.strength),
+  form: sanitizeOptionalText(medicineData.form),
+  manufacturer: sanitizeOptionalText(medicineData.manufacturer),
+  batchNumber: sanitizeOptionalText(medicineData.batchNumber),
+});
+
+const validateMedicinePayload = (medicineData) => {
+  if (!medicineData.name || !medicineData.genericName) {
+    throw new AppError("Missing required fields: name, genericName", 400);
+  }
+
+  if (!Number.isFinite(medicineData.quantity) || medicineData.quantity < 0) {
+    throw new AppError("Quantity must be a non-negative number", 400);
+  }
+
+  if (!Number.isFinite(medicineData.price) || medicineData.price <= 0) {
+    throw new AppError("Price must be a positive number", 400);
+  }
+
+  if (!medicineData.sideEffects || !medicineData.contraindications || !medicineData.warnings) {
+    throw new AppError(
+      "Safety fields are required: sideEffects, contraindications, warnings",
+      400
+    );
+  }
+
+  if (typeof medicineData.isPrescriptionRequired !== "boolean") {
+    throw new AppError("isPrescriptionRequired must be a boolean", 400);
+  }
+
+  if (!medicineData.dosageInstructions) {
+    throw new AppError("dosageInstructions is required", 400);
+  }
+
+  if (medicineData.route !== null && !ALLOWED_ROUTES.includes(medicineData.route)) {
+    throw new AppError("route must be ORAL or TOPICAL", 400);
+  }
+
+  if (medicineData.timing !== null && !ALLOWED_TIMINGS.includes(medicineData.timing)) {
+    throw new AppError("timing must be BEFORE_FOOD or AFTER_FOOD", 400);
+  }
+
+  const expiry = new Date(medicineData.expiryDate);
+  if (Number.isNaN(expiry.getTime())) {
+    throw new AppError("Invalid expiry date format", 400);
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (expiry < today) {
+    throw new AppError("Expiry date must be in the future", 400);
+  }
+
+  return {
+    ...medicineData,
+    expiryDate: expiry,
+  };
+};
+
 /**
  * Add a new medicine to pharmacy inventory
  * Includes duplicate checking by name and genericName
@@ -22,35 +105,7 @@ import { AppError } from "../../middlewares/errorHandler.js";
  * @returns {Promise<object>} Created inventory item
  */
 export const addMedicine = async (pharmacyId, medicineData) => {
-  const { name, genericName, quantity, price, expiryDate } = medicineData;
-
-  // Validate required fields
-  if (!name || !genericName || quantity === undefined || !price || !expiryDate) {
-    throw new AppError("Missing required fields: name, genericName, quantity, price, expiryDate", 400);
-  }
-
-  // Validate quantity
-  if (typeof quantity !== "number" || quantity < 0) {
-    throw new AppError("Quantity must be a non-negative number", 400);
-  }
-
-  // Validate price
-  if (typeof price !== "number" || price <= 0) {
-    throw new AppError("Price must be a positive number", 400);
-  }
-
-  // Validate expiry date
-  const expiry = new Date(expiryDate);
-  if (isNaN(expiry.getTime())) {
-    throw new AppError("Invalid expiry date format", 400);
-  }
-
-  // Check if expiry date is in the future
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (expiry < today) {
-    throw new AppError("Expiry date must be in the future", 400);
-  }
+  const preparedData = validateMedicinePayload(normalizeMedicineData(medicineData));
 
   // Verify pharmacy exists
   const pharmacy = await prisma.pharmacy.findUnique({
@@ -65,14 +120,14 @@ export const addMedicine = async (pharmacyId, medicineData) => {
   const existingMedicine = await prisma.inventory.findFirst({
     where: {
       pharmacyId,
-      name: { equals: name.trim(), mode: "insensitive" },
-      genericName: { equals: genericName.trim(), mode: "insensitive" },
+      name: { equals: preparedData.name, mode: "insensitive" },
+      genericName: { equals: preparedData.genericName, mode: "insensitive" },
     },
   });
 
   if (existingMedicine) {
     throw new AppError(
-      `Medicine "${name}" (${genericName}) already exists in your inventory. Please update the existing entry instead.`,
+      `Medicine "${preparedData.name}" (${preparedData.genericName}) already exists in your inventory. Please update the existing entry instead.`,
       409
     );
   }
@@ -80,11 +135,22 @@ export const addMedicine = async (pharmacyId, medicineData) => {
   // Create inventory item
   const inventoryItem = await prisma.inventory.create({
     data: {
-      name: name.trim(),
-      genericName: genericName.trim(),
-      quantity,
-      price,
-      expiryDate: expiry,
+      name: preparedData.name,
+      genericName: preparedData.genericName,
+      quantity: preparedData.quantity,
+      price: preparedData.price,
+      expiryDate: preparedData.expiryDate,
+      sideEffects: preparedData.sideEffects,
+      contraindications: preparedData.contraindications,
+      warnings: preparedData.warnings,
+      isPrescriptionRequired: preparedData.isPrescriptionRequired,
+      dosageInstructions: preparedData.dosageInstructions,
+      route: preparedData.route,
+      timing: preparedData.timing,
+      strength: preparedData.strength,
+      form: preparedData.form,
+      manufacturer: preparedData.manufacturer,
+      batchNumber: preparedData.batchNumber,
       pharmacyId,
     },
     include: {
@@ -178,49 +244,13 @@ export const updateInventoryItem = async (inventoryId, pharmacyId, updateData) =
     throw new AppError("You do not have permission to update this inventory item", 403);
   }
 
-  // Build update object with only allowed fields
-  const allowedFields = ["name", "genericName", "quantity", "price", "expiryDate"];
-  const updates = {};
+  const mergedData = {
+    ...inventoryItem,
+    ...updateData,
+    expiryDate: updateData.expiryDate ?? inventoryItem.expiryDate,
+  };
 
-  for (const field of allowedFields) {
-    if (updateData[field] !== undefined) {
-      updates[field] = updateData[field];
-    }
-  }
-
-  // Validate updates
-  if (updates.quantity !== undefined) {
-    if (typeof updates.quantity !== "number" || updates.quantity < 0) {
-      throw new AppError("Quantity must be a non-negative number", 400);
-    }
-  }
-
-  if (updates.price !== undefined) {
-    if (typeof updates.price !== "number" || updates.price <= 0) {
-      throw new AppError("Price must be a positive number", 400);
-    }
-  }
-
-  if (updates.expiryDate !== undefined) {
-    const expiry = new Date(updates.expiryDate);
-    if (isNaN(expiry.getTime())) {
-      throw new AppError("Invalid expiry date format", 400);
-    }
-    updates.expiryDate = expiry;
-  }
-
-  if (updates.name !== undefined) {
-    updates.name = updates.name.trim();
-  }
-
-  if (updates.genericName !== undefined) {
-    updates.genericName = updates.genericName.trim();
-  }
-
-  // Check if no valid updates provided
-  if (Object.keys(updates).length === 0) {
-    throw new AppError("No valid fields to update", 400);
-  }
+  const updates = validateMedicinePayload(normalizeMedicineData(mergedData));
 
   // Update the inventory item
   const updatedItem = await prisma.inventory.update({
@@ -236,6 +266,33 @@ export const updateInventoryItem = async (inventoryId, pharmacyId, updateData) =
   });
 
   return updatedItem;
+};
+
+/**
+ * Get single inventory item with ownership validation
+ */
+export const getInventoryItemById = async (inventoryId, pharmacyId) => {
+  const item = await prisma.inventory.findUnique({
+    where: { id: inventoryId },
+    include: {
+      pharmacy: {
+        select: {
+          id: true,
+          pharmacyName: true,
+        },
+      },
+    },
+  });
+
+  if (!item) {
+    throw new AppError("Inventory item not found", 404);
+  }
+
+  if (item.pharmacyId !== pharmacyId) {
+    throw new AppError("You do not have permission to view this inventory item", 403);
+  }
+
+  return item;
 };
 
 /**
@@ -272,6 +329,7 @@ export const deleteInventoryItem = async (inventoryId, pharmacyId) => {
 export default {
   addMedicine,
   getPharmacyInventory,
+  getInventoryItemById,
   updateInventoryItem,
   deleteInventoryItem,
 };
