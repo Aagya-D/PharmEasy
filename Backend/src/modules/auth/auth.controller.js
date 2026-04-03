@@ -1,5 +1,9 @@
 import userService from "./auth.service.js";
-import { generateAccessToken, generateRefreshToken } from "../../lib/auth.js";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  TOKEN_EXPIRY_MS,
+} from "../../utils/jwt.js";
 import { AuthenticationError, ValidationError } from "../../utils/errors.js";
 import jwt from "jsonwebtoken";
 import logger from "../../utils/logger.js";
@@ -62,6 +66,10 @@ const COOKIE_OPTIONS = {
   sameSite: "lax",
   path: "/",
 };
+
+const ACCESS_TOKEN_COOKIE_MAX_AGE = TOKEN_EXPIRY_MS.ACCESS;
+const REFRESH_TOKEN_COOKIE_MAX_AGE = TOKEN_EXPIRY_MS.REFRESH;
+const ACCESS_TOKEN_EXPIRES_IN_SECONDS = Math.floor(TOKEN_EXPIRY_MS.ACCESS / 1000);
 
 // ---------------- REGISTER ----------------
 export const register = async (req, res, next) => {
@@ -195,11 +203,11 @@ export const verifyEmailOTP = async (req, res, next) => {
 
     res.cookie("access_token", accessToken, {
       ...COOKIE_OPTIONS,
-      maxAge: 1000 * 60 * 30,
+      maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE,
     });
     res.cookie("refresh_token", refreshToken, {
       ...COOKIE_OPTIONS,
-      maxAge: 1000 * 60 * 60 * 24 * 30,
+      maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
     });
 
     const duration = Date.now() - startTime;
@@ -274,11 +282,11 @@ export const login = async (req, res, next) => {
     // 3. SET SECURE COOKIES
     res.cookie("access_token", result.accessToken, {
       ...COOKIE_OPTIONS,
-      maxAge: 1000 * 60 * 30,
+      maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE,
     });
     res.cookie("refresh_token", result.refreshToken, {
       ...COOKIE_OPTIONS,
-      maxAge: 1000 * 60 * 60 * 24 * 30,
+      maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
     });
 
     logger.debug('AUTH', '[LOGIN] Cookies set', { userId: result.userId });
@@ -432,11 +440,11 @@ export const refreshTokens = async (req, res, next) => {
     // SET NEW COOKIES (secure, httpOnly)
     res.cookie("access_token", newAccess, {
       ...COOKIE_OPTIONS,
-      maxAge: 1000 * 60 * 30, // 30 minutes
+      maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE,
     });
     res.cookie("refresh_token", newRefresh, {
       ...COOKIE_OPTIONS,
-      maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
+      maxAge: REFRESH_TOKEN_COOKIE_MAX_AGE,
     });
 
     res.json({
@@ -446,7 +454,7 @@ export const refreshTokens = async (req, res, next) => {
         accessToken: newAccess,
         refreshToken: newRefresh,
       },
-      expiresIn: "30m",
+      expiresIn: ACCESS_TOKEN_EXPIRES_IN_SECONDS,
     });
   } catch (err) {
     next(err);

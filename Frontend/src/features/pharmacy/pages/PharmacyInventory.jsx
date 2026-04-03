@@ -5,7 +5,7 @@ import {
   AlertTriangle, 
   Search,
   Plus,
-  Edit2,
+  Eye,
   X,
   Trash2,
   Calendar
@@ -16,6 +16,7 @@ import ConfirmModal from "../../../shared/components/ui/ConfirmModal";
 import LoadingSpinner from "../../../shared/components/ui/LoadingSpinner";
 import logger from "../../../utils/logger";
 import MedicineForm from "../components/MedicineForm";
+import MedicineDetailModal from "../components/MedicineDetailModal";
 
 export default function PharmacyInventory() {
   const [inventory, setInventory] = useState([]);
@@ -23,10 +24,10 @@ export default function PharmacyInventory() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editSubmitting, setEditSubmitting] = useState(false);
-  const [activeEditMedicine, setActiveEditMedicine] = useState(null);
+  const [activeDetailMedicine, setActiveDetailMedicine] = useState(null);
   const [addSubmitting, setAddSubmitting] = useState(false);
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -107,13 +108,13 @@ export default function PharmacyInventory() {
     );
   });
 
-  const handleEdit = async (item) => {
+  const handleView = async (item) => {
     try {
       setEditLoading(true);
-      logger.info("INVENTORY", "Fetching medicine details for edit", { itemId: item.id });
+      logger.info("INVENTORY", "Fetching medicine details for secure view", { itemId: item.id });
       const response = await inventoryService.getInventoryItemById(item.id);
-      setActiveEditMedicine(response?.data || item);
-      setIsEditModalOpen(true);
+      setActiveDetailMedicine(response?.data || item);
+      setIsDetailModalOpen(true);
     } catch (err) {
       logger.error("INVENTORY", "Failed to load medicine details", err);
       toast.error(err?.message || "Failed to load medicine details");
@@ -139,19 +140,21 @@ export default function PharmacyInventory() {
   };
 
   const handleUpdateMedicine = async (payload) => {
-    if (!activeEditMedicine?.id) return;
+    if (!activeDetailMedicine?.id) return null;
 
     try {
       setEditSubmitting(true);
-      logger.info("INVENTORY", "Updating medicine", { itemId: activeEditMedicine.id });
-      await inventoryService.updateInventoryItem(activeEditMedicine.id, payload);
+      logger.info("INVENTORY", "Updating medicine", { itemId: activeDetailMedicine.id });
+      await inventoryService.updateInventoryItem(activeDetailMedicine.id, payload);
+      const refreshedResponse = await inventoryService.getInventoryItemById(activeDetailMedicine.id);
+      const refreshedMedicine = refreshedResponse?.data || null;
       toast.success("✅ Medicine details updated successfully");
-      setIsEditModalOpen(false);
-      setActiveEditMedicine(null);
       await fetchInventory(pagination.currentPage);
+      return refreshedMedicine;
     } catch (err) {
       logger.error("INVENTORY", "Failed to update medicine", err);
       toast.error(err?.message || "Failed to update medicine");
+      return null;
     } finally {
       setEditSubmitting(false);
     }
@@ -201,13 +204,13 @@ export default function PharmacyInventory() {
     } else if (daysUntilExpiry <= 30) {
       return <span className="text-xs text-orange-600">Expires in {daysUntilExpiry} days</span>;
     } else {
-      return <span className="text-xs text-gray-600">{new Date(expiryDate).toLocaleDateString()}</span>;
+      return <span className="text-xs text-slate-600 dark:text-slate-400">{new Date(expiryDate).toLocaleDateString()}</span>;
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <LoadingSpinner />
       </div>
     );
@@ -215,9 +218,9 @@ export default function PharmacyInventory() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-100">
-        <header className="bg-white border-b border-gray-200 px-6 py-6">
-          <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+        <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-6">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Inventory Management</h1>
         </header>
         <div className="p-6">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -235,20 +238,20 @@ export default function PharmacyInventory() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white border-b border-gray-200 px-6 py-6">
-        <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
-        <p className="text-sm text-gray-500">Manage your pharmacy stock and medicines</p>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-6">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Inventory Management</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Manage your pharmacy stock and medicines</p>
       </header>
 
       <main className="p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat) => (
-            <div key={stat.title} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div key={stat.title} className="bg-white dark:bg-slate-900 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">{stat.title}</p>
-                  <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{stat.title}</p>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-slate-50">{stat.value}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-blue-50">
                   <stat.icon size={24} className="text-blue-600" />
@@ -258,16 +261,16 @@ export default function PharmacyInventory() {
           ))}
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-          <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row gap-4 justify-between">
+        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+          <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-4 justify-between">
             <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={20} />
               <input
                 type="text"
                 placeholder="Search medicines by name or generic name..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <button
@@ -281,7 +284,7 @@ export default function PharmacyInventory() {
 
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="text-gray-500 border-b border-gray-100">
+              <thead className="text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="text-left px-6 py-4">Medicine Name</th>
                   <th className="text-left px-6 py-4">Generic Name</th>
@@ -297,10 +300,10 @@ export default function PharmacyInventory() {
                   <tr>
                     <td colSpan="7" className="px-6 py-16 text-center">
                       <Package className="mx-auto mb-3 text-gray-300" size={48} />
-                      <p className="text-gray-700 font-semibold text-lg">
+                      <p className="text-slate-700 dark:text-slate-300 font-semibold text-lg">
                         {searchTerm ? "No matches found" : "No medicines in inventory"}
                       </p>
-                      <p className="text-gray-500 text-sm mt-1">
+                      <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
                         {searchTerm
                           ? `No medicines match "${searchTerm}". Try a different search term.`
                           : "Add your first medicine to start managing your inventory."}
@@ -317,11 +320,11 @@ export default function PharmacyInventory() {
                   </tr>
                 ) : (
                   filteredInventory.map((item) => (
-                    <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="px-6 py-4 font-medium text-gray-900">{item.name}</td>
-                      <td className="px-6 py-4 text-gray-600">{item.genericName}</td>
-                      <td className="px-6 py-4"><span className="text-gray-600">{item.quantity}</span></td>
-                      <td className="px-6 py-4"><span className="text-gray-600">₹{item.price.toFixed(2)}</span></td>
+                    <tr key={item.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800">
+                      <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-50">{item.name}</td>
+                      <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{item.genericName}</td>
+                      <td className="px-6 py-4"><span className="text-slate-600 dark:text-slate-400">{item.quantity}</span></td>
+                      <td className="px-6 py-4"><span className="text-slate-600 dark:text-slate-400">₹{item.price.toFixed(2)}</span></td>
                       <td className="px-6 py-4">
                         {getExpiryBadge(item.expiryDate)}
                       </td>
@@ -331,12 +334,12 @@ export default function PharmacyInventory() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => handleEdit(item)}
+                            onClick={() => handleView(item)}
                             disabled={editLoading}
                             className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors disabled:opacity-50"
-                            title="Edit"
+                            title="View"
                           >
-                            <Edit2 size={18} />
+                            <Eye size={18} />
                           </button>
                           <button
                             onClick={() => handleDelete(item.id, item.name)}
@@ -355,22 +358,22 @@ export default function PharmacyInventory() {
           </div>
 
           {pagination.totalPages > 1 && (
-            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
-              <p className="text-sm text-gray-600">
+            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
                 Showing {inventory.length} of {pagination.totalItems} items
               </p>
               <div className="flex gap-2">
                 <button
                   onClick={() => fetchInventory(pagination.currentPage - 1)}
                   disabled={!pagination.hasPreviousPage}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   Previous
                 </button>
                 <button
                   onClick={() => fetchInventory(pagination.currentPage + 1)}
                   disabled={!pagination.hasNextPage}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   Next
                 </button>
@@ -388,14 +391,15 @@ export default function PharmacyInventory() {
         submitting={addSubmitting}
       />
 
-      <EditMedicineModal
-        isOpen={isEditModalOpen}
+      <MedicineDetailModal
+        key={`${activeDetailMedicine?.id || "medicine-detail"}-${isDetailModalOpen ? "open" : "closed"}`}
+        isOpen={isDetailModalOpen}
         onClose={() => {
-          setIsEditModalOpen(false);
-          setActiveEditMedicine(null);
+          setIsDetailModalOpen(false);
+          setActiveDetailMedicine(null);
         }}
-        initialData={activeEditMedicine}
-        onSubmit={handleUpdateMedicine}
+        medicine={activeDetailMedicine}
+        onSave={handleUpdateMedicine}
         submitting={editSubmitting}
       />
 
@@ -419,19 +423,6 @@ function AddMedicineModal({ isOpen, onClose, onSubmit, submitting }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Add New Medicine" size="lg">
       <MedicineForm
-        onSubmit={onSubmit}
-        onCancel={onClose}
-        submitting={submitting}
-      />
-    </Modal>
-  );
-}
-
-function EditMedicineModal({ isOpen, onClose, initialData, onSubmit, submitting }) {
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Edit Medicine" size="lg">
-      <MedicineForm
-        initialData={initialData}
         onSubmit={onSubmit}
         onCancel={onClose}
         submitting={submitting}

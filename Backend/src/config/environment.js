@@ -46,7 +46,7 @@ const config = {
       "JWT_ACCESS_SECRET",
       "your-secret-key-change-in-production"
     ),
-    accessExpiry: validateEnv("JWT_ACCESS_EXPIRY", "30m"), // 30 minutes
+    accessExpiry: validateEnv("JWT_ACCESS_EXPIRY", "15m"), // 15 minutes
 
     // Refresh Token (long-lived, used to get new access tokens)
     refreshSecret: validateEnv(

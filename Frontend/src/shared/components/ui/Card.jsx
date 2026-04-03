@@ -13,13 +13,13 @@ export function Card({
   onClick,
   className = "" 
 }) {
-  const baseStyles = "rounded-xl bg-white transition-all duration-200";
+  const baseStyles = "rounded-xl bg-white dark:bg-slate-900 transition-all duration-200";
   
   const variants = {
-    default: "border border-slate-200 p-6",
+    default: "border border-slate-200 dark:border-slate-800 p-6",
     elevated: "shadow-lg p-6",
-    bordered: "border-2 border-slate-200 p-6",
-    interactive: "border border-slate-200 p-6 hover:border-cyan-600 hover:shadow-md cursor-pointer"
+    bordered: "border-2 border-slate-200 dark:border-slate-800 p-6",
+    interactive: "border border-slate-200 dark:border-slate-800 p-6 hover:border-cyan-600 hover:shadow-md cursor-pointer"
   };
 
   const variantStyle = interactive ? variants.interactive : variants[variant];
@@ -41,7 +41,7 @@ export function Card({
  */
 export function CardHeader({ children, className = "" }) {
   return (
-    <div className={`pb-4 border-b border-slate-200 mb-4 ${className}`}>
+    <div className={`pb-4 border-b border-slate-200 dark:border-slate-800 mb-4 ${className}`}>
       {children}
     </div>
   );
@@ -52,7 +52,7 @@ export function CardHeader({ children, className = "" }) {
  */
 export function CardTitle({ children, className = "" }) {
   return (
-    <h3 className={`text-lg font-semibold text-slate-900 ${className}`}>
+    <h3 className={`text-lg font-semibold text-slate-900 dark:text-slate-100 ${className}`}>
       {children}
     </h3>
   );

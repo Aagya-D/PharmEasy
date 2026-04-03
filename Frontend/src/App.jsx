@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./context/AuthContext";
 import { LocationProvider } from "./context/LocationContext";
-import { DarkModeProvider } from "./context/DarkModeContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import { CartProvider } from "./context/CartContext";
 import { routes } from "./routes/AppRoutes";
@@ -30,7 +30,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <DarkModeProvider>
+      <ThemeProvider>
         <AuthProvider>
           <NotificationProvider>
             <LocationProvider>
@@ -70,7 +70,7 @@ function App() {
             </LocationProvider>
           </NotificationProvider>
         </AuthProvider>
-      </DarkModeProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

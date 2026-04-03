@@ -5,7 +5,7 @@ import httpClient from "../../../core/services/httpClient";
 // Skeleton Pulse for loading
 function SkeletonStatCard() {
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 animate-pulse">
+    <div className="bg-white dark:bg-slate-900 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 animate-pulse">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="h-4 bg-gray-200 rounded w-20 mb-3" />
@@ -20,7 +20,7 @@ function SkeletonStatCard() {
 
 function SkeletonRow() {
   return (
-    <tr className="border-b border-gray-50 animate-pulse">
+    <tr className="border-b border-slate-100 dark:border-slate-800 animate-pulse">
       <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-24" /></td>
       <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-28" /></td>
       <td className="px-6 py-4"><div className="h-5 bg-gray-200 rounded-full w-20" /></td>
@@ -79,7 +79,7 @@ export default function PharmacyOrders() {
       CANCELLED: "bg-red-100 text-red-700",
     };
     return (
-      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${styles[status] || "bg-gray-100 text-gray-700"}`}>
+      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${styles[status] || "bg-gray-100 text-slate-700 dark:text-slate-300"}`}>
         {status?.replaceAll("_", " ")}
       </span>
     );
@@ -136,7 +136,7 @@ export default function PharmacyOrders() {
       );
     }
 
-    return <span className="text-xs text-gray-400">No actions</span>;
+    return <span className="text-xs text-slate-400 dark:text-slate-500">No actions</span>;
   };
 
   const statCards = orderStats ? [
@@ -147,12 +147,12 @@ export default function PharmacyOrders() {
   ] : [];
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white border-b border-gray-200 px-6 py-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Orders</h1>
-            <p className="text-sm text-gray-500">Track incoming and fulfilled orders</p>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Orders</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Track incoming and fulfilled orders</p>
           </div>
           <button
             onClick={fetchOrders}
@@ -177,11 +177,11 @@ export default function PharmacyOrders() {
             </>
           ) : statCards.length > 0 ? (
             statCards.map((stat) => (
-              <div key={stat.title} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+              <div key={stat.title} className="bg-white dark:bg-slate-900 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm text-gray-500 mb-1">{stat.title}</p>
-                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{stat.title}</p>
+                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-50">{stat.value}</p>
                   </div>
                   <div className="p-3 rounded-xl bg-blue-50">
                     <ClipboardList size={24} className="text-blue-600" />
@@ -192,7 +192,7 @@ export default function PharmacyOrders() {
           ) : !error ? (
             <div className="col-span-full text-center py-8">
               <ClipboardList className="mx-auto mb-2 text-gray-300" size={36} />
-              <p className="text-gray-500">No order data yet</p>
+              <p className="text-slate-500 dark:text-slate-400">No order data yet</p>
             </div>
           ) : null}
         </div>
@@ -210,7 +210,7 @@ export default function PharmacyOrders() {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Orders</option>
             <option value="PENDING">Pending</option>
@@ -223,13 +223,13 @@ export default function PharmacyOrders() {
         </div>
 
         {/* Orders Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-          <div className="p-6 border-b border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
+        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+          <div className="p-6 border-b border-slate-200 dark:border-slate-800">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Recent Orders</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="text-gray-500 border-b border-gray-100">
+              <thead className="text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="text-left px-6 py-4">Order ID</th>
                   <th className="text-left px-6 py-4">Customer</th>
@@ -251,25 +251,25 @@ export default function PharmacyOrders() {
                   <tr>
                     <td colSpan="7" className="px-6 py-16 text-center">
                       <Package className="mx-auto mb-3 text-gray-300" size={48} />
-                      <p className="text-gray-700 font-semibold text-lg">No orders yet</p>
-                      <p className="text-gray-500 text-sm mt-1">
+                      <p className="text-slate-700 dark:text-slate-300 font-semibold text-lg">No orders yet</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
                         Orders from patients will appear here once they start purchasing.
                       </p>
                     </td>
                   </tr>
                 ) : (
                   orders.map((order) => (
-                    <tr key={order.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 font-medium text-gray-900">{order.id.slice(0, 12)}...</td>
-                      <td className="px-6 py-4 text-gray-600">{order.patient?.name || "Unknown"}</td>
+                    <tr key={order.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                      <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-50">{order.id.slice(0, 12)}...</td>
+                      <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{order.patient?.name || "Unknown"}</td>
                       <td className="px-6 py-4">{getStatusBadge(order.status)}</td>
-                      <td className="px-6 py-4 text-gray-600">
+                      <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
                         {order.totalAmount ? `Rs. ${order.totalAmount.toLocaleString()}` : "-"}
                       </td>
-                      <td className="px-6 py-4 text-gray-600 text-xs">
+                      <td className="px-6 py-4 text-slate-600 dark:text-slate-400 text-xs">
                         {order.items?.length || 0}
                       </td>
-                      <td className="px-6 py-4 text-gray-500 text-xs">
+                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs">
                         {new Date(order.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4">

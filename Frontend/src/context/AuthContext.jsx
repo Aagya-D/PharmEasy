@@ -185,6 +185,48 @@ function shouldForceLogoutOnRefreshFailure(refreshError) {
   return (status === 401 || status === 403) && tokenInvalidSignal;
 }
 
+function isTransientRefreshFailure(refreshError) {
+  const status = refreshError?.response?.status;
+  const code = String(refreshError?.code || "").toUpperCase();
+
+  if (!status) return true;
+  if (status >= 500) return true;
+  if (code === "ECONNABORTED" || code === "ERR_NETWORK") return true;
+  return false;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function requestTokenRefreshWithRetry(maxRetries = 2, baseDelayMs = 500) {
+  let attempt = 0;
+
+  while (attempt <= maxRetries) {
+    try {
+      return await authService.refreshToken();
+    } catch (refreshError) {
+      const shouldRetry =
+        isTransientRefreshFailure(refreshError) && attempt < maxRetries;
+
+      if (!shouldRetry) {
+        throw refreshError;
+      }
+
+      const delay = baseDelayMs * 2 ** attempt;
+      logger.warn("Transient refresh failure, retrying", {
+        attempt: attempt + 1,
+        delay,
+        error: refreshError?.message,
+      });
+      await wait(delay);
+      attempt += 1;
+    }
+  }
+
+  throw new Error("Token refresh retries exhausted");
+}
+
 // ✅ TASK: Robust Initializer - read from localStorage on first mount
 // This runs BEFORE the component renders, ensuring state is hydrated immediately
 function initAuthState(initial) {
@@ -253,29 +295,67 @@ export function AuthProvider({ children }) {
     const restoreSession = async () => {
       try {
         const storedUser = localStorage.getItem("user");
-        const storedAccessToken = localStorage.getItem("accessToken");
+        let storedAccessToken = localStorage.getItem("accessToken");
         
         if (storedUser && storedAccessToken) {
           const user = JSON.parse(storedUser);
 
-          // ✅ TASK 3: Pre-check token expiry BEFORE hitting the network.
-          // If the stored access token is already expired, skip /api/auth/me
-          // entirely, clear the session, and let the user log in again.
+          // If the stored access token is expired, try one refresh path before forcing logout.
           if (isTokenExpired(storedAccessToken)) {
-            logger.warn("Stored access token is already expired — skipping /auth/me", {
+            logger.warn("Stored access token expired during hydration, trying refresh", {
               userId: user.id,
             });
-            clearAuth();
-            dispatch({
-              type: ACTIONS.RESTORE_SESSION,
-              payload: {
-                user: null,
-                accessToken: null,
-                isAuthenticated: false,
-                isOTPVerified: false,
-              },
-            });
-            return;
+
+            const refreshToken = localStorage.getItem("refreshToken");
+            if (!refreshToken) {
+              clearAuth();
+              dispatch({
+                type: ACTIONS.RESTORE_SESSION,
+                payload: {
+                  user: null,
+                  accessToken: null,
+                  isAuthenticated: false,
+                  isOTPVerified: false,
+                },
+              });
+              return;
+            }
+
+            try {
+              const refreshResponse = await requestTokenRefreshWithRetry();
+              const {
+                accessToken: refreshedAccessToken,
+                refreshToken: rotatedRefreshToken,
+              } = extractRefreshPayload(refreshResponse);
+
+              if (!refreshedAccessToken) {
+                throw new Error("Hydration refresh returned no access token");
+              }
+
+              storedAccessToken = refreshedAccessToken;
+              localStorage.setItem("accessToken", refreshedAccessToken);
+              if (rotatedRefreshToken) {
+                localStorage.setItem("refreshToken", rotatedRefreshToken);
+              }
+            } catch (refreshError) {
+              logger.warn("Hydration refresh failed", {
+                userId: user.id,
+                status: refreshError?.response?.status,
+                error: refreshError?.message,
+              });
+
+              clearAuth();
+              dispatch({
+                type: ACTIONS.RESTORE_SESSION,
+                payload: {
+                  user: null,
+                  accessToken: null,
+                  isAuthenticated: false,
+                  isOTPVerified: false,
+                },
+              });
+              return;
+            }
           }
 
           logger.info("Session found in localStorage, verifying token", { 
@@ -464,8 +544,7 @@ export function AuthProvider({ children }) {
 
           try {
             logger.info("Attempting token refresh");
-            // authService.refreshToken reads from localStorage internally
-            const response = await authService.refreshToken();
+            const response = await requestTokenRefreshWithRetry();
 
             // Backend returns { success, data: { accessToken, refreshToken }, ... }
             const { accessToken, refreshToken: rotatedRefreshToken } = extractRefreshPayload(response);
@@ -546,7 +625,7 @@ export function AuthProvider({ children }) {
       httpClient.interceptors.request.eject(requestInterceptor);
       httpClient.interceptors.response.eject(responseInterceptor);
     };
-  }, [state.accessToken]);
+  }, [state.accessToken, state.isAuthenticated]);
 
   // Silent token refresh — schedules a proactive refresh 1 minute before the
   // access token expires so the user is never interrupted by a 401 error.
@@ -563,7 +642,7 @@ export function AuthProvider({ children }) {
     const timer = setTimeout(async () => {
       try {
         logger.info("Silent token refresh triggered");
-        const response = await authService.refreshToken();
+        const response = await requestTokenRefreshWithRetry();
         const { accessToken, refreshToken: rotatedRefreshToken } = extractRefreshPayload(response);
         if (!accessToken) {
           throw new Error("Silent refresh succeeded but accessToken missing in response");

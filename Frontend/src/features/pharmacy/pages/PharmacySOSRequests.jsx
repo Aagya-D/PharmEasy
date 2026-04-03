@@ -401,7 +401,7 @@ export default function PharmacySOSRequests() {
 
   if (loading && !caseRooms.length) {
     return (
-      <div className="h-[calc(100vh-80px)] bg-white flex items-center justify-center">
+      <div className="h-[calc(100vh-80px)] bg-white dark:bg-slate-900 flex items-center justify-center">
         <div className="text-center">
           <Loader className="animate-spin text-slate-700 mx-auto mb-3" size={34} />
           <p className="text-slate-500 text-sm">Loading communication center...</p>
@@ -411,8 +411,8 @@ export default function PharmacySOSRequests() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">SOS Requests</h1>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6 space-y-6">
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">SOS Requests</h1>
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700 text-sm">
@@ -422,7 +422,7 @@ export default function PharmacySOSRequests() {
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Pending Requests Card */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm hover:shadow-md transition-all">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm hover:shadow-md transition-all">
           <div className="flex items-center justify-between">
             <div className="space-y-2">
               <p className="text-sm font-medium text-slate-500">Pending Requests</p>
@@ -435,7 +435,7 @@ export default function PharmacySOSRequests() {
         </div>
 
         {/* Active Cases Card */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm hover:shadow-md transition-all">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm hover:shadow-md transition-all">
           <div className="flex items-center justify-between">
             <div className="space-y-2">
               <p className="text-sm font-medium text-slate-500">Active Cases</p>
@@ -448,7 +448,7 @@ export default function PharmacySOSRequests() {
         </div>
 
         {/* Completed Cases Card */}
-        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm hover:shadow-md transition-all">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm hover:shadow-md transition-all">
           <div className="flex items-center justify-between">
             <div className="space-y-2">
               <p className="text-sm font-medium text-slate-500">Completed Cases</p>
@@ -461,7 +461,7 @@ export default function PharmacySOSRequests() {
         </div>
       </section>
 
-      <section className="bg-white rounded-2xl border border-slate-200 p-5">
+      <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
             <AlertTriangle size={18} className="text-orange-600" />
@@ -487,7 +487,7 @@ export default function PharmacySOSRequests() {
                     </p>
 
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span className="text-xs px-2.5 py-1 rounded-md border border-slate-200 bg-white text-slate-700">
+                      <span className="text-xs px-2.5 py-1 rounded-md border border-slate-200 bg-white dark:bg-slate-900 text-slate-700">
                         Qty: {request.quantity || 1} units
                       </span>
                       <span className={`text-xs px-2.5 py-1 rounded-md border font-semibold ${getUrgencyBadgeClasses(request.urgency || request.urgencyLevel)}`}>
@@ -502,7 +502,7 @@ export default function PharmacySOSRequests() {
                       <Phone size={12} /> {request.contactNumber || request.patient?.phone || "No contact"}
                     </p>
 
-                    <div className="mt-3 rounded-lg border border-slate-200 bg-white p-2.5">
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-white dark:bg-slate-900 p-2.5">
                       <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1 inline-flex items-center gap-1">
                         <FileText size={12} /> Additional Notes
                       </p>
@@ -550,7 +550,7 @@ export default function PharmacySOSRequests() {
         )}
       </section>
 
-      <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
         <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between">
           <h2 className="text-base font-semibold text-slate-900">Communication Command Center</h2>
           <span className="text-xs text-slate-500 inline-flex items-center gap-1">
@@ -560,7 +560,7 @@ export default function PharmacySOSRequests() {
 
         <div className="h-[calc(100vh-430px)] min-h-[520px] flex">
       {/* Left Panel */}
-      <aside className="w-[360px] border-r border-slate-200 flex flex-col bg-white">
+      <aside className="w-[360px] border-r border-slate-200 flex flex-col bg-white dark:bg-slate-900">
         <div className="px-5 py-4 border-b border-slate-200">
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-lg font-semibold text-slate-900">Direct</h1>
@@ -719,7 +719,7 @@ export default function PharmacySOSRequests() {
           onClick={closeRejectModal}
         >
           <div
-            className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-2xl"
+            className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
@@ -779,10 +779,10 @@ export default function PharmacySOSRequests() {
           onClick={() => setSelectedPrescription(null)}
         >
           <div
-            className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-auto"
+            className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+            <div className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-200 px-4 py-3 flex items-center justify-between">
               <p className="text-sm font-semibold text-slate-900">Prescription</p>
               <button
                 type="button"

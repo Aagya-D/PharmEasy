@@ -526,7 +526,7 @@ export const login = async (
     isOnboarded,
     accessToken,
     refreshToken,
-    expiresIn: 1800, // 30 minutes
+    expiresIn: 900, // 15 minutes
   };
 };
 
@@ -599,7 +599,7 @@ export const refreshAccessToken = async (refreshToken) => {
 
   console.log(`[REFRESH] New access token issued for user: ${userId}`);
 
-  return { userId: user.id, accessToken: newAccessToken, expiresIn: 1800 };
+  return { userId: user.id, accessToken: newAccessToken, expiresIn: 900 };
 };
 
 /**

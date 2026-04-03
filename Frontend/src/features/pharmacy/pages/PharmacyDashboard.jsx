@@ -37,7 +37,7 @@ import { getDashboardStats } from "../../../core/services/pharmacy.service";
 // Skeleton Pulse component for loading state
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 animate-pulse">
+    <div className="bg-white dark:bg-slate-900 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 animate-pulse">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="h-4 bg-gray-200 rounded w-24 mb-3" />
@@ -134,8 +134,8 @@ export default function PharmacyDashboard() {
       subtitle: "Nearby emergencies",
       icon: Siren,
       color: "bg-red-500",
-      iconBg: stats.pendingSOS > 0 ? "bg-red-50" : "bg-gray-50",
-      iconColor: stats.pendingSOS > 0 ? "text-red-600" : "text-gray-400",
+      iconBg: stats.pendingSOS > 0 ? "bg-red-50" : "bg-slate-50 dark:bg-slate-900",
+      iconColor: stats.pendingSOS > 0 ? "text-red-600" : "text-slate-400 dark:text-slate-500",
       alert: stats.pendingSOS > 0,
     },
     {
@@ -184,12 +184,12 @@ export default function PharmacyDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white border-b border-gray-200 px-6 py-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Inventory Management</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Manage your pharmacy stock and medicines
             </p>
           </div>
@@ -197,10 +197,10 @@ export default function PharmacyDashboard() {
             <button 
               onClick={fetchDashboardData}
               disabled={loading}
-              className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg disabled:opacity-50"
               title="Refresh data"
             >
-              <Loader size={22} className={`text-gray-600 ${loading ? "animate-spin" : ""}`} />
+              <Loader size={22} className={`text-slate-600 dark:text-slate-400 ${loading ? "animate-spin" : ""}`} />
             </button>
           </div>
         </div>
@@ -251,13 +251,13 @@ export default function PharmacyDashboard() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.08 }}
-                  className={`bg-white rounded-xl p-6 shadow-sm border ${stat.alert ? 'border-yellow-200' : 'border-gray-100'}`}
+                  className={`bg-white dark:bg-slate-900 rounded-xl p-6 shadow-sm border ${stat.alert ? 'border-yellow-200' : 'border-slate-200 dark:border-slate-800'}`}
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-sm text-gray-500 mb-1">{stat.title}</p>
-                      <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
-                      <p className="text-xs text-gray-400 mt-1">{stat.subtitle}</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{stat.title}</p>
+                      <p className="text-3xl font-bold text-slate-900 dark:text-slate-50">{stat.value}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{stat.subtitle}</p>
                     </div>
                     <div className={`p-3 rounded-xl ${stat.iconBg}`}>
                       <Icon size={24} className={stat.iconColor} />
@@ -269,8 +269,8 @@ export default function PharmacyDashboard() {
           ) : !error ? (
             <div className="col-span-full text-center py-12">
               <Package className="mx-auto mb-3 text-gray-300" size={40} />
-              <p className="text-gray-500 font-medium">No inventory data available yet</p>
-              <p className="text-sm text-gray-400 mt-1">Add medicines to your inventory to see live stats</p>
+              <p className="text-slate-500 dark:text-slate-400 font-medium">No inventory data available yet</p>
+              <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Add medicines to your inventory to see live stats</p>
               <Link
                 to="/pharmacy/inventory"
                 className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
@@ -308,15 +308,15 @@ export default function PharmacyDashboard() {
         )}
 
             {/* Table Section */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
             {/* Table Header */}
-            <div className="p-6 border-b border-gray-100">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800">
               <div className="flex flex-col lg:flex-row gap-4 justify-between">
                 {/* Search and Filters */}
                 <div className="flex flex-col sm:flex-row gap-3 flex-1">
                   <div className="relative flex-1 max-w-md">
                     <Search
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"
                       size={20}
                     />
                     <input
@@ -324,7 +324,7 @@ export default function PharmacyDashboard() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Search medicines..."
-                      className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
 
@@ -332,7 +332,7 @@ export default function PharmacyDashboard() {
                     <select
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value)}
-                        className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="all">All Status</option>
                         <option value="in-stock">In Stock</option>
@@ -359,13 +359,13 @@ export default function PharmacyDashboard() {
               {loading ? (
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Medicine Name</th>
-                      <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Generic Name</th>
-                      <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Quantity</th>
-                      <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Price</th>
-                      <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Expiry Date</th>
-                      <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Medicine Name</th>
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Generic Name</th>
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Quantity</th>
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Price</th>
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Expiry Date</th>
+                      <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -379,8 +379,8 @@ export default function PharmacyDashboard() {
               ) : medicines.length === 0 ? (
                 <div className="p-12 text-center">
                   <Package className="mx-auto mb-3 text-gray-300" size={48} />
-                  <p className="text-gray-700 font-semibold text-lg">No stock added yet</p>
-                  <p className="text-gray-500 text-sm mt-1">
+                  <p className="text-slate-700 dark:text-slate-300 font-semibold text-lg">No stock added yet</p>
+                  <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
                     Your inventory is empty. Add your first medicine to start tracking stock.
                   </p>
                   <Link
@@ -395,23 +395,23 @@ export default function PharmacyDashboard() {
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-100">
-                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      <tr className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                           Medicine Name
                         </th>
-                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                           Generic Name
                         </th>
-                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                           Quantity
                         </th>
-                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                           Price
                         </th>
-                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                           Expiry Date
                         </th>
-                        <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <th className="text-left px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                           Status
                         </th>
                       </tr>
@@ -433,20 +433,20 @@ export default function PharmacyDashboard() {
                             key={medicine.id || index}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="hover:bg-gray-50 transition-colors"
+                            className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                           >
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
                                   <Pill className="text-blue-600" size={18} />
                                 </div>
-                                <p className="font-medium text-gray-900">
+                                <p className="font-medium text-slate-900 dark:text-slate-50">
                                   {medicine.name || "N/A"}
                                 </p>
                               </div>
                             </td>
                             <td className="px-6 py-4">
-                              <span className="text-gray-600 text-sm">
+                              <span className="text-slate-600 dark:text-slate-400 text-sm">
                                 {medicine.genericName || "-"}
                               </span>
                             </td>
@@ -457,19 +457,19 @@ export default function PharmacyDashboard() {
                                     ? "text-red-600"
                                     : medicine.quantity < 10
                                     ? "text-yellow-600"
-                                    : "text-gray-900"
+                                    : "text-slate-900 dark:text-slate-50"
                                 }`}
                               >
                                 {medicine.quantity || 0} units
                               </span>
                             </td>
                             <td className="px-6 py-4">
-                              <span className="font-medium text-gray-900">
+                              <span className="font-medium text-slate-900 dark:text-slate-50">
                                 ₹{(medicine.price || 0).toFixed(2)}
                               </span>
                             </td>
                             <td className="px-6 py-4">
-                              <span className="text-gray-600 text-sm">
+                              <span className="text-slate-600 dark:text-slate-400 text-sm">
                                 {medicine.expiryDate
                                   ? new Date(medicine.expiryDate).toLocaleDateString()
                                   : "-"}
@@ -487,8 +487,8 @@ export default function PharmacyDashboard() {
 
               {/* Table Footer */}
               {medicines.length > 0 && (
-                <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
-                  <p className="text-sm text-gray-500">
+                <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
                     Showing up to 10 of {medicines.length} medicines
                   </p>
                   <Link

@@ -9,7 +9,7 @@ import { X } from "lucide-react";
  * @param {ReactNode} children - Modal content
  * @param {string} size - Modal size: 'sm', 'md', 'lg', 'xl' (default: 'md')
  */
-export default function Modal({ isOpen, onClose, title, children, size = "md" }) {
+export default function Modal({ isOpen, onClose, title, children, size = "md", headerActions = null }) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -66,13 +66,16 @@ export default function Modal({ isOpen, onClose, title, children, size = "md" })
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-500 transition-colors"
-              aria-label="Close modal"
-            >
-              <X size={24} />
-            </button>
+            <div className="flex items-center gap-2">
+              {headerActions}
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-gray-500 transition-colors"
+                aria-label="Close modal"
+              >
+                <X size={24} />
+              </button>
+            </div>
           </div>
 
           {/* Body */}
