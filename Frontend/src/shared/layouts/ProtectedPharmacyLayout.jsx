@@ -7,6 +7,7 @@ import PharmacyNotificationBell from "../../features/pharmacy/components/Pharmac
 import PharmacyChatDrawer from "../../features/pharmacy/components/PharmacyChatDrawer";
 import { MessageSquare } from "lucide-react";
 import { connectSocket } from "../../core/services/socket";
+import DashboardHeader from "../components/dashboard/DashboardHeader";
 
 /**
  * Inner component to initialize SOS count
@@ -53,38 +54,30 @@ function ProtectedPharmacyLayoutInner({ children, isApprovedPharmacy }) {
       <div className="flex min-h-screen">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <div className="flex-1 flex flex-col min-w-0">
-          {/* ─── Top Header Bar ─── */}
-          <header className="sticky top-0 z-30 flex items-center justify-between px-4 lg:px-6 py-3 border-b border-slate-200 bg-white/80 backdrop-blur">
-            {/* Mobile hamburger */}
-            <button
-              type="button"
-              onClick={() => setSidebarOpen(true)}
-              className="lg:hidden inline-flex items-center gap-2 text-sm font-medium text-slate-700"
-            >
-              ☰ Menu
-            </button>
-            <div className="hidden lg:block" /> {/* spacer */}
-
-            {/* Right icons */}
-            <div className="flex items-center gap-2">
-              {/* Chat / Message icon */}
-              <button
-                onClick={handleOpenChat}
-                className="relative p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition-colors"
-                title="Messages"
-              >
-                <MessageSquare size={20} />
-                {chatBadge > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-5 h-5 flex items-center justify-center bg-blue-600 text-white text-[10px] font-bold rounded-full animate-bounce">
-                    {chatBadge > 9 ? "9+" : chatBadge}
-                  </span>
-                )}
-              </button>
-
-              {/* Notification Bell */}
-              <PharmacyNotificationBell />
-            </div>
-          </header>
+          <DashboardHeader
+            onOpenSidebar={() => setSidebarOpen(true)}
+            userName={user?.name || user?.email || "Pharmacy User"}
+            title="Pharmacy Intelligence Hub"
+            subtitle="Operations and inventory control"
+            searchPlaceholder="Search medicines, customers, SOS records..."
+            notificationSlot={(
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleOpenChat}
+                  className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-blue-600"
+                  title="Messages"
+                >
+                  <MessageSquare size={18} />
+                  {chatBadge > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                      {chatBadge > 9 ? "9+" : chatBadge}
+                    </span>
+                  )}
+                </button>
+                <PharmacyNotificationBell />
+              </div>
+            )}
+          />
 
           <main className="flex-1 w-full">{children}</main>
         </div>

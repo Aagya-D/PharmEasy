@@ -29,6 +29,7 @@ export default function MedicineSearch() {
   const { addToCart, clearCart, isPharmacyMismatchError } = useCart();
   const [searchQuery, setSearchQuery] = useState("");
   const [medicines, setMedicines] = useState([]);
+  const [pharmacies, setPharmacies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [locationError, setLocationError] = useState(null);
@@ -223,31 +224,36 @@ export default function MedicineSearch() {
         nearbyOnly: filters.nearbyOnly,
       });
 
-      const response = await searchService.searchMedicines(
+      const response = await searchService.universalSearch(
         searchQuery,
         lat,
         lng,
         {
           includeOutOfStock: !filters.inStock,
-          maxDistance: filters.searchRadius,
-          limit: 50,
+          medicineLimit: 50,
+          pharmacyLimit: 20,
         }
       );
 
-      // Safely extract data array from response (Axios response → { data: { success, data, meta } })
-      const resultData = response.data?.data || response.data || [];
-      const results = Array.isArray(resultData) ? resultData : [];
+      const categorized = response?.data?.data || {};
+      const medicineResults = Array.isArray(categorized.medicines)
+        ? categorized.medicines
+        : [];
+      const pharmacyResults = Array.isArray(categorized.pharmacies)
+        ? categorized.pharmacies
+        : [];
       
       console.log("[MEDICINE SEARCH] Results received:", {
-        count: results.length,
+        medicineCount: medicineResults.length,
+        pharmacyCount: pharmacyResults.length,
         location: selectedLocation?.name,
-        nearestPharmacy: results.length > 0 ? results[0].pharmacy?.name : 'N/A',
-        failsafeApplied: results.length > 0 && results[0].failsafeNote ? true : false,
+        nearestPharmacy: pharmacyResults.length > 0 ? pharmacyResults[0].name : 'N/A',
       });
       
-      setMedicines(results);
+      setMedicines(medicineResults);
+      setPharmacies(pharmacyResults);
 
-      if (results.length === 0) {
+      if (medicineResults.length === 0 && pharmacyResults.length === 0) {
         setError(`❌ No pharmacies found with "${searchQuery}" in ${selectedLocation?.name || "your area"}. Try a different medicine name or expand your search location.`);
       }
     } catch (err) {
@@ -255,6 +261,7 @@ export default function MedicineSearch() {
       setError(`⚠️ ${errorMsg}`);
       console.error("[MEDICINE SEARCH]", err);
       setMedicines([]);
+      setPharmacies([]);
     } finally {
       setLoading(false);
     }
@@ -290,14 +297,14 @@ export default function MedicineSearch() {
             <div className="flex-1 relative">
               <Search
                 size={20}
-                className="absolute left-4 top-3 text-gray-400"
+                className="absolute left-4 top-3 text-slate-400"
               />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by medicine name, composition, or condition..."
-                className="w-full pl-12 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-12 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
               />
             </div>
 
@@ -340,7 +347,7 @@ export default function MedicineSearch() {
                 onChange={(e) =>
                   setFilters({ ...filters, searchRadius: parseInt(e.target.value) })
                 }
-                className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-3 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
               >
                 <option value={10}>10 km</option>
                 <option value={25}>25 km</option>
@@ -389,13 +396,16 @@ export default function MedicineSearch() {
         )}
 
         {/* Results */}
-        {medicines.length > 0 && (
+        {(medicines.length > 0 || pharmacies.length > 0) && (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold text-gray-900">
-              Found {medicines.length} medicines
+              Found {medicines.length} medicines and {pharmacies.length} pharmacies
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {medicines.length > 0 && (
+              <>
+                <h3 className="text-xl font-semibold text-gray-800">Medicines</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {medicines.map((medicine) => (
                 <div
                   key={getMedicineRouteId(medicine)}
@@ -527,7 +537,35 @@ export default function MedicineSearch() {
                   </div>
                 </div>
               ))}
-            </div>
+                </div>
+              </>
+            )}
+
+            {pharmacies.length > 0 && (
+              <>
+                <h3 className="text-xl font-semibold text-gray-800 mt-8">Pharmacies</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {pharmacies.map((pharmacy) => (
+                    <button
+                      key={pharmacy.id}
+                      onClick={() => handleOpenStore(pharmacy.id)}
+                      className="text-left bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+                    >
+                      <h4 className="text-lg font-bold text-gray-900 mb-1">{pharmacy.name}</h4>
+                      <p className="text-sm text-gray-600 mb-3">{pharmacy.address}</p>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-blue-700 font-medium">
+                          {pharmacy.distanceFormatted || "Distance unavailable"}
+                        </span>
+                        <span className="text-gray-500">
+                          {pharmacy.medicinesInStock || 0} in stock
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -548,7 +586,7 @@ export default function MedicineSearch() {
         )}
 
         {/* Empty State */}
-        {!loading && searchQuery && medicines.length === 0 && !error && (
+        {!loading && searchQuery && medicines.length === 0 && pharmacies.length === 0 && !error && (
           <div className="text-center py-16 bg-white rounded-lg">
             <AlertCircle
               size={48}
@@ -584,7 +622,7 @@ export default function MedicineSearch() {
         )}
 
         {/* Initial State */}
-        {!loading && !searchQuery && medicines.length === 0 && (
+        {!loading && !searchQuery && medicines.length === 0 && pharmacies.length === 0 && (
           <div className="text-center py-16">
             <Search size={48} className="mx-auto text-gray-300 mb-4" />
             <p className="text-gray-500 font-medium mb-2">

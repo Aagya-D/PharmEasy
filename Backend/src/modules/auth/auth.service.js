@@ -512,6 +512,7 @@ export const login = async (
     userId: user.id,
     email: user.email,
     name: user.name,
+    avatarUrl: user.avatarUrl || null,
     role: user.role.name,
     roleId: user.roleId,
     status: user.status,

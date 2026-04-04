@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useLocation as useLocationContext } from "../../context/LocationContext";
 import { useNotification } from "../../context/NotificationContext";
 import { useCart } from "../../context/CartContext";
+import searchService from "../../core/services/search.service";
 import LocationModal from "../components/LocationModal";
 import NotificationDropdown from "../components/NotificationDropdown";
 import {
@@ -45,16 +46,90 @@ export function PatientLayout({ children, searchEnabled = true }) {
   const { cartCount } = useCart();
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState({ medicines: [], pharmacies: [] });
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const searchBoxRef = useRef(null);
 
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
-      setSearchQuery("");
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setShowSearchDropdown(false);
     }
+  };
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+
+    if (query.length < 2) {
+      setSearchResults({ medicines: [], pharmacies: [] });
+      setSearchLoading(false);
+      return undefined;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setSearchLoading(true);
+        const response = await searchService.universalSearch(
+          query,
+          selectedLocation?.lat,
+          selectedLocation?.lng,
+          {
+            medicineLimit: 5,
+            pharmacyLimit: 5,
+          }
+        );
+
+        const data = response?.data?.data || {};
+        setSearchResults({
+          medicines: Array.isArray(data.medicines) ? data.medicines : [],
+          pharmacies: Array.isArray(data.pharmacies) ? data.pharmacies : [],
+        });
+        setShowSearchDropdown(true);
+      } catch {
+        setSearchResults({ medicines: [], pharmacies: [] });
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, selectedLocation?.lat, selectedLocation?.lng]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!searchBoxRef.current?.contains(event.target)) {
+        setShowSearchDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleOpenMedicine = (medicine) => {
+    if (!medicine?.id) return;
+
+    try {
+      sessionStorage.setItem(`medicine_detail_${medicine.id}`, JSON.stringify(medicine));
+    } catch {
+      // ignore storage failures
+    }
+
+    setShowSearchDropdown(false);
+    navigate(`/patient/medicine/${encodeURIComponent(medicine.id)}`, {
+      state: { medicine },
+    });
+  };
+
+  const handleOpenPharmacy = (pharmacyId) => {
+    if (!pharmacyId) return;
+    setShowSearchDropdown(false);
+    navigate(`/patient/pharmacy/${encodeURIComponent(pharmacyId)}`);
   };
 
   const handleLogout = async () => {
@@ -112,15 +187,70 @@ export function PatientLayout({ children, searchEnabled = true }) {
                   <span className="hidden lg:inline max-w-[150px] truncate">{selectedLocation?.name || "Select Location"}</span>
                 </button>
                 {/* Search Bar */}
-                <form onSubmit={handleSearch} className="flex-1 relative">
+                <form onSubmit={handleSearch} className="flex-1 relative" ref={searchBoxRef}>
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => {
+                      if (searchQuery.trim().length >= 2) {
+                        setShowSearchDropdown(true);
+                      }
+                    }}
                     placeholder="Search medicines, health conditions, pharmacies..."
-                    className="w-full px-4 py-2 pl-10 rounded-lg border border-slate-200 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all"
+                    className="w-full px-4 py-2 pl-10 rounded-lg bg-white border border-slate-200 shadow-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                   />
-                  <Search size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                  <Search size={18} strokeWidth={2.5} className="absolute left-3 top-2.5 text-blue-600" />
+
+                  {showSearchDropdown && searchQuery.trim().length >= 2 && (
+                    <div className="absolute left-0 right-0 mt-2 rounded-xl border border-gray-200 bg-white shadow-xl z-50">
+                      {searchLoading ? (
+                        <div className="px-4 py-3 text-sm text-gray-500">Searching...</div>
+                      ) : (
+                        <div className="max-h-96 overflow-auto py-2">
+                          <div className="px-4 py-1 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                            Medicines
+                          </div>
+                          {searchResults.medicines.length > 0 ? (
+                            searchResults.medicines.map((medicine) => (
+                              <button
+                                type="button"
+                                key={`pl-med-${medicine.id}`}
+                                onClick={() => handleOpenMedicine(medicine)}
+                                className="w-full px-4 py-2 text-left hover:bg-blue-50 transition-colors"
+                              >
+                                <div className="text-sm font-medium text-gray-900">{medicine.medicine}</div>
+                                <div className="text-xs text-gray-600">Rs. {Number(medicine.price || 0).toFixed(2)}</div>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-2 text-sm text-gray-400">No medicines found</div>
+                          )}
+
+                          <div className="mt-1 px-4 py-1 text-xs font-semibold tracking-wide text-gray-500 uppercase border-t border-gray-100">
+                            Pharmacies
+                          </div>
+                          {searchResults.pharmacies.length > 0 ? (
+                            searchResults.pharmacies.map((pharmacy) => (
+                              <button
+                                type="button"
+                                key={`pl-pharm-${pharmacy.id}`}
+                                onClick={() => handleOpenPharmacy(pharmacy.id)}
+                                className="w-full px-4 py-2 text-left hover:bg-blue-50 transition-colors"
+                              >
+                                <div className="text-sm font-medium text-gray-900">{pharmacy.name}</div>
+                                <div className="text-xs text-gray-600">
+                                  {pharmacy.distanceFormatted || "Distance unavailable"}
+                                </div>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-2 text-sm text-gray-400">No pharmacies found</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </form>
               </div>
             )}
@@ -256,11 +386,12 @@ export function PatientLayout({ children, searchEnabled = true }) {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search medicines..."
-                  className="w-full px-4 py-2 pl-10 rounded-lg border border-slate-200 focus:border-blue-500 focus:outline-none"
+                  className="w-full px-4 py-2 pl-10 rounded-lg bg-white border border-slate-200 shadow-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                 />
                 <Search
                   size={18}
-                  className="absolute left-3 top-2.5 text-gray-400"
+                  strokeWidth={2.5}
+                  className="absolute left-3 top-2.5 text-blue-600"
                 />
               </form>
             </div>

@@ -9,6 +9,7 @@
  *   'urgent'    — 3-pulse descending square-wave emergency beep (SOS alerts, new chat messages)
  *   'sos'       — alias for 'urgent'
  *   'message'   — alias for 'urgent'
+ *   'admin'     — 2-step soft triad chime for system-admin global alerts
  * 
  * Browser Audio Unlock:
  *   Browsers require a user gesture before AudioContext can play sound.
@@ -105,10 +106,38 @@ function playUrgentChime() {
   }
 }
 
+function playAdminChime() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  try {
+    const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+    notes.forEach((freq, index) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+
+      const t = ctx.currentTime + index * 0.11;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.18, t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+
+      osc.start(t);
+      osc.stop(t + 0.24);
+    });
+  } catch {
+    // AudioContext unavailable or blocked
+  }
+}
+
 /**
  * Play a notification sound appropriate for the alert type.
  *
- * @param {'standard'|'cms'|'urgent'|'sos'|'message'} type
+ * @param {'standard'|'cms'|'urgent'|'sos'|'message'|'admin'} type
  */
 export function playNotificationSound(type = "standard") {
   // If the user hasn't interacted yet, queue the play for the next microtask
@@ -119,6 +148,9 @@ export function playNotificationSound(type = "standard") {
       case "sos":
       case "message":
         playUrgentChime();
+        break;
+      case "admin":
+        playAdminChime();
         break;
       case "standard":
       case "cms":

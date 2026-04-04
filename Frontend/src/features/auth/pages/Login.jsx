@@ -72,7 +72,8 @@ export function Login() {
       slogan="Your trusted pharmacy partner, available 24/7 to serve your healthcare needs with expertise and care."
       accentColor="#3B82F6"
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="auth-light bg-white text-slate-900">
+      <form onSubmit={handleSubmit} className="space-y-6 bg-white text-slate-900">
         {/* Error Alert */}
         {error && (
           <Alert 
@@ -149,6 +150,7 @@ export function Login() {
           </Link>
         </p>
       </form>
+      </div>
     </AuthLayout>
   );
 }

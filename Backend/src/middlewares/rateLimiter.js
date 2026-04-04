@@ -4,6 +4,8 @@
  * Uses in-memory store (use Redis for production)
  */
 
+import notificationService from "../modules/notifications/notification.service.js";
+
 /**
  * Simple in-memory rate limiter
  * For production, use Redis or a dedicated rate limiting service
@@ -71,12 +73,43 @@ const limiter = new RateLimiter();
  * Rate limit login attempts
  * 5 attempts per 15 minutes per email
  */
-export const loginRateLimit = (req, res, next) => {
+export const loginRateLimit = async (req, res, next) => {
   const key = `login:${req.body.email}`;
   const limit = 5;
   const windowMs = 15 * 60 * 1000; // 15 minutes
 
   if (!limiter.isAllowed(key, limit, windowMs)) {
+    const email = req.body?.email || "unknown";
+    const ipAddress = req.ip || "unknown";
+    const securityMessage = `Security flag: Login rate limit triggered for ${email} from IP ${ipAddress}.`;
+
+    try {
+      await notificationService.notifySecurityFlag(securityMessage, {
+        signal: "LOGIN_RATE_LIMIT",
+        email,
+        ipAddress,
+        limit,
+        windowMinutes: 15,
+      });
+
+      const io = req.app?.get("io");
+      if (io) {
+        io.emit("SYSTEM_ALERT", {
+          event: "SECURITY_FLAG",
+          title: "SECURITY_FLAG",
+          message: securityMessage,
+          priority: "high",
+          metadata: {
+            signal: "LOGIN_RATE_LIMIT",
+            link: "/admin/logs",
+          },
+          createdAt: new Date().toISOString(),
+        });
+      }
+    } catch {
+      // Non-blocking: rate limit response should still be returned
+    }
+
     const remaining = limiter.getRemaining(key, limit, windowMs);
     return res.status(429).json({
       success: false,

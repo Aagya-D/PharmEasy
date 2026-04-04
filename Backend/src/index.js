@@ -27,6 +27,7 @@ import adminRoutes from "./routes/admin.routes.js";
 import contentRoutes from "./routes/content.routes.js";
 import chatRoutes from "./modules/chat/chat.routes.js";
 import reviewRoutes from "./modules/review/review.routes.js";
+import userRoutes from "./modules/user/user.routes.js";
 import chatHandler from "./sockets/chatHandler.js";
 // Note: adminExtendedRoutes uses CommonJS, will need conversion or dynamic import
 
@@ -233,6 +234,9 @@ app.use("/api/chat", chatRoutes);
 // Review routes (patient-to-pharmacy ratings and reviews)
 // Routes include: POST /reviews, GET /reviews/:pharmacyId
 app.use("/api/reviews", reviewRoutes);
+
+// User profile routes (avatar upload/update)
+app.use("/api/user", userRoutes);
 
 // Admin extended routes will be loaded dynamically
 // Dynamic import for CommonJS module compatibility

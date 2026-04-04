@@ -28,11 +28,13 @@ export function AuthLayout({
 
   return (
     <div
+      className="auth-light light"
       style={{
         display: "flex",
         flexDirection: isMobile ? "column" : "row",
         minHeight: "100vh",
-        backgroundColor: "var(--color-bg-primary)",
+        backgroundColor: "#ffffff",
+        color: "#0f172a",
       }}
     >
       {/* Left side - Hero section with image background */}
@@ -216,6 +218,8 @@ export function AuthLayout({
           position: "relative",
           overflow: isMobile ? "visible" : "hidden",
           width: isMobile ? "100%" : "auto",
+          backgroundColor: "#ffffff",
+          color: "#0f172a",
         }}
       >
         {/* Form container */}
@@ -247,7 +251,7 @@ export function AuthLayout({
                 gap: "8px",
                 fontSize: "14px",
                 fontWeight: "700",
-                color: "var(--color-primary)",
+                color: "#0ea5e9",
                 textTransform: "uppercase",
                 letterSpacing: "0.5px",
               }}
@@ -261,7 +265,7 @@ export function AuthLayout({
                 style={{
                   fontSize: isMobile ? "24px" : "28px",
                   fontWeight: "700",
-                  color: "var(--color-text-primary)",
+                  color: "#0f172a",
                   margin: 0,
                   letterSpacing: "-0.2px",
                 }}
@@ -274,7 +278,7 @@ export function AuthLayout({
               <p
                 style={{
                   fontSize: isMobile ? "13px" : "14px",
-                  color: "var(--color-text-secondary)",
+                  color: "#475569",
                   margin: 0,
                   fontWeight: "400",
                   lineHeight: 1.5,

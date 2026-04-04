@@ -159,7 +159,8 @@ export function Register() {
       slogan="Growing together as a community of healthcare professionals and patients committed to better pharmacy care."
       accentColor="#10B981"
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="auth-light bg-white text-slate-900">
+      <form onSubmit={handleSubmit} className="space-y-6 bg-white text-slate-900">
         {/* Error Alert */}
         {error && (
           <Alert 
@@ -297,6 +298,7 @@ export function Register() {
           </Link>
         </p>
       </form>
+      </div>
     </AuthLayout>
   );
 }

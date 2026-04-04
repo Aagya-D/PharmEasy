@@ -67,6 +67,7 @@ model User {
   name           String
   password       String
   phone          String?
+  avatarUrl      String?
   shippingAddress Json?
   roleId         Int
   status         UserStatus           @default(APPROVED)

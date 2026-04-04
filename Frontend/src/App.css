@@ -16,6 +16,65 @@ html.dark body {
   color: #f1f5f9;
 }
 
+/* Keep authentication pages strictly light-themed regardless of global dark mode. */
+body:has(.auth-light) {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+html.dark body:has(.auth-light) {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+.auth-light,
+.auth-light * {
+  color-scheme: light;
+}
+
+.auth-light input,
+.auth-light textarea,
+.auth-light select {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.auth-light input::placeholder,
+.auth-light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Global classy form controls for better contrast and accessibility. */
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+select,
+textarea) {
+  border: 1px solid #e2e8f0;
+  transition: all 200ms ease;
+}
+
+html.dark :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+select,
+textarea) {
+  border-color: #334155;
+}
+
+:where(input, textarea)::placeholder {
+  color: #64748b;
+}
+
+html.dark :where(input, textarea)::placeholder {
+  color: #9ca3af;
+}
+
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):focus,
+select:focus,
+textarea:focus) {
+  outline: none;
+  border-color: transparent;
+  box-shadow: 0 0 0 2px #3b82f6;
+}
+
 /* Custom Animations */
 @keyframes spin {
   to {

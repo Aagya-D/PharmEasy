@@ -14,6 +14,7 @@
  *   new_message_notification — same as NEW_MESSAGE (legacy alias from chat controller)
  *   ADMIN_BROADCAST      — increments unreadNotifications + plays standard ping
  *   NEW_ORDER            — increments unreadNotifications + plays standard ping (pharmacy)
+ *   SYSTEM_ALERT         — global system-admin alert stream (registrations, SOS, security flags)
  *
  * Imperative API (for badge-clearing after user actions):
  *   refreshNotifications()     — re-fetches notification count from backend
@@ -154,11 +155,19 @@ export function NotificationProvider({ children }) {
       playNotificationSound("standard");
     };
 
+    const onSystemAlert = () => {
+      if (user?.roleId !== 1) return;
+      setUnreadNotifications((c) => c + 1);
+      setHasHighPriority(true);
+      playNotificationSound("admin");
+    };
+
     socket.on("NEW_SOS_ALERT",              onSOS);
     socket.on("NEW_MESSAGE",                onNewMessage);
     socket.on("new_message_notification",   onNewMessageLegacy);
     socket.on("ADMIN_BROADCAST",            onAdminBroadcast);
     socket.on("NEW_ORDER",                  onNewOrder);
+    socket.on("SYSTEM_ALERT",               onSystemAlert);
 
     return () => {
       socket.off("NEW_SOS_ALERT",             onSOS);
@@ -166,8 +175,9 @@ export function NotificationProvider({ children }) {
       socket.off("new_message_notification",  onNewMessageLegacy);
       socket.off("ADMIN_BROADCAST",           onAdminBroadcast);
       socket.off("NEW_ORDER",                 onNewOrder);
+      socket.off("SYSTEM_ALERT",              onSystemAlert);
     };
-  }, [isAuthenticated, user?.id]);
+  }, [isAuthenticated, user?.id, user?.roleId]);
 
   // ── Imperative badge-clearing helpers ─────────────────────────────────────
 

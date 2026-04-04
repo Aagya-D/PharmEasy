@@ -12,6 +12,21 @@ import { isValidNepaliPhone } from "../../utils/validation.js";
 // ─── SOS Expiration Config ────────────────────────────
 const SOS_TTL_MINUTES = 30;
 
+const extractDistrictName = (address = "") => {
+  const normalized = String(address || "").trim();
+  if (!normalized) return "Unknown District";
+
+  const parts = normalized
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) return "Unknown District";
+  if (parts.length === 1) return parts[0];
+
+  return parts[parts.length - 1];
+};
+
 /**
  * Automatically expire stale SOS requests.
  * Marks any "pending" SOS older than 30 minutes as "expired".
@@ -484,6 +499,30 @@ export const submitSOSRequest = async (req, res) => {
     const sosRequest = await prisma.sOSRequest.create({
       data: sosData
     });
+
+    const districtName = extractDistrictName(sosRequest.address);
+    await notificationService.notifyGlobalSosAlert(
+      sosRequest.medicineName,
+      districtName,
+      sosRequest.id
+    );
+
+    const adminIo = req.app.get("io");
+    if (adminIo) {
+      adminIo.emit("SYSTEM_ALERT", {
+        event: "GLOBAL_SOS_ALERT",
+        title: "GLOBAL_SOS_ALERT",
+        message: `Emergency: ${sosRequest.medicineName} requested in ${districtName}.`,
+        priority: "high",
+        metadata: {
+          sosId: sosRequest.id,
+          medicineName: sosRequest.medicineName,
+          districtName,
+          link: "/admin/map",
+        },
+        createdAt: sosRequest.createdAt,
+      });
+    }
 
     logger.info("[PATIENT] SOS request created", { 
       sosId: sosRequest.id, 

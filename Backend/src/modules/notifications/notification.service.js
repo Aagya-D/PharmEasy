@@ -18,6 +18,79 @@ import { calculateDistance } from "../../utils/distance.js";
 import logger from "../../utils/logger.js";
 
 class NotificationService {
+  async getSystemAdminUserIds() {
+    const admins = await prisma.user.findMany({
+      where: {
+        roleId: 1,
+        isActive: true,
+      },
+      select: { id: true },
+    });
+
+    return admins.map((admin) => admin.id);
+  }
+
+  async notifySystemAdmins(title, message, metadata = null, priority = "normal", type = "SYSTEM_MESSAGE") {
+    const adminIds = await this.getSystemAdminUserIds();
+    if (adminIds.length === 0) return 0;
+
+    return this.broadcastNotification(
+      adminIds,
+      title,
+      message,
+      type,
+      metadata,
+      "ADMIN",
+      priority
+    );
+  }
+
+  async notifyNewPharmacyRegistration(pharmacyName, pharmacyUserId = null, pharmacyId = null) {
+    return this.notifySystemAdmins(
+      "NEW_PHARMACY_REGISTRATION",
+      `New Onboarding: ${pharmacyName} is awaiting license verification.`,
+      {
+        event: "NEW_PHARMACY_REGISTRATION",
+        pharmacyName,
+        pharmacyUserId,
+        pharmacyId,
+        link: "/admin/pharmacies?status=PENDING",
+      },
+      "high",
+      "SYSTEM_MESSAGE"
+    );
+  }
+
+  async notifyGlobalSosAlert(medicineName, districtName, sosId) {
+    return this.notifySystemAdmins(
+      "GLOBAL_SOS_ALERT",
+      `Emergency: ${medicineName} requested in ${districtName}.`,
+      {
+        event: "GLOBAL_SOS_ALERT",
+        medicineName,
+        districtName,
+        sosId,
+        link: "/admin/map",
+      },
+      "high",
+      "SOS_ALERT"
+    );
+  }
+
+  async notifySecurityFlag(message, metadata = {}) {
+    return this.notifySystemAdmins(
+      "SECURITY_FLAG",
+      message,
+      {
+        event: "SECURITY_FLAG",
+        ...metadata,
+        link: "/admin/logs",
+      },
+      "high",
+      "SYSTEM_MESSAGE"
+    );
+  }
+
   /**
    * Create a single notification for a user
    * @param {string} userId - Target user ID
@@ -123,16 +196,22 @@ class NotificationService {
    * @param {string} targetRole - Optional role filter (PHARMACY, PATIENT, ADMIN)
    * @returns {Promise<array>} Notifications sorted by newest first
    */
-  async getUserNotifications(userId, limit = 20, skip = 0, targetRole = null) {
+  async getUserNotifications(userId, limit = 20, skip = 0, targetRole = null, options = {}) {
     try {
+      const { strictGlobal = false } = options;
       const where = { userId };
 
       // Role-based filtering: only show notifications meant for this role (or null = everyone)
       if (targetRole) {
-        where.OR = [
-          { targetRole },
-          { targetRole: null },
-        ];
+        if (strictGlobal && targetRole === "ADMIN") {
+          where.targetRole = "ADMIN";
+          where.type = { in: ["SYSTEM_MESSAGE", "SOS_ALERT", "CMS_ALERT"] };
+        } else {
+          where.OR = [
+            { targetRole },
+            { targetRole: null },
+          ];
+        }
       }
 
       const notifications = await prisma.notification.findMany({
@@ -158,18 +237,24 @@ class NotificationService {
    * @param {string} targetRole - Optional role filter
    * @returns {Promise<number>} Count of unread notifications
    */
-  async getUnreadCount(userId, targetRole = null) {
+  async getUnreadCount(userId, targetRole = null, options = {}) {
     try {
+      const { strictGlobal = false } = options;
       const where = { userId, isRead: false };
 
       if (targetRole) {
-        where.OR = [
-          { targetRole, isRead: false },
-          { targetRole: null, isRead: false },
-        ];
-        // When using OR, remove top-level isRead to avoid conflict
-        delete where.isRead;
-        where.AND = [{ userId }];
+        if (strictGlobal && targetRole === "ADMIN") {
+          where.targetRole = "ADMIN";
+          where.type = { in: ["SYSTEM_MESSAGE", "SOS_ALERT", "CMS_ALERT"] };
+        } else {
+          where.OR = [
+            { targetRole, isRead: false },
+            { targetRole: null, isRead: false },
+          ];
+          // When using OR, remove top-level isRead to avoid conflict
+          delete where.isRead;
+          where.AND = [{ userId }];
+        }
       }
 
       const count = await prisma.notification.count({ where });
@@ -186,18 +271,24 @@ class NotificationService {
   /**
    * Check if there are any unread high-priority notifications for the user
    */
-  async hasUnreadHighPriority(userId, targetRole = null) {
+  async hasUnreadHighPriority(userId, targetRole = null, options = {}) {
     try {
+      const { strictGlobal = false } = options;
       const where = { userId, isRead: false, priority: "high" };
 
       if (targetRole) {
-        where.OR = [
-          { targetRole, isRead: false, priority: "high" },
-          { targetRole: null, isRead: false, priority: "high" },
-        ];
-        delete where.isRead;
-        delete where.priority;
-        where.AND = [{ userId }, { priority: "high" }];
+        if (strictGlobal && targetRole === "ADMIN") {
+          where.targetRole = "ADMIN";
+          where.type = { in: ["SYSTEM_MESSAGE", "SOS_ALERT", "CMS_ALERT"] };
+        } else {
+          where.OR = [
+            { targetRole, isRead: false, priority: "high" },
+            { targetRole: null, isRead: false, priority: "high" },
+          ];
+          delete where.isRead;
+          delete where.priority;
+          where.AND = [{ userId }, { priority: "high" }];
+        }
       }
 
       const count = await prisma.notification.count({ where });

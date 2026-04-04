@@ -421,7 +421,16 @@ export default function PharmacyInventory() {
 // Add Medicine Modal Component
 function AddMedicineModal({ isOpen, onClose, onSubmit, submitting }) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Add New Medicine" size="lg">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Add New Medicine"
+      size="compact"
+      backdropClassName="bg-slate-900/20 backdrop-blur-sm"
+      contentClassName="bg-white/80 backdrop-blur-lg border border-white/50 rounded-2xl"
+      headerClassName="bg-transparent border-slate-200/80"
+      bodyClassName="p-0"
+    >
       <MedicineForm
         onSubmit={onSubmit}
         onCancel={onClose}

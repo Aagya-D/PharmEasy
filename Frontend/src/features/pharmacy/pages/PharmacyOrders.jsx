@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, ClipboardList, Loader, Package, RefreshCw } from "lucide-react";
+import { TrendingUp, TrendingDown, ClipboardList, Loader, Package, RefreshCw, Search } from "lucide-react";
 import httpClient from "../../../core/services/httpClient";
 
 // Skeleton Pulse for loading
@@ -36,6 +36,7 @@ export default function PharmacyOrders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filterStatus, setFilterStatus] = useState("all");
+  const [orderSearch, setOrderSearch] = useState("");
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
 
   useEffect(() => {
@@ -146,6 +147,44 @@ export default function PharmacyOrders() {
     { title: "Revenue", value: `Rs. ${orderStats.revenue.toLocaleString()}` },
   ] : [];
 
+  const normalizedQuery = orderSearch.trim().toLowerCase();
+  const filteredOrders = normalizedQuery
+    ? orders.filter((order) => {
+        const orderId = String(order.id || "").toLowerCase();
+        const patientName = String(order.patient?.name || "").toLowerCase();
+        const status = String(order.status || "").toLowerCase();
+        return orderId.includes(normalizedQuery) || patientName.includes(normalizedQuery) || status.includes(normalizedQuery);
+      })
+    : orders;
+
+  const isStatusFilterActive = filterStatus !== "all";
+  const statusFilterPills = [
+    {
+      label: "All",
+      value: "all",
+      idle: "border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-700",
+      active: "border-slate-600 bg-slate-600 text-white",
+    },
+    {
+      label: "Pending",
+      value: "PENDING",
+      idle: "border-amber-300 text-amber-700 hover:border-amber-400 hover:text-amber-800",
+      active: "border-amber-500 bg-amber-500 text-white",
+    },
+    {
+      label: "Accepted",
+      value: "ACCEPTED",
+      idle: "border-blue-300 text-blue-700 hover:border-blue-400 hover:text-blue-800",
+      active: "border-blue-600 bg-blue-600 text-white",
+    },
+    {
+      label: "Completed",
+      value: "COMPLETED",
+      idle: "border-green-300 text-green-700 hover:border-green-400 hover:text-green-800",
+      active: "border-green-600 bg-green-600 text-white",
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-6">
@@ -205,21 +244,44 @@ export default function PharmacyOrders() {
           </div>
         )}
 
-        {/* Filter */}
-        <div className="mb-4">
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Orders</option>
-            <option value="PENDING">Pending</option>
-            <option value="ACCEPTED">Accepted</option>
-            <option value="PREPARING">Preparing</option>
-            <option value="READY">Ready</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
+        {/* Filter and Search */}
+        <div className="mb-4 flex flex-col gap-4">
+          <div className="relative w-full sm:max-w-md">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={orderSearch}
+              onChange={(event) => setOrderSearch(event.target.value)}
+              placeholder="Search by order ID, customer, or status"
+              className="w-full rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 pl-9 pr-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {statusFilterPills.map((pill) => {
+              const isActive = filterStatus === pill.value;
+              return (
+                <button
+                  key={pill.value}
+                  type="button"
+                  onClick={() => setFilterStatus(pill.value)}
+                  className={`px-3.5 py-1.5 rounded-full border text-sm font-medium transition-all duration-200 ${isActive ? pill.active : pill.idle}`}
+                >
+                  {pill.label}
+                </button>
+              );
+            })}
+
+            {isStatusFilterActive && (
+              <button
+                type="button"
+                onClick={() => setFilterStatus("all")}
+                className="px-3.5 py-1.5 rounded-full border border-slate-300 text-slate-600 hover:text-slate-900 hover:border-slate-400 text-sm font-medium transition-all duration-200"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Orders Table */}
@@ -247,18 +309,18 @@ export default function PharmacyOrders() {
                     <SkeletonRow />
                     <SkeletonRow />
                   </>
-                ) : orders.length === 0 ? (
+                ) : filteredOrders.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="px-6 py-16 text-center">
                       <Package className="mx-auto mb-3 text-gray-300" size={48} />
-                      <p className="text-slate-700 dark:text-slate-300 font-semibold text-lg">No orders yet</p>
+                      <p className="text-slate-700 dark:text-slate-300 font-semibold text-lg">No matching orders found</p>
                       <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-                        Orders from patients will appear here once they start purchasing.
+                        Try a different keyword or adjust the status filter.
                       </p>
                     </td>
                   </tr>
                 ) : (
-                  orders.map((order) => (
+                  filteredOrders.map((order) => (
                     <tr key={order.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                       <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-50">{order.id.slice(0, 12)}...</td>
                       <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{order.patient?.name || "Unknown"}</td>

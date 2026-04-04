@@ -164,9 +164,28 @@ function isTokenExpired(token) {
 function extractRefreshPayload(response) {
   // authService returns response.data, but keep this defensive for mixed callers
   const payload = response?.data?.data || response?.data || response;
+
+  const refreshUser = payload?.user
+    ? {
+        id: payload.user.userId || payload.user.id,
+        email: payload.user.email,
+        name: payload.user.name,
+        phone: payload.user.phone || null,
+        role: payload.user.role,
+        roleId: payload.user.roleId,
+        status: payload.user.status,
+        isVerified: payload.user.isVerified ?? true,
+        shippingAddress: payload.user.shippingAddress || null,
+        pharmacy: payload.user.pharmacy || null,
+        isOnboarded: payload.user.isOnboarded ?? true,
+        needsOnboarding: payload.user.needsOnboarding ?? false,
+      }
+    : null;
+
   return {
     accessToken: payload?.accessToken || null,
     refreshToken: payload?.refreshToken || null,
+    user: refreshUser,
   };
 }
 
@@ -326,6 +345,7 @@ export function AuthProvider({ children }) {
               const {
                 accessToken: refreshedAccessToken,
                 refreshToken: rotatedRefreshToken,
+                user: refreshedUser,
               } = extractRefreshPayload(refreshResponse);
 
               if (!refreshedAccessToken) {
@@ -336,6 +356,9 @@ export function AuthProvider({ children }) {
               localStorage.setItem("accessToken", refreshedAccessToken);
               if (rotatedRefreshToken) {
                 localStorage.setItem("refreshToken", rotatedRefreshToken);
+              }
+              if (refreshedUser?.id) {
+                localStorage.setItem("user", JSON.stringify(refreshedUser));
               }
             } catch (refreshError) {
               logger.warn("Hydration refresh failed", {
@@ -547,7 +570,11 @@ export function AuthProvider({ children }) {
             const response = await requestTokenRefreshWithRetry();
 
             // Backend returns { success, data: { accessToken, refreshToken }, ... }
-            const { accessToken, refreshToken: rotatedRefreshToken } = extractRefreshPayload(response);
+            const {
+              accessToken,
+              refreshToken: rotatedRefreshToken,
+              user: refreshUser,
+            } = extractRefreshPayload(response);
             if (!accessToken) {
               throw new Error("Refresh succeeded but accessToken was missing in response");
             }
@@ -555,6 +582,11 @@ export function AuthProvider({ children }) {
             localStorage.setItem("accessToken", accessToken);
             if (rotatedRefreshToken) {
               localStorage.setItem("refreshToken", rotatedRefreshToken);
+            }
+
+            if (refreshUser?.id) {
+              localStorage.setItem("user", JSON.stringify(refreshUser));
+              dispatch({ type: ACTIONS.SET_USER, payload: refreshUser });
             }
 
             // Keep axios default auth header in sync immediately.
@@ -572,6 +604,7 @@ export function AuthProvider({ children }) {
                   id: profileUser.userId || profileUser.id,
                   email: profileUser.email,
                   name: profileUser.name,
+                  avatarUrl: profileUser.avatarUrl || state.user?.avatarUrl || null,
                   phone: profileUser.phone || state.user?.phone || null,
                   role: profileUser.role,
                   roleId: profileUser.roleId,
@@ -643,7 +676,11 @@ export function AuthProvider({ children }) {
       try {
         logger.info("Silent token refresh triggered");
         const response = await requestTokenRefreshWithRetry();
-        const { accessToken, refreshToken: rotatedRefreshToken } = extractRefreshPayload(response);
+        const {
+          accessToken,
+          refreshToken: rotatedRefreshToken,
+          user: refreshUser,
+        } = extractRefreshPayload(response);
         if (!accessToken) {
           throw new Error("Silent refresh succeeded but accessToken missing in response");
         }
@@ -651,6 +688,10 @@ export function AuthProvider({ children }) {
         localStorage.setItem("accessToken", accessToken);
         if (rotatedRefreshToken) {
           localStorage.setItem("refreshToken", rotatedRefreshToken);
+        }
+        if (refreshUser?.id) {
+          localStorage.setItem("user", JSON.stringify(refreshUser));
+          dispatch({ type: ACTIONS.SET_USER, payload: refreshUser });
         }
         httpClient.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
         dispatch({ type: ACTIONS.REFRESH_TOKEN_SUCCESS, payload: accessToken });
@@ -687,6 +728,7 @@ export function AuthProvider({ children }) {
         id: userData.userId,
         email: userData.email,
         name: userData.name,
+        avatarUrl: userData.avatarUrl || null,
         role: userData.role,
         roleId: userData.roleId,
         status: userData.status,
@@ -870,6 +912,7 @@ export function AuthProvider({ children }) {
         id: apiData.user?.id,
         email: apiData.user?.email,
         name: apiData.user?.name,
+        avatarUrl: apiData.user?.avatarUrl || null,
         roleId: apiData.user?.roleId,
         role: apiData.user?.role,
         status: apiData.user?.status,
@@ -952,6 +995,7 @@ export function AuthProvider({ children }) {
           id: userData.user.id,
           email: userData.user.email,
           name: userData.user.name,
+          avatarUrl: userData.user.avatarUrl || null,
           roleId: userData.user.roleId,
           role: userData.user.role,
           status: userData.user.status,

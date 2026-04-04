@@ -6,10 +6,7 @@ import patientService from "../../services/patient.service";
 import {
   Package,
   Search,
-  Filter,
-  ChevronDown,
   AlertCircle,
-  Loader,
 } from "lucide-react";
 
 export function OrdersPage() {
@@ -20,9 +17,33 @@ export function OrdersPage() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
 
-  const statuses = ["all", "pending", "accepted", "preparing", "ready", "completed", "cancelled"];
+  const statusPills = [
+    {
+      value: "all",
+      label: "All",
+      idle: "border-slate-300 text-slate-600 hover:border-slate-400 hover:text-slate-700",
+      active: "border-slate-600 bg-slate-600 text-white",
+    },
+    {
+      value: "pending",
+      label: "Pending",
+      idle: "border-amber-300 text-amber-700 hover:border-amber-400 hover:text-amber-800",
+      active: "border-amber-500 bg-amber-500 text-white",
+    },
+    {
+      value: "accepted",
+      label: "Accepted",
+      idle: "border-blue-300 text-blue-700 hover:border-blue-400 hover:text-blue-800",
+      active: "border-blue-600 bg-blue-600 text-white",
+    },
+    {
+      value: "completed",
+      label: "Completed",
+      idle: "border-green-300 text-green-700 hover:border-green-400 hover:text-green-800",
+      active: "border-green-600 bg-green-600 text-white",
+    },
+  ];
 
   useEffect(() => {
     loadOrders();
@@ -89,58 +110,42 @@ export function OrdersPage() {
             <div className="relative">
               <Search
                 size={20}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                strokeWidth={2.5}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-600"
               />
               <input
                 type="text"
                 placeholder="Search by order ID or pharmacy..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
+                className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 shadow-sm rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
               />
             </div>
 
-            {/* Filter Buttons */}
+            {/* Filter Pills */}
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative">
-                <button
-                  onClick={() => setShowFilterMenu(!showFilterMenu)}
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-                >
-                  <Filter size={18} />
-                  Status Filter
-                  <ChevronDown size={16} />
-                </button>
-
-                {showFilterMenu && (
-                  <div className="absolute top-full mt-2 left-0 bg-white border border-gray-300 rounded-lg shadow-lg z-20 min-w-48">
-                    {statuses.map((status) => (
-                      <button
-                        key={status}
-                        onClick={() => {
-                          setStatusFilter(status);
-                          setShowFilterMenu(false);
-                        }}
-                        className={`w-full text-left px-4 py-2 hover:bg-gray-100 capitalize transition ${
-                          statusFilter === status
-                            ? "bg-blue-50 text-blue-600 font-medium"
-                            : "text-gray-700"
-                        }`}
-                      >
-                        {status}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {statusPills.map((pill) => {
+                const isActive = statusFilter === pill.value;
+                return (
+                  <button
+                    key={pill.value}
+                    type="button"
+                    onClick={() => setStatusFilter(pill.value)}
+                    className={`px-3.5 py-1.5 rounded-full border text-sm font-medium transition-all duration-200 ${isActive ? pill.active : pill.idle}`}
+                  >
+                    {pill.label}
+                  </button>
+                );
+              })}
 
               {(searchTerm || statusFilter !== "all") && (
                 <button
+                  type="button"
                   onClick={() => {
                     setSearchTerm("");
                     setStatusFilter("all");
                   }}
-                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  className="px-3.5 py-1.5 rounded-full border border-slate-300 text-slate-600 hover:text-slate-900 hover:border-slate-400 text-sm font-medium transition-all duration-200"
                 >
                   Clear Filters
                 </button>

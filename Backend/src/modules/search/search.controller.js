@@ -14,6 +14,91 @@ import logger from "../../utils/logger.js";
 
 class SearchController {
   /**
+   * Universal search endpoint for medicines and pharmacies
+   *
+   * GET /api/search/universal?query=paracetamol&lat=27.7172&lng=85.3240
+   */
+  getUniversalSearchResults = asyncHandler(async (req, res) => {
+    const {
+      query,
+      lat,
+      lng,
+      latitude,
+      longitude,
+      includeOutOfStock,
+      medicineLimit,
+      pharmacyLimit,
+    } = req.query;
+
+    if (!query || !query.trim()) {
+      throw new BadRequestError("Search query parameter is required");
+    }
+
+    const resolvedLat = lat ?? latitude;
+    const resolvedLng = lng ?? longitude;
+
+    const parsedLatitude =
+      resolvedLat !== undefined ? parseFloat(resolvedLat) : undefined;
+    const parsedLongitude =
+      resolvedLng !== undefined ? parseFloat(resolvedLng) : undefined;
+
+    const hasLatitude = Number.isFinite(parsedLatitude);
+    const hasLongitude = Number.isFinite(parsedLongitude);
+
+    if (hasLatitude !== hasLongitude) {
+      throw new BadRequestError(
+        "Both lat and lng must be provided together"
+      );
+    }
+
+    if (
+      hasLatitude &&
+      (parsedLatitude < -90 ||
+        parsedLatitude > 90 ||
+        parsedLongitude < -180 ||
+        parsedLongitude > 180)
+    ) {
+      throw new BadRequestError("Invalid latitude or longitude");
+    }
+
+    const results = await searchService.getUniversalSearchResults({
+      query: query.trim(),
+      latitude: hasLatitude ? parsedLatitude : undefined,
+      longitude: hasLongitude ? parsedLongitude : undefined,
+      includeOutOfStock: includeOutOfStock === "true",
+      medicineLimit: medicineLimit
+        ? Math.min(Math.max(parseInt(medicineLimit, 10), 1), 20)
+        : 8,
+      pharmacyLimit: pharmacyLimit
+        ? Math.min(Math.max(parseInt(pharmacyLimit, 10), 1), 20)
+        : 8,
+    });
+
+    logger.info("Universal search query", {
+      query: query.trim(),
+      hasLocation: hasLatitude,
+      coordinates: hasLatitude
+        ? { lat: parsedLatitude, lng: parsedLongitude }
+        : null,
+      medicineResults: results.medicines.length,
+      pharmacyResults: results.pharmacies.length,
+      userId: req.user?.id,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        medicines: results.medicines,
+        pharmacies: results.pharmacies,
+      },
+      meta: {
+        query: query.trim(),
+        hasUserLocation: hasLatitude,
+      },
+    });
+  });
+
+  /**
    * Search for medicines by name or generic name
    * 
    * GET /api/search?query=Cetamol&latitude=27.7172&longitude=85.3240

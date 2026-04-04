@@ -14,6 +14,245 @@ import { NotFoundError, BadRequestError } from "../../utils/errors.js";
 
 class SearchService {
   /**
+   * Universal search across medicines and pharmacies
+   *
+   * @param {Object} params
+   * @param {string} params.query
+   * @param {number} [params.latitude]
+   * @param {number} [params.longitude]
+   * @param {boolean} [params.includeOutOfStock=false]
+   * @param {number} [params.medicineLimit=8]
+   * @param {number} [params.pharmacyLimit=8]
+   * @returns {Promise<{medicines: Array, pharmacies: Array}>}
+   */
+  async getUniversalSearchResults({
+    query,
+    latitude,
+    longitude,
+    includeOutOfStock = false,
+    medicineLimit = 8,
+    pharmacyLimit = 8,
+  }) {
+    if (!query || query.trim().length === 0) {
+      throw new BadRequestError("Search query is required");
+    }
+
+    const searchTerm = query.trim();
+    const hasLocation =
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude) &&
+      latitude >= -90 &&
+      latitude <= 90 &&
+      longitude >= -180 &&
+      longitude <= 180;
+
+    const [inventoryItems, pharmacies] = await Promise.all([
+      prisma.inventory.findMany({
+        where: {
+          OR: [
+            {
+              name: {
+                contains: searchTerm,
+                mode: "insensitive",
+              },
+            },
+            {
+              genericName: {
+                contains: searchTerm,
+                mode: "insensitive",
+              },
+            },
+          ],
+          ...(includeOutOfStock ? {} : { quantity: { gt: 0 } }),
+          pharmacy: {
+            verificationStatus: "VERIFIED",
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          genericName: true,
+          price: true,
+          quantity: true,
+          pharmacy: {
+            select: {
+              id: true,
+              pharmacyName: true,
+              address: true,
+              contactNumber: true,
+              latitude: true,
+              longitude: true,
+              averageRating: true,
+              totalReviews: true,
+            },
+          },
+        },
+        take: Math.max(medicineLimit * 8, 40),
+      }),
+      prisma.pharmacy.findMany({
+        where: {
+          verificationStatus: "VERIFIED",
+          pharmacyName: {
+            contains: searchTerm,
+            mode: "insensitive",
+          },
+        },
+        select: {
+          id: true,
+          pharmacyName: true,
+          address: true,
+          contactNumber: true,
+          latitude: true,
+          longitude: true,
+          averageRating: true,
+          totalReviews: true,
+          _count: {
+            select: {
+              inventory: {
+                where: {
+                  quantity: { gt: 0 },
+                },
+              },
+            },
+          },
+        },
+        take: Math.max(pharmacyLimit * 3, 20),
+      }),
+    ]);
+
+    const medicineGroups = new Map();
+
+    inventoryItems.forEach((item) => {
+      const groupKey = `${String(item.name || "").toLowerCase()}::${String(
+        item.genericName || ""
+      ).toLowerCase()}`;
+
+      const distance = hasLocation
+        ? calculateDistance(
+            latitude,
+            longitude,
+            item.pharmacy.latitude,
+            item.pharmacy.longitude
+          )
+        : null;
+
+      const offering = {
+        inventoryId: item.id,
+        pharmacyId: item.pharmacy.id,
+        pharmacyName: item.pharmacy.pharmacyName,
+        address: item.pharmacy.address,
+        contactNumber: item.pharmacy.contactNumber,
+        price: item.price,
+        quantity: item.quantity,
+        location: {
+          lat: item.pharmacy.latitude,
+          lng: item.pharmacy.longitude,
+        },
+        distance,
+        distanceFormatted: distance !== null ? formatDistance(distance) : null,
+      };
+
+      if (!medicineGroups.has(groupKey)) {
+        medicineGroups.set(groupKey, {
+          name: item.name,
+          genericName: item.genericName,
+          offerings: [offering],
+        });
+        return;
+      }
+
+      medicineGroups.get(groupKey).offerings.push(offering);
+    });
+
+    const medicines = Array.from(medicineGroups.values())
+      .map((group) => {
+        const sortedOfferings = [...group.offerings].sort((a, b) => {
+          if (hasLocation) {
+            return (a.distance ?? Number.MAX_SAFE_INTEGER) - (b.distance ?? Number.MAX_SAFE_INTEGER);
+          }
+          return a.price - b.price;
+        });
+
+        const bestOffering = sortedOfferings[0];
+
+        return {
+          id: bestOffering.inventoryId,
+          medicine: group.name,
+          genericName: group.genericName,
+          price: bestOffering.price,
+          quantity: bestOffering.quantity,
+          inStock: bestOffering.quantity > 0,
+          pharmacy: {
+            id: bestOffering.pharmacyId,
+            name: bestOffering.pharmacyName,
+            address: bestOffering.address,
+            contactNumber: bestOffering.contactNumber,
+            location: bestOffering.location,
+          },
+          distance: bestOffering.distance,
+          distanceFormatted: bestOffering.distanceFormatted,
+          pharmacies: sortedOfferings.map((offering) => ({
+            id: offering.pharmacyId,
+            name: offering.pharmacyName,
+            address: offering.address,
+            contactNumber: offering.contactNumber,
+            price: offering.price,
+            quantity: offering.quantity,
+            distance: offering.distance,
+            distanceFormatted: offering.distanceFormatted,
+          })),
+        };
+      })
+      .sort((a, b) => {
+        if (hasLocation) {
+          return (a.distance ?? Number.MAX_SAFE_INTEGER) - (b.distance ?? Number.MAX_SAFE_INTEGER);
+        }
+        return a.medicine.localeCompare(b.medicine);
+      })
+      .slice(0, medicineLimit);
+
+    const mappedPharmacies = pharmacies
+      .map((pharmacy) => {
+        const distance = hasLocation
+          ? calculateDistance(
+              latitude,
+              longitude,
+              pharmacy.latitude,
+              pharmacy.longitude
+            )
+          : null;
+
+        return {
+          id: pharmacy.id,
+          name: pharmacy.pharmacyName,
+          address: pharmacy.address,
+          contactNumber: pharmacy.contactNumber,
+          location: {
+            lat: pharmacy.latitude,
+            lng: pharmacy.longitude,
+          },
+          distance,
+          distanceFormatted: distance !== null ? formatDistance(distance) : null,
+          medicinesInStock: pharmacy._count.inventory,
+          averageRating: pharmacy.averageRating || 0,
+          totalReviews: pharmacy.totalReviews || 0,
+        };
+      })
+      .sort((a, b) => {
+        if (hasLocation) {
+          return (a.distance ?? Number.MAX_SAFE_INTEGER) - (b.distance ?? Number.MAX_SAFE_INTEGER);
+        }
+        return a.name.localeCompare(b.name);
+      })
+      .slice(0, pharmacyLimit);
+
+    return {
+      medicines,
+      pharmacies: mappedPharmacies,
+    };
+  }
+
+  /**
    * Search for medicines with geospatial filtering
    * 
    * @param {Object} params - Search parameters

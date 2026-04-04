@@ -45,6 +45,12 @@ const router = express.Router();
  * Returns array of medicines with pharmacy details and distance (if location provided)
  */
 router.get(
+  "/search/universal",
+  authenticate({ optional: true }),
+  searchController.getUniversalSearchResults
+);
+
+router.get(
   "/search",
   authenticate({ optional: true }), // Optional auth for analytics
   searchController.searchMedicines

@@ -74,10 +74,45 @@ export const getSearchStats = async (query) => {
   return httpClient.get(`/search/stats?query=${encodeURIComponent(query)}`);
 };
 
+/**
+ * Universal search for medicines and pharmacies
+ *
+ * @param {string} query - Search term
+ * @param {number} lat - User latitude (optional)
+ * @param {number} lng - User longitude (optional)
+ * @param {Object} options - Additional search options
+ * @returns {Promise} Categorized universal search results
+ */
+export const universalSearch = async (query, lat, lng, options = {}) => {
+  const params = new URLSearchParams();
+
+  params.append("query", query);
+
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    params.append("lat", String(lat));
+    params.append("lng", String(lng));
+  }
+
+  if (options.includeOutOfStock !== undefined) {
+    params.append("includeOutOfStock", String(options.includeOutOfStock));
+  }
+
+  if (options.medicineLimit) {
+    params.append("medicineLimit", String(options.medicineLimit));
+  }
+
+  if (options.pharmacyLimit) {
+    params.append("pharmacyLimit", String(options.pharmacyLimit));
+  }
+
+  return httpClient.get(`/search/universal?${params.toString()}`);
+};
+
 const searchService = {
   searchMedicines,
   findNearbyPharmacies,
   getSearchStats,
+  universalSearch,
 };
 
 export default searchService;

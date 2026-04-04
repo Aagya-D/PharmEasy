@@ -24,7 +24,7 @@ import {
 import notificationService from "../../core/services/notification.service";
 import { useNotification } from "../../context/NotificationContext";
 
-const NotificationDropdown = () => {
+const NotificationDropdown = ({ mode = "default" }) => {
   const navigate = useNavigate();
   const {
     unreadNotifications: unreadCount,
@@ -39,6 +39,7 @@ const NotificationDropdown = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const dropdownRef = useRef(null);
+  const footerLink = mode === "admin" ? "/admin/logs" : "/notifications";
 
   // Fetch detailed notifications when dropdown opens; sync badge count from real list
   useEffect(() => {
@@ -89,6 +90,12 @@ const NotificationDropdown = () => {
     if (notif.metadata?.link) {
       setIsOpen(false);
       navigate(notif.metadata.link);
+      return;
+    }
+
+    if (mode === "admin" && notif?.title === "NEW_PHARMACY_REGISTRATION") {
+      setIsOpen(false);
+      navigate("/admin/pharmacies?status=PENDING");
     }
   };
 
@@ -191,7 +198,9 @@ const NotificationDropdown = () => {
         <div className="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl z-50 overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-900">Notifications</h3>
+            <h3 className="text-lg font-bold text-gray-900">
+              {mode === "admin" ? "System Alerts" : "Notifications"}
+            </h3>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
@@ -294,7 +303,7 @@ const NotificationDropdown = () => {
           {!loading && !error && notifications.length > 0 && (
             <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-center">
               <a
-                href="/notifications"
+                href={footerLink}
                 className="text-sm font-medium text-blue-600 hover:text-blue-700"
               >
                 View all notifications →

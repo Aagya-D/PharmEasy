@@ -11,6 +11,7 @@ import { createLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
 import { hashPassword, comparePassword } from "../../utils/password.js";
 import { prisma } from "../../database/prisma.js";
 import { isValidNepaliPhone } from "../../utils/validation.js";
+import notificationService from "../notifications/notification.service.js";
 
 const normalizeShippingAddress = (payload) => {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
@@ -70,6 +71,28 @@ const COOKIE_OPTIONS = {
 const ACCESS_TOKEN_COOKIE_MAX_AGE = TOKEN_EXPIRY_MS.ACCESS;
 const REFRESH_TOKEN_COOKIE_MAX_AGE = TOKEN_EXPIRY_MS.REFRESH;
 const ACCESS_TOKEN_EXPIRES_IN_SECONDS = Math.floor(TOKEN_EXPIRY_MS.ACCESS / 1000);
+
+const failedLoginTracker = new Map();
+const FAILED_LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const FAILED_LOGIN_THRESHOLD = 3;
+const SECURITY_ALERT_COOLDOWN_MS = 5 * 60 * 1000;
+
+const registerFailedLoginAttempt = ({ email, ipAddress }) => {
+  const key = `${String(email || "unknown").toLowerCase()}::${String(ipAddress || "unknown")}`;
+  const now = Date.now();
+  const current = failedLoginTracker.get(key) || { attempts: [], lastAlertAt: 0 };
+
+  const validAttempts = current.attempts.filter((ts) => now - ts <= FAILED_LOGIN_WINDOW_MS);
+  validAttempts.push(now);
+
+  const next = {
+    attempts: validAttempts,
+    lastAlertAt: current.lastAlertAt || 0,
+  };
+
+  failedLoginTracker.set(key, next);
+  return { key, ...next };
+};
 
 // ---------------- REGISTER ----------------
 export const register = async (req, res, next) => {
@@ -138,6 +161,36 @@ export const register = async (req, res, next) => {
         roleId: result.roleId,
       }
     );
+
+    const resolvedRoleId = Number(roleId || roleTypeId);
+    if (resolvedRoleId === 2) {
+      const pharmacyName =
+        String(pharmacyDetails?.pharmacyName || "").trim() ||
+        fullName ||
+        "New Pharmacy Applicant";
+
+      await notificationService.notifyNewPharmacyRegistration(
+        pharmacyName,
+        result.userId,
+        null
+      );
+
+      const io = req.app.get("io");
+      if (io) {
+        io.emit("SYSTEM_ALERT", {
+          event: "NEW_PHARMACY_REGISTRATION",
+          title: "NEW_PHARMACY_REGISTRATION",
+          message: `New Onboarding: ${pharmacyName} is awaiting license verification.`,
+          priority: "high",
+          metadata: {
+            link: "/admin/pharmacies?status=PENDING",
+            pharmacyName,
+            pharmacyUserId: result.userId,
+          },
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -231,6 +284,7 @@ export const verifyEmailOTP = async (req, res, next) => {
           id: user.id,
           email: user.email,
           name: user.name,
+          avatarUrl: user.avatarUrl || null,
           roleId: user.roleId,
           role: user.role.name,
           isVerified: user.isVerified,
@@ -319,6 +373,7 @@ export const login = async (req, res, next) => {
         userId: result.userId,
         email: result.email,
         name: result.name,
+        avatarUrl: result.avatarUrl || null,
         role: result.role,
         roleId: result.roleId,
         status: result.status,
@@ -368,6 +423,49 @@ export const login = async (req, res, next) => {
     // Handle invalid credentials (401 Unauthorized)
     if (err.status === 401 || err.statusCode === 401) {
       logger.warn('AUTH', '[LOGIN] Invalid credentials', { email: req.body.email });
+
+      const attemptInfo = registerFailedLoginAttempt({
+        email: req.body.email,
+        ipAddress: req.ip,
+      });
+
+      const now = Date.now();
+      const shouldRaiseSecurityFlag =
+        attemptInfo.attempts.length >= FAILED_LOGIN_THRESHOLD &&
+        now - attemptInfo.lastAlertAt > SECURITY_ALERT_COOLDOWN_MS;
+
+      if (shouldRaiseSecurityFlag) {
+        failedLoginTracker.set(attemptInfo.key, {
+          attempts: attemptInfo.attempts,
+          lastAlertAt: now,
+        });
+
+        const maskedEmail = String(req.body.email || "unknown").replace(/(.{2}).+(@.*)/, "$1***$2");
+        const securityMessage = `Security flag: Multiple failed login attempts detected for ${maskedEmail} from IP ${req.ip || "unknown"}.`;
+
+        await notificationService.notifySecurityFlag(securityMessage, {
+          signal: "FAILED_LOGIN_THRESHOLD",
+          email: req.body.email || null,
+          ipAddress: req.ip || null,
+          attempts: attemptInfo.attempts.length,
+        });
+
+        const io = req.app.get("io");
+        if (io) {
+          io.emit("SYSTEM_ALERT", {
+            event: "SECURITY_FLAG",
+            title: "SECURITY_FLAG",
+            message: securityMessage,
+            priority: "high",
+            metadata: {
+              link: "/admin/logs",
+              signal: "FAILED_LOGIN_THRESHOLD",
+            },
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
@@ -430,6 +528,11 @@ export const refreshTokens = async (req, res, next) => {
     // GENERATE NEW TOKENS
     // ============================================
     const user = await userService.getUserById(payload.userId);
+    if (!user) {
+      await userService.clearRefreshToken(payload.userId).catch(() => {});
+      throw new AuthenticationError("User not found for refresh token");
+    }
+
     const pharmacyStatus = user?.pharmacy?.verificationStatus || null;
     const newAccess = generateAccessToken(payload.userId, user?.role?.name, pharmacyStatus);
     const newRefresh = generateRefreshToken(payload.userId);
@@ -453,6 +556,29 @@ export const refreshTokens = async (req, res, next) => {
       data: {
         accessToken: newAccess,
         refreshToken: newRefresh,
+        user: {
+          userId: user.id,
+          email: user.email,
+          name: user.name,
+          avatarUrl: user.avatarUrl || null,
+          role: user.role?.name,
+          roleId: user.roleId,
+          status: user.status,
+          isVerified: user.isVerified,
+          shippingAddress: user.shippingAddress || null,
+          pharmacy: user.pharmacy
+            ? {
+                id: user.pharmacy.id,
+                pharmacyName: user.pharmacy.pharmacyName,
+                verificationStatus: user.pharmacy.verificationStatus,
+                rejectionReason: user.pharmacy.rejectionReason,
+                address: user.pharmacy.address,
+                contactNumber: user.pharmacy.contactNumber,
+              }
+            : null,
+          isOnboarded: user.roleId === 2 ? !!user.pharmacy : true,
+          needsOnboarding: user.roleId === 2 && !user.pharmacy,
+        },
       },
       expiresIn: ACCESS_TOKEN_EXPIRES_IN_SECONDS,
     });
@@ -594,6 +720,7 @@ export const getCurrentUser = async (req, res, next) => {
           id: user.id,
           email: user.email,
           name: user.name,
+          avatarUrl: user.avatarUrl || null,
           roleId: user.roleId,
           role: user.role.name,
           status: user.status,

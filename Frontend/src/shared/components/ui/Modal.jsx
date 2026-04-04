@@ -9,7 +9,18 @@ import { X } from "lucide-react";
  * @param {ReactNode} children - Modal content
  * @param {string} size - Modal size: 'sm', 'md', 'lg', 'xl' (default: 'md')
  */
-export default function Modal({ isOpen, onClose, title, children, size = "md", headerActions = null }) {
+export default function Modal({
+  isOpen,
+  onClose,
+  title,
+  children,
+  size = "md",
+  headerActions = null,
+  backdropClassName = "",
+  contentClassName = "",
+  headerClassName = "",
+  bodyClassName = "",
+}) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -43,6 +54,7 @@ export default function Modal({ isOpen, onClose, title, children, size = "md", h
   const sizeClasses = {
     sm: "max-w-md",
     md: "max-w-lg",
+    compact: "max-w-xl",
     lg: "max-w-2xl",
     xl: "max-w-4xl",
   };
@@ -51,7 +63,7 @@ export default function Modal({ isOpen, onClose, title, children, size = "md", h
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        className={`fixed inset-0 bg-black bg-opacity-50 transition-opacity ${backdropClassName}`}
         onClick={onClose}
         aria-hidden="true"
       />
@@ -60,11 +72,11 @@ export default function Modal({ isOpen, onClose, title, children, size = "md", h
       <div className="flex min-h-full items-center justify-center p-4">
         {/* Modal Content */}
         <div
-          className={`relative bg-white rounded-lg shadow-xl ${sizeClasses[size]} w-full transform transition-all`}
+          className={`relative bg-white rounded-lg shadow-xl ${sizeClasses[size]} w-full transform transition-all ${contentClassName}`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className={`flex items-center justify-between px-6 py-4 border-b border-gray-200 ${headerClassName}`}>
             <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
             <div className="flex items-center gap-2">
               {headerActions}
@@ -79,7 +91,7 @@ export default function Modal({ isOpen, onClose, title, children, size = "md", h
           </div>
 
           {/* Body */}
-          <div className="px-6 py-4">{children}</div>
+          <div className={`px-6 py-4 ${bodyClassName}`}>{children}</div>
         </div>
       </div>
     </div>

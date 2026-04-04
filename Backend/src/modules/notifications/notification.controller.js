@@ -23,6 +23,7 @@ export const getUserNotifications = async (req, res, next) => {
   try {
     const userId = req.user.userId || req.user.id;
     const { limit = 20, skip = 0 } = req.query;
+    const isSystemAdmin = req.user.role === "SYSTEM_ADMIN";
 
     if (isNaN(limit) || isNaN(skip)) {
       throw new BadRequestError("Invalid limit or skip parameters");
@@ -40,7 +41,8 @@ export const getUserNotifications = async (req, res, next) => {
       userId,
       parseInt(limit),
       parseInt(skip),
-      targetRole
+      targetRole,
+      { strictGlobal: isSystemAdmin }
     );
 
     res.success({
@@ -63,6 +65,7 @@ export const getUserNotifications = async (req, res, next) => {
 export const getUnreadCount = async (req, res, next) => {
   try {
     const userId = req.user.userId || req.user.id;
+    const isSystemAdmin = req.user.role === "SYSTEM_ADMIN";
 
     const roleMap = {
       PHARMACY_ADMIN: "PHARMACY",
@@ -71,12 +74,18 @@ export const getUnreadCount = async (req, res, next) => {
     };
     const targetRole = roleMap[req.user.role] || null;
 
-    const count = await notificationService.getUnreadCount(userId, targetRole);
+    const count = await notificationService.getUnreadCount(userId, targetRole, {
+      strictGlobal: isSystemAdmin,
+    });
 
     // Check if any unread notification is high-priority (SOS)
     let hasHighPriority = false;
     if (count > 0) {
-      hasHighPriority = await notificationService.hasUnreadHighPriority(userId, targetRole);
+      hasHighPriority = await notificationService.hasUnreadHighPriority(
+        userId,
+        targetRole,
+        { strictGlobal: isSystemAdmin }
+      );
     }
 
     res.success({
