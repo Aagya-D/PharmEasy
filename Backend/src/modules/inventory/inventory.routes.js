@@ -16,7 +16,7 @@
 import express from "express";
 import { authenticate } from "../../middlewares/auth.js";
 import { requireVerifiedPharmacy } from "../../middlewares/roleCheck.js";
-import inventoryController from "./inventory.controller.js";
+import inventoryController, { uploadMedicineImage } from "./inventory.controller.js";
 
 const router = express.Router();
 
@@ -47,6 +47,17 @@ router.post(
   "/inventory",
   authenticate(),
   requireVerifiedPharmacy,
+  (req, res, next) => {
+    uploadMedicineImage(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message || "Medicine image upload failed",
+        });
+      }
+      return next();
+    });
+  },
   inventoryController.addMedicine
 );
 
@@ -102,6 +113,17 @@ router.patch(
   "/inventory/:id",
   authenticate(),
   requireVerifiedPharmacy,
+  (req, res, next) => {
+    uploadMedicineImage(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message || "Medicine image upload failed",
+        });
+      }
+      return next();
+    });
+  },
   inventoryController.updateInventoryItem
 );
 

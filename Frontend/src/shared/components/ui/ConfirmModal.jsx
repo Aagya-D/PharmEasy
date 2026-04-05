@@ -23,6 +23,7 @@ export default function ConfirmModal({
   confirmLabel = "Delete",
   variant = "danger",
   isLoading = false,
+  backdropClassName = "bg-black/50 backdrop-blur-sm",
 }) {
   // Lock body scroll and handle Escape key
   useEffect(() => {
@@ -48,7 +49,7 @@ export default function ConfirmModal({
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className={`absolute inset-0 ${backdropClassName}`}
         onClick={!isLoading ? onClose : undefined}
         aria-hidden="true"
       />

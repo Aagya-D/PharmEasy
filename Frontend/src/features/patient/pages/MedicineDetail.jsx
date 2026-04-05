@@ -14,18 +14,44 @@ import {
   Route,
   Building2,
   CalendarDays,
-  PackageSearch,
   Phone,
 } from "lucide-react";
 import { useCart } from "../../../context/CartContext";
 import StarRating from "../../../shared/components/StarRating";
 import searchService from "../../../core/services/search.service";
+import MedicineImage from "../../../shared/components/ui/MedicineImage";
 
 const formatCurrency = (price) =>
   `Rs. ${Number(price || 0).toLocaleString("en-NP", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+
+const formatDistance = (medicine) => {
+  const distance = medicine?.distanceFormatted || medicine?.distance || medicine?.pharmacy?.distance;
+  if (distance === undefined || distance === null || distance === "") return "Distance unavailable";
+
+  if (typeof distance === "string") {
+    return distance.includes("km") || distance.includes("m") ? distance : `${distance} away`;
+  }
+
+  const numericDistance = Number(distance);
+  if (!Number.isFinite(numericDistance)) return "Distance unavailable";
+  return numericDistance < 1
+    ? `${Math.max(1, Math.round(numericDistance * 1000))}m away`
+    : `${numericDistance.toFixed(1)}km away`;
+};
+
+const getDirectionsUrl = (medicine) => {
+  const lat = medicine?.pharmacy?.location?.lat;
+  const lng = medicine?.pharmacy?.location?.lng;
+
+  if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+    return null;
+  }
+
+  return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+};
 
 const formatExpiryDate = (value) => {
   if (!value) return "N/A";
@@ -67,8 +93,7 @@ export default function MedicineDetail() {
   const { id } = useParams();
   const { addToCart, clearCart, isPharmacyMismatchError } = useCart();
 
-  const [similarSubstitutes, setSimilarSubstitutes] = useState([]);
-  const [loadingAlternatives, setLoadingAlternatives] = useState(false);
+  const [resolvedMedicine, setResolvedMedicine] = useState(null);
 
   const medicine = useMemo(() => {
     if (location.state?.medicine) {
@@ -83,8 +108,28 @@ export default function MedicineDetail() {
     }
   }, [id, location.state]);
 
-  const medicineId = String(medicine?.id || id || "");
-  const medicineName = medicine?.medicine || medicine?.brandName || medicine?.name || "Medicine";
+  const hasFullDetails = (item) =>
+    Boolean(
+      item &&
+      item.sideEffects !== undefined &&
+      item.contraindications !== undefined &&
+      item.warnings !== undefined &&
+      item.dosageInstructions !== undefined &&
+      item.strength !== undefined &&
+      item.form !== undefined &&
+      item.manufacturer !== undefined &&
+      item.batchNumber !== undefined &&
+      item.expiryDate !== undefined
+    );
+
+  useEffect(() => {
+    setResolvedMedicine(medicine);
+  }, [medicine]);
+
+  const activeMedicine = resolvedMedicine || medicine;
+
+  const medicineId = String(activeMedicine?.id || id || "");
+  const medicineName = activeMedicine?.medicine || activeMedicine?.brandName || activeMedicine?.name || "Medicine";
 
   const persistMedicineSnapshot = (item) => {
     try {
@@ -96,47 +141,43 @@ export default function MedicineDetail() {
   };
 
   useEffect(() => {
-    const loadAlternatives = async () => {
-      if (!medicine?.genericName && !medicineName) {
-        setSimilarSubstitutes([]);
-        return;
-      }
+    const hydrateMedicine = async () => {
+      if (!medicine || hasFullDetails(medicine)) return;
 
       try {
-        setLoadingAlternatives(true);
-        const lat = Number(medicine?.pharmacy?.location?.lat);
-        const lng = Number(medicine?.pharmacy?.location?.lng);
-
+        const lat = Number(activeMedicine?.pharmacy?.location?.lat);
+        const lng = Number(activeMedicine?.pharmacy?.location?.lng);
         const response = await searchService.searchMedicines(
-          medicine?.genericName || medicineName,
+          activeMedicine?.genericName || activeMedicine?.medicine || activeMedicine?.brandName || activeMedicine?.name || "",
           Number.isFinite(lat) ? lat : undefined,
           Number.isFinite(lng) ? lng : undefined,
           {
             includeOutOfStock: true,
             maxDistance: 80,
-            limit: 12,
+            limit: 20,
           }
         );
 
         const data = response?.data?.data || [];
         const normalized = Array.isArray(data) ? data : [];
+        const matched =
+          normalized.find((item) => String(item?.id) === String(activeMedicine?.id)) ||
+          normalized[0] ||
+          null;
 
-        const alternatives = normalized
-          .filter((item) => String(item?.id || "") !== medicineId)
-          .slice(0, 10);
-
-        setSimilarSubstitutes(alternatives);
+        if (matched) {
+          setResolvedMedicine(matched);
+          persistMedicineSnapshot(matched);
+        }
       } catch {
-        setSimilarSubstitutes([]);
-      } finally {
-        setLoadingAlternatives(false);
+        // keep cached version
       }
     };
 
-    loadAlternatives();
-  }, [medicine?.genericName, medicine?.pharmacy?.location?.lat, medicine?.pharmacy?.location?.lng, medicineId, medicineName]);
+    hydrateMedicine();
+  }, [medicine]);
 
-  const handleAddToCart = async (item = medicine) => {
+  const handleAddToCart = async (item = activeMedicine) => {
     if (!item) return;
 
     try {
@@ -175,27 +216,21 @@ export default function MedicineDetail() {
           {
             id: medicineId,
             medicineId,
-            pharmacyId: medicine?.pharmacy?.id || medicine?.pharmacyId || null,
+            pharmacyId: activeMedicine?.pharmacy?.id || activeMedicine?.pharmacyId || null,
             medicineName,
-            genericName: medicine?.genericName || null,
+            genericName: activeMedicine?.genericName || null,
             quantity: 1,
-            price: Number(medicine?.price || 0),
-            pharmacyName: medicine?.pharmacy?.name || "Unknown Pharmacy",
-            pharmacyAddress: medicine?.pharmacy?.address || null,
-            pharmacyContact: medicine?.pharmacy?.contactNumber || null,
+            price: Number(activeMedicine?.price || 0),
+            pharmacyName: activeMedicine?.pharmacy?.name || "Unknown Pharmacy",
+            pharmacyAddress: activeMedicine?.pharmacy?.address || null,
+            pharmacyContact: activeMedicine?.pharmacy?.contactNumber || null,
           },
         ],
       },
     });
   };
 
-  const handleOpenAlternative = (item) => {
-    const routeId = String(item?.id || item?.medicine || item?.name || "medicine");
-    persistMedicineSnapshot(item);
-    navigate(`/patient/medicine/${encodeURIComponent(routeId)}`, { state: { medicine: item } });
-  };
-
-  if (!medicine) {
+  if (!activeMedicine) {
     return (
       <div className="min-h-screen bg-slate-50 py-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -217,9 +252,13 @@ export default function MedicineDetail() {
     );
   }
 
-  const sideEffects = splitTextAsBullets(medicine?.sideEffects);
-  const contraindications = splitTextAsBullets(medicine?.contraindications);
-  const warnings = splitTextAsBullets(medicine?.warnings);
+  const sideEffects = splitTextAsBullets(activeMedicine?.sideEffects);
+  const contraindications = splitTextAsBullets(activeMedicine?.contraindications);
+  const warnings = splitTextAsBullets(activeMedicine?.warnings);
+  const directionsUrl = getDirectionsUrl(activeMedicine);
+  const pharmacyPhone = activeMedicine?.pharmacy?.contactNumber;
+  const pharmacyRating = activeMedicine?.pharmacy?.averageRating || 0;
+  const pharmacyReviews = activeMedicine?.pharmacy?.totalReviews || 0;
 
   return (
     <div className="min-h-screen bg-slate-100 py-6">
@@ -232,45 +271,94 @@ export default function MedicineDetail() {
           Back to Search
         </button>
 
-        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
-            <div>
-              <p className="text-xs uppercase tracking-widest text-cyan-700 font-semibold">Section 1 · Hero Card</p>
-              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mt-2">{medicineName}</h1>
-              <p className="text-slate-600 mt-2 text-lg">Generic Name: {medicine?.genericName || "N/A"}</p>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 font-semibold">
-                  <CircleDollarSign size={16} />
-                  {formatCurrency(medicine?.price)}
-                </span>
-                <span
-                  className={`inline-flex items-center gap-2 px-3 py-1 rounded-full font-semibold border ${
-                    medicine?.isPrescriptionRequired
-                      ? "bg-red-50 text-red-700 border-red-300"
-                      : "bg-emerald-50 text-emerald-700 border-emerald-300"
-                  }`}
-                >
-                  <ShieldAlert size={16} />
-                  {medicine?.isPrescriptionRequired ? "Prescription Required" : "OTC / No Prescription"}
-                </span>
+        <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm backdrop-blur-sm sm:p-5">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:items-stretch">
+            <div className="lg:col-span-3">
+              <div className="h-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 aspect-[4/3] lg:aspect-auto lg:min-h-[220px]">
+                <MedicineImage src={activeMedicine?.imageUrl} alt={medicineName} className="object-cover" />
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={() => handleAddToCart(medicine)}
-                className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors inline-flex items-center justify-center gap-2"
-              >
-                <ShoppingCart size={18} />
-                Add to Cart
-              </button>
-              <button
-                onClick={handlePlaceOrder}
-                className="px-6 py-3 rounded-xl bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-semibold transition-colors inline-flex items-center justify-center gap-2"
-              >
-                <Truck size={18} />
-                Buy Now
-              </button>
+            <div className="lg:col-span-9 flex flex-col gap-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-2">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 leading-tight">{medicineName}</h1>
+                  <p className="text-sm text-slate-600">Generic Name: {activeMedicine?.genericName || "N/A"}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-sm font-semibold text-cyan-700">
+                      <CircleDollarSign size={16} />
+                      {formatCurrency(activeMedicine?.price)}
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${
+                        activeMedicine?.isPrescriptionRequired
+                          ? "border-red-200 bg-red-50 text-red-700"
+                          : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      }`}
+                    >
+                      <ShieldAlert size={14} />
+                      {activeMedicine?.isPrescriptionRequired ? "Prescription Required" : "OTC / No Prescription"}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleAddToCart(activeMedicine)}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                  >
+                    <ShoppingCart size={16} />
+                    Add to Cart
+                  </button>
+                  <button
+                    onClick={handlePlaceOrder}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                  >
+                    <Truck size={16} />
+                    Buy Now
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 sm:p-4">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 font-semibold">Pharmacy Info</p>
+                    <p className="text-sm font-semibold text-slate-900">{activeMedicine?.pharmacy?.name || "Unknown Pharmacy"}</p>
+                    <p className="text-xs text-slate-600">{activeMedicine?.pharmacy?.address || "Address unavailable"}</p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <StarRating rating={pharmacyRating} totalReviews={pharmacyReviews} size={14} />
+                      <span className="text-xs text-slate-500">{pharmacyReviews > 0 ? `${pharmacyReviews} reviews` : "No reviews yet"}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 border border-slate-200">
+                      {formatDistance(activeMedicine)}
+                    </span>
+                    {pharmacyPhone && (
+                      <a
+                        href={`tel:${pharmacyPhone}`}
+                        className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50"
+                      >
+                        <Phone size={14} />
+                        Call Now
+                      </a>
+                    )}
+                    {directionsUrl && (
+                      <a
+                        href={directionsUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white px-3 py-1 text-xs font-semibold text-cyan-700 transition-colors hover:bg-cyan-50"
+                      >
+                        <Route size={14} />
+                        Directions
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -332,21 +420,21 @@ export default function MedicineDetail() {
               <p className="text-sm text-slate-500">Step 1</p>
               <p className="mt-1 font-semibold text-slate-900 inline-flex items-center gap-2">
                 <Route size={16} className="text-blue-600" />
-                Route: {formatRoute(medicine?.route)}
+                Route: {formatRoute(activeMedicine?.route)}
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
               <p className="text-sm text-slate-500">Step 2</p>
               <p className="mt-1 font-semibold text-slate-900 inline-flex items-center gap-2">
                 <Clock3 size={16} className="text-blue-600" />
-                Timing: {formatTiming(medicine?.timing)}
+                Timing: {formatTiming(activeMedicine?.timing)}
               </p>
             </div>
             <div className="md:col-span-2 rounded-xl border border-slate-200 p-4 bg-slate-50">
               <p className="text-sm text-slate-500">Step 3</p>
               <p className="mt-1 font-semibold text-slate-900">Dosage Instructions</p>
               <p className="mt-2 text-slate-700 text-sm whitespace-pre-line">
-                {medicine?.dosageInstructions || "Dosage guidance not provided. Please consult a pharmacist before use."}
+                {activeMedicine?.dosageInstructions || "Dosage guidance not provided. Please consult a pharmacist before use."}
               </p>
             </div>
           </div>
@@ -357,107 +445,37 @@ export default function MedicineDetail() {
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
               <p className="text-xs text-slate-500 uppercase">Strength</p>
-              <p className="mt-1 text-slate-900 font-semibold">{medicine?.strength || "N/A"}</p>
+              <p className="mt-1 text-slate-900 font-semibold">{activeMedicine?.strength || "N/A"}</p>
             </div>
             <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
               <p className="text-xs text-slate-500 uppercase">Form</p>
-              <p className="mt-1 text-slate-900 font-semibold">{medicine?.form || "N/A"}</p>
+              <p className="mt-1 text-slate-900 font-semibold">{activeMedicine?.form || "N/A"}</p>
             </div>
             <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
               <p className="text-xs text-slate-500 uppercase">Manufacturer</p>
               <p className="mt-1 text-slate-900 font-semibold inline-flex items-center gap-2">
                 <Building2 size={15} className="text-purple-600" />
-                {medicine?.manufacturer || "N/A"}
+                {activeMedicine?.manufacturer || "N/A"}
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
               <p className="text-xs text-slate-500 uppercase">Batch Number</p>
-              <p className="mt-1 text-slate-900 font-semibold">{medicine?.batchNumber || "N/A"}</p>
+              <p className="mt-1 text-slate-900 font-semibold">{activeMedicine?.batchNumber || "N/A"}</p>
             </div>
             <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
               <p className="text-xs text-slate-500 uppercase">Expiry</p>
               <p className="mt-1 text-slate-900 font-semibold inline-flex items-center gap-2">
                 <CalendarDays size={15} className="text-purple-600" />
-                {formatExpiryDate(medicine?.expiryDate || medicine?.expiry)}
+                {formatExpiryDate(activeMedicine?.expiryDate || activeMedicine?.expiry)}
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
               <p className="text-xs text-slate-500 uppercase">Available Stock</p>
-              <p className="mt-1 text-slate-900 font-semibold">{medicine?.quantity ?? "N/A"}</p>
+              <p className="mt-1 text-slate-900 font-semibold">{activeMedicine?.quantity ?? "N/A"}</p>
             </div>
           </div>
         </section>
 
-        <section className="bg-white border border-orange-200 rounded-2xl shadow-sm p-6 sm:p-8">
-          <p className="text-xs uppercase tracking-widest text-orange-700 font-semibold">Section 5 · Social & Alternatives</p>
-          <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-5">
-            <article className="lg:col-span-1 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <h3 className="text-lg font-semibold text-slate-900">Pharmacy Reviews</h3>
-              <p className="mt-1 text-sm text-slate-600">{medicine?.pharmacy?.name || "Unknown Pharmacy"}</p>
-              <div className="mt-3">
-                <StarRating
-                  rating={medicine?.pharmacy?.averageRating || 0}
-                  totalReviews={medicine?.pharmacy?.totalReviews || 0}
-                  size={15}
-                />
-              </div>
-              {medicine?.pharmacy?.contactNumber && (
-                <a
-                  href={`tel:${medicine.pharmacy.contactNumber}`}
-                  className="mt-4 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100 transition-colors"
-                >
-                  <Phone size={16} />
-                  Call Pharmacy
-                </a>
-              )}
-            </article>
-
-            <article className="lg:col-span-2 rounded-xl border border-slate-200 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-slate-900 inline-flex items-center gap-2">
-                  <PackageSearch size={18} className="text-orange-600" />
-                  Similar Substitutes
-                </h3>
-              </div>
-
-              {loadingAlternatives ? (
-                <p className="mt-4 text-sm text-slate-500">Loading alternatives...</p>
-              ) : similarSubstitutes.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500">No similar substitutes found nearby.</p>
-              ) : (
-                <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
-                  {similarSubstitutes.map((item) => (
-                    <div
-                      key={String(item?.id || item?.medicine || item?.name)}
-                      className="min-w-[220px] max-w-[220px] rounded-lg border border-slate-200 bg-slate-50 p-3"
-                    >
-                      <p className="font-semibold text-slate-900 line-clamp-2">{item?.medicine || item?.name}</p>
-                      <p className="text-xs text-slate-500 mt-1 line-clamp-1">{item?.genericName || "N/A"}</p>
-                      <p className="text-sm text-blue-700 font-bold mt-2">{formatCurrency(item?.price)}</p>
-                      <p className="text-xs text-slate-600 mt-1 line-clamp-1">{item?.pharmacy?.name || "Unknown Pharmacy"}</p>
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenAlternative(item)}
-                          className="flex-1 px-3 py-2 text-xs rounded-md border border-slate-300 hover:bg-white transition-colors"
-                        >
-                          View
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleAddToCart(item)}
-                          className="flex-1 px-3 py-2 text-xs rounded-md bg-orange-600 text-white hover:bg-orange-700 transition-colors"
-                        >
-                          Add
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </article>
-          </div>
-        </section>
       </div>
     </div>
   );

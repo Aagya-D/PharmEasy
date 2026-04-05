@@ -236,6 +236,7 @@ model Inventory {
   id          String   @id @default(uuid())
   name        String
   genericName String
+  imageUrl    String?
   quantity    Int
   price       Float
   expiryDate  DateTime

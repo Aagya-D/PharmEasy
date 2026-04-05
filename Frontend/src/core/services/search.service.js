@@ -108,11 +108,39 @@ export const universalSearch = async (query, lat, lng, options = {}) => {
   return httpClient.get(`/search/universal?${params.toString()}`);
 };
 
+/**
+ * Get top medicines near user location for patient home discovery grid
+ *
+ * @param {Object} params
+ * @param {number} [params.lat] - User latitude
+ * @param {number} [params.lng] - User longitude
+ * @param {number} [params.limit=8] - Max results
+ * @param {string} [params.category] - Optional category key
+ * @returns {Promise}
+ */
+export const getTopMedicines = async ({ lat, lng, limit = 8, category } = {}) => {
+  const params = new URLSearchParams();
+
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    params.append("lat", String(lat));
+    params.append("lng", String(lng));
+  }
+
+  params.append("limit", String(limit));
+
+  if (category) {
+    params.append("category", String(category));
+  }
+
+  return httpClient.get(`/search/top-medicines?${params.toString()}`);
+};
+
 const searchService = {
   searchMedicines,
   findNearbyPharmacies,
   getSearchStats,
   universalSearch,
+  getTopMedicines,
 };
 
 export default searchService;

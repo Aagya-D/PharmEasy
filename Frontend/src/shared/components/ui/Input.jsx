@@ -43,7 +43,7 @@ export function Input({
       {label && (
         <label
           htmlFor={inputId}
-          className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
+          className="block text-sm font-medium text-slate-700 mb-2"
         >
           {label}
           {required && <span className="text-red-500 ml-1" aria-label="required">*</span>}
@@ -75,14 +75,14 @@ export function Input({
             ${icon ? "pl-10" : ""}
             ${hasError 
               ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200" 
-              : "border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              : "border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             }
             ${disabled 
               ? "bg-slate-50 text-slate-500 cursor-not-allowed" 
-              : "bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+              : "bg-white text-slate-900"
             }
             focus:outline-none
-            placeholder:text-slate-500 dark:placeholder:text-gray-400
+            placeholder:text-slate-500
           `}
           {...props}
         />
@@ -165,14 +165,14 @@ export function TextArea({
           w-full px-4 py-2.5 text-base rounded-lg border transition-all resize-none
           ${hasError 
             ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200" 
-            : "border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            : "border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           }
           ${disabled 
             ? "bg-slate-50 text-slate-500 cursor-not-allowed" 
-            : "bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+            : "bg-white text-slate-900"
           }
           focus:outline-none
-          placeholder:text-slate-500 dark:placeholder:text-gray-400
+          placeholder:text-slate-500
         `}
         {...props}
       />
@@ -200,3 +200,4 @@ export function TextArea({
 }
 
 export default Input;
+

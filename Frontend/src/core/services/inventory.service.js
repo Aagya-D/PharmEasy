@@ -1,5 +1,24 @@
 import httpClient from "./httpClient";
 
+const toInventoryFormData = (payload = {}) => {
+  const formData = new FormData();
+
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined || value === null || key === "imageFile" || key === "removeImage") return;
+    formData.append(key, value);
+  });
+
+  if (payload.imageFile instanceof File) {
+    formData.append("image", payload.imageFile);
+  }
+
+  if (payload.removeImage === true) {
+    formData.append("removeImage", "true");
+  }
+
+  return formData;
+};
+
 /**
  * Inventory Service
  * Handles all pharmacy inventory management API calls
@@ -13,7 +32,12 @@ import httpClient from "./httpClient";
  */
 export const addMedicine = async (medicineData) => {
   try {
-    const response = await httpClient.post("/inventory", medicineData);
+    const payload = toInventoryFormData(medicineData);
+    const response = await httpClient.post("/inventory", payload, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
     
     if (!response.data) {
       throw new Error("Invalid response format from server");
@@ -120,7 +144,12 @@ export const getInventoryItemById = async (inventoryId) => {
  */
 export const updateInventoryItem = async (inventoryId, updateData) => {
   try {
-    const response = await httpClient.patch(`/inventory/${inventoryId}`, updateData);
+    const payload = toInventoryFormData(updateData);
+    const response = await httpClient.patch(`/inventory/${inventoryId}`, payload, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
     
     if (!response.data) {
       throw new Error("Invalid response format from server");

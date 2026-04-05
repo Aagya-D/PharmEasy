@@ -8,6 +8,87 @@ import logger from "../../utils/logger.js";
 import notificationService from "../notifications/notification.service.js";
 import { createAuditLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
 import prisma from "../../database/prisma.js";
+import multer from "multer";
+import path from "path";
+import { promises as fs } from "fs";
+import crypto from "crypto";
+import cloudinary from "../../config/cloudinary.js";
+
+const MEDICINE_IMAGE_ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const MEDICINE_IMAGE_MAX_SIZE = 4 * 1024 * 1024;
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MEDICINE_IMAGE_MAX_SIZE },
+  fileFilter: (req, file, cb) => {
+    if (!MEDICINE_IMAGE_ALLOWED_TYPES.includes(file.mimetype)) {
+      cb(new Error("Invalid medicine image type. Allowed: JPG, PNG, WEBP"));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+export const uploadMedicineImage = upload.single("image");
+
+const parseBoolean = (value) => {
+  if (value === true || value === false) return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "1" || normalized === "yes";
+  }
+  return false;
+};
+
+const toUploadDataUri = (file) => `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+
+const toFileExtension = (mimetype) => {
+  if (mimetype === "image/png") return "png";
+  if (mimetype === "image/webp") return "webp";
+  return "jpg";
+};
+
+const uploadToLocalStorage = async (req, file) => {
+  const extension = toFileExtension(file.mimetype);
+  const fileName = `medicine_${req.user?.pharmacyId || "unknown"}_${Date.now()}_${crypto.randomUUID()}.${extension}`;
+  const uploadDir = path.join(process.cwd(), "uploads", "medicine-images");
+  await fs.mkdir(uploadDir, { recursive: true });
+
+  const absolutePath = path.join(uploadDir, fileName);
+  await fs.writeFile(absolutePath, file.buffer);
+
+  return `${req.protocol}://${req.get("host")}/uploads/medicine-images/${fileName}`;
+};
+
+const resolveMedicineImageUrl = async (req) => {
+  if (!req.file) return undefined;
+
+  const hasCloudinaryCreds =
+    Boolean(process.env.CLOUDINARY_CLOUD_NAME) &&
+    Boolean(process.env.CLOUDINARY_API_KEY) &&
+    Boolean(process.env.CLOUDINARY_API_SECRET);
+
+  if (hasCloudinaryCreds) {
+    try {
+      const result = await cloudinary.uploader.upload(toUploadDataUri(req.file), {
+        folder: "medicines/images",
+        public_id: `medicine_${req.user?.pharmacyId || "unknown"}_${Date.now()}`,
+        resource_type: "image",
+        overwrite: true,
+      });
+
+      if (result?.secure_url) {
+        return result.secure_url;
+      }
+    } catch (error) {
+      logger.warn("INVENTORY", "Cloudinary upload failed, falling back to local storage", {
+        error: error?.message,
+      });
+    }
+  }
+
+  return uploadToLocalStorage(req, req.file);
+};
 
 /**
  * POST /api/inventory
@@ -19,6 +100,7 @@ export const addMedicine = async (req, res, next) => {
   try {
     const pharmacyId = req.user.pharmacyId;
     logger.operation('INVENTORY', 'addMedicine', 'START', { pharmacyId });
+    const imageUrl = await resolveMedicineImageUrl(req);
 
     const medicineData = {
       name: req.body.name,
@@ -38,6 +120,7 @@ export const addMedicine = async (req, res, next) => {
       form: req.body.form,
       manufacturer: req.body.manufacturer,
       batchNumber: req.body.batchNumber,
+      imageUrl,
     };
 
     logger.debug('INVENTORY', '[ADD] Medicine data received', { 
@@ -197,8 +280,11 @@ export const updateInventoryItem = async (req, res, next) => {
         form: true,
         manufacturer: true,
         batchNumber: true,
+        imageUrl: true,
       },
     });
+
+    const uploadedImageUrl = await resolveMedicineImageUrl(req);
 
     const updateData = {
       name: req.body.name,
@@ -220,6 +306,12 @@ export const updateInventoryItem = async (req, res, next) => {
       form: req.body.form,
       manufacturer: req.body.manufacturer,
       batchNumber: req.body.batchNumber,
+      imageUrl:
+        uploadedImageUrl !== undefined
+          ? uploadedImageUrl
+          : parseBoolean(req.body.removeImage)
+          ? null
+          : undefined,
     };
 
     // Remove undefined values
@@ -275,6 +367,7 @@ export const updateInventoryItem = async (req, res, next) => {
         form: updatedItem.form,
         manufacturer: updatedItem.manufacturer,
         batchNumber: updatedItem.batchNumber,
+        imageUrl: updatedItem.imageUrl,
       },
       metadata: { pharmacyId, changedFields },
       req,

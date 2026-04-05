@@ -13,6 +13,182 @@ import { calculateDistance, formatDistance } from "../../utils/distance.js";
 import { NotFoundError, BadRequestError } from "../../utils/errors.js";
 
 class SearchService {
+  async getTopMedicinesNearLocation({
+    latitude,
+    longitude,
+    limit = 8,
+    category,
+  }) {
+    const hasLocation =
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude) &&
+      latitude >= -90 &&
+      latitude <= 90 &&
+      longitude >= -180 &&
+      longitude <= 180;
+
+    const categoryKeywordMap = {
+      fever: ["paracetamol", "ibuprofen", "acetaminophen", "cold", "flu"],
+      chronic: ["insulin", "metformin", "bp", "hypertension", "cholesterol"],
+      baby: ["pediatric", "baby", "infant", "syrup", "drops"],
+      ayurvedic: ["ayur", "herbal", "ashwagandha", "triphala"],
+      firstaid: ["antiseptic", "bandage", "gauze", "burn", "wound"],
+      surgical: ["surgical", "gloves", "suture", "catheter", "mask"],
+    };
+
+    const normalizedCategory = category
+      ? String(category).toLowerCase().replace(/\s+/g, "")
+      : null;
+    const categoryKeywords = normalizedCategory
+      ? categoryKeywordMap[normalizedCategory] || []
+      : [];
+
+    const keywordFilter =
+      categoryKeywords.length > 0
+        ? {
+            OR: categoryKeywords.flatMap((keyword) => [
+              {
+                name: {
+                  contains: keyword,
+                  mode: "insensitive",
+                },
+              },
+              {
+                genericName: {
+                  contains: keyword,
+                  mode: "insensitive",
+                },
+              },
+            ]),
+          }
+        : {};
+
+    const inventoryItems = await prisma.inventory.findMany({
+      where: {
+        quantity: { gt: 0 },
+        pharmacy: {
+          verificationStatus: "VERIFIED",
+        },
+        ...keywordFilter,
+      },
+      select: {
+        id: true,
+        name: true,
+        genericName: true,
+        imageUrl: true,
+        price: true,
+        quantity: true,
+        expiryDate: true,
+        isPrescriptionRequired: true,
+        dosageInstructions: true,
+        route: true,
+        timing: true,
+        strength: true,
+        form: true,
+        manufacturer: true,
+        pharmacy: {
+          select: {
+            id: true,
+            pharmacyName: true,
+            address: true,
+            contactNumber: true,
+            latitude: true,
+            longitude: true,
+            averageRating: true,
+            totalReviews: true,
+          },
+        },
+      },
+      orderBy: [{ quantity: "desc" }, { updatedAt: "desc" }],
+      take: Math.max(limit * 10, 60),
+    });
+
+    const groupedMedicines = new Map();
+
+    inventoryItems.forEach((item) => {
+      const distance = hasLocation
+        ? calculateDistance(
+            latitude,
+            longitude,
+            item.pharmacy.latitude,
+            item.pharmacy.longitude
+          )
+        : null;
+
+      const groupKey = `${String(item.name || "").toLowerCase()}::${String(
+        item.genericName || ""
+      ).toLowerCase()}`;
+
+      const offering = {
+        id: item.id,
+        medicine: item.name,
+        genericName: item.genericName,
+        imageUrl: item.imageUrl || null,
+        price: item.price,
+        quantity: item.quantity,
+        expiryDate: item.expiryDate,
+        isPrescriptionRequired: item.isPrescriptionRequired,
+        dosageInstructions: item.dosageInstructions,
+        route: item.route,
+        timing: item.timing,
+        strength: item.strength,
+        form: item.form,
+        manufacturer: item.manufacturer,
+        distance,
+        distanceFormatted: distance !== null ? formatDistance(distance) : null,
+        pharmacy: {
+          id: item.pharmacy.id,
+          name: item.pharmacy.pharmacyName,
+          address: item.pharmacy.address,
+          contactNumber: item.pharmacy.contactNumber,
+          averageRating: item.pharmacy.averageRating || 0,
+          totalReviews: item.pharmacy.totalReviews || 0,
+          location: {
+            lat: item.pharmacy.latitude,
+            lng: item.pharmacy.longitude,
+          },
+        },
+      };
+
+      if (!groupedMedicines.has(groupKey)) {
+        groupedMedicines.set(groupKey, [offering]);
+      } else {
+        groupedMedicines.get(groupKey).push(offering);
+      }
+    });
+
+    const ranked = Array.from(groupedMedicines.values())
+      .map((offerings) => {
+        const sortedOfferings = [...offerings].sort((a, b) => {
+          if (hasLocation) {
+            return (a.distance ?? Number.MAX_SAFE_INTEGER) - (b.distance ?? Number.MAX_SAFE_INTEGER);
+          }
+
+          if (b.quantity !== a.quantity) {
+            return b.quantity - a.quantity;
+          }
+
+          return a.price - b.price;
+        });
+
+        return sortedOfferings[0];
+      })
+      .sort((a, b) => {
+        if (hasLocation) {
+          return (a.distance ?? Number.MAX_SAFE_INTEGER) - (b.distance ?? Number.MAX_SAFE_INTEGER);
+        }
+
+        if (b.quantity !== a.quantity) {
+          return b.quantity - a.quantity;
+        }
+
+        return a.price - b.price;
+      })
+      .slice(0, limit);
+
+    return ranked;
+  }
+
   /**
    * Universal search across medicines and pharmacies
    *
@@ -72,8 +248,21 @@ class SearchService {
           id: true,
           name: true,
           genericName: true,
+          imageUrl: true,
           price: true,
           quantity: true,
+          expiryDate: true,
+          sideEffects: true,
+          contraindications: true,
+          warnings: true,
+          isPrescriptionRequired: true,
+          dosageInstructions: true,
+          route: true,
+          timing: true,
+          strength: true,
+          form: true,
+          manufacturer: true,
+          batchNumber: true,
           pharmacy: {
             select: {
               id: true,
@@ -138,12 +327,25 @@ class SearchService {
 
       const offering = {
         inventoryId: item.id,
+        imageUrl: item.imageUrl || null,
         pharmacyId: item.pharmacy.id,
         pharmacyName: item.pharmacy.pharmacyName,
         address: item.pharmacy.address,
         contactNumber: item.pharmacy.contactNumber,
         price: item.price,
         quantity: item.quantity,
+        expiryDate: item.expiryDate,
+        sideEffects: item.sideEffects,
+        contraindications: item.contraindications,
+        warnings: item.warnings,
+        isPrescriptionRequired: item.isPrescriptionRequired,
+        dosageInstructions: item.dosageInstructions,
+        route: item.route,
+        timing: item.timing,
+        strength: item.strength,
+        form: item.form,
+        manufacturer: item.manufacturer,
+        batchNumber: item.batchNumber,
         location: {
           lat: item.pharmacy.latitude,
           lng: item.pharmacy.longitude,
@@ -179,8 +381,21 @@ class SearchService {
           id: bestOffering.inventoryId,
           medicine: group.name,
           genericName: group.genericName,
+          imageUrl: bestOffering.imageUrl || null,
           price: bestOffering.price,
           quantity: bestOffering.quantity,
+          expiryDate: bestOffering.expiryDate,
+          sideEffects: bestOffering.sideEffects,
+          contraindications: bestOffering.contraindications,
+          warnings: bestOffering.warnings,
+          isPrescriptionRequired: bestOffering.isPrescriptionRequired,
+          dosageInstructions: bestOffering.dosageInstructions,
+          route: bestOffering.route,
+          timing: bestOffering.timing,
+          strength: bestOffering.strength,
+          form: bestOffering.form,
+          manufacturer: bestOffering.manufacturer,
+          batchNumber: bestOffering.batchNumber,
           inStock: bestOffering.quantity > 0,
           pharmacy: {
             id: bestOffering.pharmacyId,
@@ -200,6 +415,7 @@ class SearchService {
             quantity: offering.quantity,
             distance: offering.distance,
             distanceFormatted: offering.distanceFormatted,
+            imageUrl: offering.imageUrl || null,
           })),
         };
       })
@@ -373,6 +589,7 @@ class SearchService {
       id: item.id,
       medicine: item.name,
       genericName: item.genericName,
+      imageUrl: item.imageUrl || null,
       price: item.price,
       quantity: item.quantity,
       expiryDate: item.expiryDate,
@@ -464,6 +681,7 @@ class SearchService {
             id: item.id,
             medicine: item.name,
             genericName: item.genericName,
+            imageUrl: item.imageUrl || null,
             price: item.price,
             quantity: item.quantity,
             expiryDate: item.expiryDate,

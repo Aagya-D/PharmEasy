@@ -24,6 +24,13 @@ const sanitizeOptionalText = (value) => {
   return cleaned || null;
 };
 
+const sanitizeImageUrl = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const cleaned = String(value).trim();
+  return cleaned || null;
+};
+
 const normalizeMedicineData = (medicineData) => ({
   name: sanitizeText(medicineData.name),
   genericName: sanitizeText(medicineData.genericName),
@@ -41,6 +48,7 @@ const normalizeMedicineData = (medicineData) => ({
   form: sanitizeOptionalText(medicineData.form),
   manufacturer: sanitizeOptionalText(medicineData.manufacturer),
   batchNumber: sanitizeOptionalText(medicineData.batchNumber),
+  imageUrl: sanitizeImageUrl(medicineData.imageUrl),
 });
 
 const validateMedicinePayload = (medicineData) => {
@@ -151,6 +159,7 @@ export const addMedicine = async (pharmacyId, medicineData) => {
       form: preparedData.form,
       manufacturer: preparedData.manufacturer,
       batchNumber: preparedData.batchNumber,
+      imageUrl: preparedData.imageUrl ?? null,
       pharmacyId,
     },
     include: {

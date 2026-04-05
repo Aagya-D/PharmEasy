@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronRight, Pencil } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useForm, useWatch } from "react-hook-form";
 import LoadingSpinner from "../../../shared/components/ui/LoadingSpinner";
+import MedicineImage from "../../../shared/components/ui/MedicineImage";
 
 const COMMON_GENERIC_NAMES = [
   "Paracetamol",
@@ -57,6 +58,7 @@ const getDefaultFormData = () => ({
   form: "",
   manufacturer: "",
   batchNumber: "",
+  imageUrl: "",
   quantity: "",
   price: "",
   expiryDate: "",
@@ -84,6 +86,7 @@ const mapInitialData = (initialData) => {
     form: initialData.form || "",
     manufacturer: initialData.manufacturer || "",
     batchNumber: initialData.batchNumber || "",
+    imageUrl: initialData.imageUrl || "",
     quantity:
       initialData.quantity !== undefined && initialData.quantity !== null
         ? String(initialData.quantity)
@@ -114,16 +117,36 @@ function FloatingField({ label, error, children, hint }) {
   );
 }
 
+function ReadOnlyField({ label, value, hint }) {
+  const display = value === null || value === undefined || value === "" ? "Not specified" : value;
+  return (
+    <div className="space-y-1.5">
+      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</p>
+        <p className="mt-1 text-sm font-medium text-slate-900 whitespace-pre-wrap">{display}</p>
+      </div>
+      {hint && <p className="text-xs text-slate-400">{hint}</p>}
+    </div>
+  );
+}
+
 export default function MedicineForm({
   initialData,
   onSubmit,
   onCancel,
+  mode = "ADD",
   submitting = false,
 }) {
-  const isEditMode = Boolean(initialData?.id);
+  const [currentMode, setCurrentMode] = useState(mode);
+  const isViewMode = currentMode === "VIEW";
+  const isEditMode = currentMode === "EDIT" || (currentMode === "ADD" && Boolean(initialData?.id));
   const [currentStep, setCurrentStep] = useState(1);
   const [filteredGenericNames, setFilteredGenericNames] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(initialData?.imageUrl || "");
+  const [removeImage, setRemoveImage] = useState(false);
+  const [imageError, setImageError] = useState("");
 
   const {
     register,
@@ -142,11 +165,24 @@ export default function MedicineForm({
   const values = useWatch({ control });
 
   useEffect(() => {
+    setCurrentMode(mode);
     reset(mapInitialData(initialData));
     setCurrentStep(1);
     setFilteredGenericNames([]);
     setShowSuggestions(false);
-  }, [initialData, reset]);
+    setImageFile(null);
+    setImagePreview(initialData?.imageUrl || "");
+    setRemoveImage(false);
+    setImageError("");
+  }, [initialData, mode, reset]);
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview && imagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
 
   useEffect(() => {
     const generic = values?.genericName || "";
@@ -190,9 +226,14 @@ export default function MedicineForm({
     return isStepComplete(currentStep) && fields.every((name) => !errors[name]);
   }, [currentStep, errors, values]);
 
-  const title = isEditMode ? "Edit Medicine" : "Add New Medicine";
+  const title = currentMode === "VIEW" ? "View Medicine" : isEditMode ? "Edit Medicine" : "Add New Medicine";
 
   const navigateToStep = async (targetStep) => {
+    if (isViewMode) {
+      setCurrentStep(targetStep);
+      return;
+    }
+
     if (targetStep <= currentStep) {
       setCurrentStep(targetStep);
       return;
@@ -204,6 +245,11 @@ export default function MedicineForm({
 
   const goNext = async () => {
     if (currentStep >= 5) return;
+    if (isViewMode) {
+      setCurrentStep((prev) => Math.min(5, prev + 1));
+      return;
+    }
+
     const valid = await trigger(STEP_FIELDS[currentStep], { shouldFocus: true });
     if (!valid) return;
     setCurrentStep((prev) => Math.min(5, prev + 1));
@@ -212,6 +258,8 @@ export default function MedicineForm({
   const goBack = () => setCurrentStep((prev) => Math.max(1, prev - 1));
 
   const submitForm = (formData) => {
+    if (isViewMode) return;
+
     onSubmit({
       name: formData.name.trim(),
       genericName: formData.genericName.trim(),
@@ -226,38 +274,84 @@ export default function MedicineForm({
       form: formData.form.trim(),
       manufacturer: formData.manufacturer.trim(),
       batchNumber: formData.batchNumber.trim(),
+      imageFile,
+      removeImage,
       quantity: Number(formData.quantity),
       price: Number(formData.price),
       expiryDate: formData.expiryDate,
     });
   };
 
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setImageError("Please select a valid image file.");
+      return;
+    }
+
+    const maxSize = 4 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setImageError("Image must be 4MB or smaller.");
+      return;
+    }
+
+    if (imagePreview && imagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(imagePreview);
+    }
+
+    const preview = URL.createObjectURL(file);
+    setImageFile(file);
+    setImagePreview(preview);
+    setRemoveImage(false);
+    setImageError("");
+  };
+
+  const handleRemoveImage = () => {
+    if (imagePreview && imagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(imagePreview);
+    }
+    setImageFile(null);
+    setImagePreview("");
+    setRemoveImage(true);
+    setImageError("");
+  };
+
   const renderCoreIdentification = () => (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       <div className="md:col-span-1">
-        <FloatingField label="Brand Name" error={errors.name?.message}>
-          <input
-            type="text"
-            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="e.g., Cetamol 500mg"
-            {...register("name", { required: "Brand name is required" })}
-          />
-        </FloatingField>
+        {isViewMode ? (
+          <ReadOnlyField label="Brand Name" value={values?.name} />
+        ) : (
+          <FloatingField label="Brand Name" error={errors.name?.message}>
+            <input
+              type="text"
+              className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., Cetamol 500mg"
+              {...register("name", { required: "Brand name is required" })}
+            />
+          </FloatingField>
+        )}
       </div>
 
       <div className="relative md:col-span-1">
-        <FloatingField label="Generic Name" error={errors.genericName?.message}>
-          <input
-            type="text"
-            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="e.g., Paracetamol"
-            {...register("genericName", { required: "Generic name is required" })}
-            onFocus={() => setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-          />
-        </FloatingField>
+        {isViewMode ? (
+          <ReadOnlyField label="Generic Name" value={values?.genericName} />
+        ) : (
+          <FloatingField label="Generic Name" error={errors.genericName?.message}>
+            <input
+              type="text"
+              className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., Paracetamol"
+              {...register("genericName", { required: "Generic name is required" })}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            />
+          </FloatingField>
+        )}
 
-        {showSuggestions && filteredGenericNames.length > 0 && (
+        {!isViewMode && showSuggestions && filteredGenericNames.length > 0 && (
           <div className="absolute z-20 mt-1 max-h-44 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
             {filteredGenericNames.map((name) => (
               <button
@@ -275,6 +369,56 @@ export default function MedicineForm({
           </div>
         )}
       </div>
+
+      <div className="md:col-span-2 rounded-xl border border-slate-200 bg-white p-3">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Medicine Photo</p>
+            <p className="text-xs text-slate-500">Upload a clear product image for patient search and detail pages.</p>
+          </div>
+          {!isViewMode && (
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={handleImageChange}
+              />
+              Upload Photo
+            </label>
+          )}
+        </div>
+
+        <div className="flex items-start gap-3">
+          <div className="h-24 w-24 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+            <MedicineImage
+              src={imagePreview}
+              alt={values?.name || "Medicine preview"}
+              className="object-cover"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs text-slate-600">
+              {imageFile
+                ? `${imageFile.name} selected`
+                : imagePreview
+                ? "Current medicine image"
+                : "No photo selected. A medical placeholder will be shown to patients."}
+            </p>
+            {!isViewMode && (imageFile || imagePreview) && (
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-100"
+              >
+                Remove Photo
+              </button>
+            )}
+            {imageError && <p className="text-xs text-red-600">{imageError}</p>}
+          </div>
+        </div>
+      </div>
     </div>
   );
 
@@ -286,158 +430,218 @@ export default function MedicineForm({
             <p className="text-xs font-semibold tracking-wide text-emerald-700">PRESCRIPTION CONTROL</p>
             <p className="text-sm text-emerald-800">Use this toggle to enforce prescription-only dispensing.</p>
           </div>
-          <button
-            type="button"
-            onClick={() => setValue("isPrescriptionRequired", !values?.isPrescriptionRequired, { shouldDirty: true })}
-            className={`rounded-full px-4 py-2 text-xs font-semibold text-white ${
+          {isViewMode ? (
+            <span className={`rounded-full px-4 py-2 text-xs font-semibold text-white ${
               values?.isPrescriptionRequired ? "bg-emerald-600" : "bg-slate-500"
-            }`}
-          >
-            {values?.isPrescriptionRequired ? "Prescription Required" : "No Prescription"}
-          </button>
+            }`}>
+              {values?.isPrescriptionRequired ? "Prescription Required" : "No Prescription"}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setValue("isPrescriptionRequired", !values?.isPrescriptionRequired, { shouldDirty: true })}
+              className={`rounded-full px-4 py-2 text-xs font-semibold text-white ${
+                values?.isPrescriptionRequired ? "bg-emerald-600" : "bg-slate-500"
+              }`}
+            >
+              {values?.isPrescriptionRequired ? "Prescription Required" : "No Prescription"}
+            </button>
+          )}
         </div>
       </div>
 
-      <FloatingField label="Side Effects" error={errors.sideEffects?.message}>
-        <textarea
-          rows={3}
-          className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="List common and severe side effects"
-          {...register("sideEffects", { required: "Side effects are required" })}
-        />
-      </FloatingField>
+      {isViewMode ? (
+        <ReadOnlyField label="Side Effects" value={values?.sideEffects} />
+      ) : (
+        <FloatingField label="Side Effects" error={errors.sideEffects?.message}>
+          <textarea
+            rows={3}
+            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="List common and severe side effects"
+            {...register("sideEffects", { required: "Side effects are required" })}
+          />
+        </FloatingField>
+      )}
 
-      <FloatingField label="Contraindications" error={errors.contraindications?.message}>
-        <textarea
-          rows={3}
-          className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Who should avoid this medicine?"
-          {...register("contraindications", { required: "Contraindications are required" })}
-        />
-      </FloatingField>
+      {isViewMode ? (
+        <ReadOnlyField label="Contraindications" value={values?.contraindications} />
+      ) : (
+        <FloatingField label="Contraindications" error={errors.contraindications?.message}>
+          <textarea
+            rows={3}
+            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Who should avoid this medicine?"
+            {...register("contraindications", { required: "Contraindications are required" })}
+          />
+        </FloatingField>
+      )}
 
-      <FloatingField label="Warnings" error={errors.warnings?.message}>
-        <textarea
-          rows={3}
-          className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Pregnancy, organ-risk, and interaction warnings"
-          {...register("warnings", { required: "Warnings are required" })}
-        />
-      </FloatingField>
+      {isViewMode ? (
+        <ReadOnlyField label="Warnings" value={values?.warnings} />
+      ) : (
+        <FloatingField label="Warnings" error={errors.warnings?.message}>
+          <textarea
+            rows={3}
+            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Pregnancy, organ-risk, and interaction warnings"
+            {...register("warnings", { required: "Warnings are required" })}
+          />
+        </FloatingField>
+      )}
     </div>
   );
 
   const renderDosage = () => (
     <div className="space-y-3">
-      <FloatingField label="Dosage Instructions" error={errors.dosageInstructions?.message}>
-        <textarea
-          rows={4}
-          className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="e.g., 1 tablet twice daily for 5 days"
-          {...register("dosageInstructions", { required: "Dosage instructions are required" })}
-        />
-      </FloatingField>
+      {isViewMode ? (
+        <ReadOnlyField label="Dosage Instructions" value={values?.dosageInstructions} />
+      ) : (
+        <FloatingField label="Dosage Instructions" error={errors.dosageInstructions?.message}>
+          <textarea
+            rows={4}
+            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="e.g., 1 tablet twice daily for 5 days"
+            {...register("dosageInstructions", { required: "Dosage instructions are required" })}
+          />
+        </FloatingField>
+      )}
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <FloatingField label="Route" error={errors.route?.message}>
-          <select
-            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-            {...register("route")}
-          >
-            <option value="ORAL">Oral</option>
-            <option value="TOPICAL">Topical</option>
-          </select>
-        </FloatingField>
+        {isViewMode ? (
+          <ReadOnlyField label="Route" value={values?.route === "TOPICAL" ? "Topical" : "Oral"} />
+        ) : (
+          <FloatingField label="Route" error={errors.route?.message}>
+            <select
+              className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+              {...register("route")}
+            >
+              <option value="ORAL">Oral</option>
+              <option value="TOPICAL">Topical</option>
+            </select>
+          </FloatingField>
+        )}
 
-        <FloatingField label="Timing" error={errors.timing?.message}>
-          <select
-            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-            {...register("timing")}
-          >
-            <option value="BEFORE_FOOD">Before Food</option>
-            <option value="AFTER_FOOD">After Food</option>
-          </select>
-        </FloatingField>
+        {isViewMode ? (
+          <ReadOnlyField label="Timing" value={values?.timing === "BEFORE_FOOD" ? "Before Food" : "After Food"} />
+        ) : (
+          <FloatingField label="Timing" error={errors.timing?.message}>
+            <select
+              className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+              {...register("timing")}
+            >
+              <option value="BEFORE_FOOD">Before Food</option>
+              <option value="AFTER_FOOD">After Food</option>
+            </select>
+          </FloatingField>
+        )}
       </div>
     </div>
   );
 
   const renderProductDetails = () => (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-      <FloatingField label="Strength" error={errors.strength?.message}>
-        <input
-          type="text"
-          className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="e.g., 500mg"
-          {...register("strength", { required: "Strength is required" })}
-        />
-      </FloatingField>
-
-      <FloatingField label="Form" error={errors.form?.message}>
-        <input
-          type="text"
-          className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="e.g., Tablet"
-          {...register("form", { required: "Form is required" })}
-        />
-      </FloatingField>
-
-      <FloatingField label="Manufacturer" error={errors.manufacturer?.message}>
-        <input
-          type="text"
-          className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="e.g., ABC Pharma"
-          {...register("manufacturer", { required: "Manufacturer is required" })}
-        />
-      </FloatingField>
-
-      <FloatingField label="Batch Number" error={errors.batchNumber?.message}>
-        <input
-          type="text"
-          className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="e.g., BT-2044"
-          {...register("batchNumber", { required: "Batch number is required" })}
-        />
-      </FloatingField>
-
-      <FloatingField label="Quantity" error={errors.quantity?.message}>
-        <input
-          type="number"
-          min="0"
-          className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="e.g., 100"
-          {...register("quantity", {
-            required: "Quantity is required",
-            validate: (value) => Number(value) >= 0 || "Quantity must be 0 or greater",
-          })}
-        />
-      </FloatingField>
-
-      <FloatingField label="Price (Rs.)" error={errors.price?.message}>
-        <input
-          type="number"
-          min="0"
-          step="0.01"
-          className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="e.g., 5.99"
-          {...register("price", {
-            required: "Price is required",
-            validate: (value) => Number(value) > 0 || "Price must be greater than 0",
-          })}
-        />
-      </FloatingField>
-
-      <div className="md:col-span-2">
-        <FloatingField label="Expiry Date" error={errors.expiryDate?.message} hint="Must be today or a future date.">
+      {isViewMode ? (
+        <ReadOnlyField label="Strength" value={values?.strength} />
+      ) : (
+        <FloatingField label="Strength" error={errors.strength?.message}>
           <input
-            type="date"
-            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
-            {...register("expiryDate", {
-              required: "Expiry date is required",
-              validate: (value) => isFutureDate(value) || "Expiry date must be in the future",
+            type="text"
+            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="e.g., 500mg"
+            {...register("strength", { required: "Strength is required" })}
+          />
+        </FloatingField>
+      )}
+
+      {isViewMode ? (
+        <ReadOnlyField label="Form" value={values?.form} />
+      ) : (
+        <FloatingField label="Form" error={errors.form?.message}>
+          <input
+            type="text"
+            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="e.g., Tablet"
+            {...register("form", { required: "Form is required" })}
+          />
+        </FloatingField>
+      )}
+
+      {isViewMode ? (
+        <ReadOnlyField label="Manufacturer" value={values?.manufacturer} />
+      ) : (
+        <FloatingField label="Manufacturer" error={errors.manufacturer?.message}>
+          <input
+            type="text"
+            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="e.g., ABC Pharma"
+            {...register("manufacturer", { required: "Manufacturer is required" })}
+          />
+        </FloatingField>
+      )}
+
+      {isViewMode ? (
+        <ReadOnlyField label="Batch Number" value={values?.batchNumber} />
+      ) : (
+        <FloatingField label="Batch Number" error={errors.batchNumber?.message}>
+          <input
+            type="text"
+            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="e.g., BT-2044"
+            {...register("batchNumber", { required: "Batch number is required" })}
+          />
+        </FloatingField>
+      )}
+
+      {isViewMode ? (
+        <ReadOnlyField label="Quantity" value={values?.quantity} />
+      ) : (
+        <FloatingField label="Quantity" error={errors.quantity?.message}>
+          <input
+            type="number"
+            min="0"
+            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="e.g., 100"
+            {...register("quantity", {
+              required: "Quantity is required",
+              validate: (value) => Number(value) >= 0 || "Quantity must be 0 or greater",
             })}
           />
         </FloatingField>
+      )}
+
+      {isViewMode ? (
+        <ReadOnlyField label="Price (Rs.)" value={values?.price} />
+      ) : (
+        <FloatingField label="Price (Rs.)" error={errors.price?.message}>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="e.g., 5.99"
+            {...register("price", {
+              required: "Price is required",
+              validate: (value) => Number(value) > 0 || "Price must be greater than 0",
+            })}
+          />
+        </FloatingField>
+      )}
+
+      <div className="md:col-span-2">
+        {isViewMode ? (
+          <ReadOnlyField label="Expiry Date" value={values?.expiryDate} hint="Must be today or a future date." />
+        ) : (
+          <FloatingField label="Expiry Date" error={errors.expiryDate?.message} hint="Must be today or a future date.">
+            <input
+              type="date"
+              className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+              {...register("expiryDate", {
+                required: "Expiry date is required",
+                validate: (value) => isFutureDate(value) || "Expiry date must be in the future",
+              })}
+            />
+          </FloatingField>
+        )}
       </div>
     </div>
   );
@@ -460,6 +664,7 @@ export default function MedicineForm({
           ["Form", values?.form],
           ["Manufacturer", values?.manufacturer],
           ["Batch Number", values?.batchNumber],
+          ["Image", imagePreview ? "Attached" : "Placeholder will be used"],
           ["Quantity", values?.quantity],
           ["Price", values?.price],
           ["Expiry Date", values?.expiryDate],
@@ -529,16 +734,28 @@ export default function MedicineForm({
         <section className="max-h-[78vh] overflow-y-auto p-4 lg:col-span-9 lg:p-5">
           <AnimatePresence mode="wait">
             <motion.div
-              key={currentStep}
+              key={`${currentMode}-${currentStep}`}
               initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.14, ease: "easeOut" }}
+              animate={{ opacity: 1, x: 0, scale: currentMode === "EDIT" ? 1 : 0.995 }}
+              exit={{ opacity: 0, x: -10, scale: 0.99 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
               className="space-y-3"
             >
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-base font-semibold text-slate-900">{STEPS[currentStep - 1].title}</h3>
-                <p className="text-xs font-medium text-slate-500">Step {currentStep} of {STEPS.length}</p>
+                <div className="flex items-center gap-2">
+                  {isViewMode && (
+                    <button
+                      type="button"
+                      onClick={() => setCurrentMode("EDIT")}
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      <Pencil size={12} />
+                      Edit
+                    </button>
+                  )}
+                  <p className="text-xs font-medium text-slate-500">Step {currentStep} of {STEPS.length}</p>
+                </div>
               </div>
 
               {currentStep === 1 && renderCoreIdentification()}
@@ -574,29 +791,31 @@ export default function MedicineForm({
               <button
                 type="button"
                 onClick={goNext}
-                disabled={submitting || !canGoNext}
+                disabled={submitting || (!isViewMode && !canGoNext)}
                 className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Next
                 <ChevronRight size={14} />
               </button>
             ) : (
-              <button
-                type="submit"
-                disabled={submitting}
-                className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {submitting ? (
-                  <>
-                    <LoadingSpinner />
-                    Saving...
-                  </>
-                ) : isEditMode ? (
-                  "Update Medicine"
-                ) : (
-                  "Publish to Inventory"
-                )}
-              </button>
+              !isViewMode && (
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {submitting ? (
+                    <>
+                      <LoadingSpinner />
+                      Saving...
+                    </>
+                  ) : isEditMode ? (
+                    "Update Medicine"
+                  ) : (
+                    "Publish to Inventory"
+                  )}
+                </button>
+              )
             )}
           </div>
         </section>

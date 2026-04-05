@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Menu, Search, Moon, Sun } from "lucide-react";
-import { useTheme } from "../../../context/ThemeContext";
+import { Menu, Search } from "lucide-react";
 
 export default function DashboardHeader({
   onOpenSidebar,
@@ -11,7 +10,6 @@ export default function DashboardHeader({
   onSearch,
   notificationSlot = null,
 }) {
-  const { isDark, toggleTheme } = useTheme();
   const [searchText, setSearchText] = useState("");
 
   const welcomeText = useMemo(() => {
@@ -57,17 +55,6 @@ export default function DashboardHeader({
               className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-blue-600"
-            title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-          >
-            {isDark ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
-
           <div className="flex items-center">{notificationSlot}</div>
         </div>
       </div>

@@ -339,6 +339,57 @@ class SearchController {
       data: stats,
     });
   });
+
+  /**
+   * Get top medicines near user location for patient home storefront.
+   *
+   * GET /api/search/top-medicines?lat=27.7172&lng=85.3240&limit=8&category=fever
+   */
+  getTopMedicinesNearUser = asyncHandler(async (req, res) => {
+    const { lat, lng, latitude, longitude, limit, category } = req.query;
+
+    const resolvedLat = lat ?? latitude;
+    const resolvedLng = lng ?? longitude;
+
+    const parsedLatitude =
+      resolvedLat !== undefined ? parseFloat(resolvedLat) : undefined;
+    const parsedLongitude =
+      resolvedLng !== undefined ? parseFloat(resolvedLng) : undefined;
+
+    const hasLatitude = Number.isFinite(parsedLatitude);
+    const hasLongitude = Number.isFinite(parsedLongitude);
+
+    if (hasLatitude !== hasLongitude) {
+      throw new BadRequestError("Both lat and lng must be provided together");
+    }
+
+    if (
+      hasLatitude &&
+      (parsedLatitude < -90 ||
+        parsedLatitude > 90 ||
+        parsedLongitude < -180 ||
+        parsedLongitude > 180)
+    ) {
+      throw new BadRequestError("Invalid latitude or longitude");
+    }
+
+    const medicines = await searchService.getTopMedicinesNearLocation({
+      latitude: hasLatitude ? parsedLatitude : undefined,
+      longitude: hasLongitude ? parsedLongitude : undefined,
+      limit: limit ? Math.min(Math.max(parseInt(limit, 10), 1), 12) : 8,
+      category: category ? String(category).trim() : undefined,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: medicines,
+      meta: {
+        hasUserLocation: hasLatitude,
+        category: category || null,
+        totalResults: medicines.length,
+      },
+    });
+  });
 }
 
 export default new SearchController();

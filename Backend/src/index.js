@@ -118,6 +118,9 @@ app.use((req, res, next) => {
 // Request/Response Logger (comprehensive)
 app.use(loggingMiddleware);
 
+// Public static folder for local upload fallback assets
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
 
 // Simple health check (no dependencies)
 app.get("/api/health", (req, res) => {

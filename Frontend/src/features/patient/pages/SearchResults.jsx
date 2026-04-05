@@ -225,7 +225,7 @@ export default function SearchResults() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search medicines..."
-                  className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                 />
               </form>
             </div>
@@ -255,13 +255,13 @@ export default function SearchResults() {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 pr-10 text-sm font-medium text-slate-900 dark:text-white cursor-pointer hover:border-slate-300 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  className="appearance-none bg-white border border-slate-200 rounded-lg px-4 py-2 pr-10 text-sm font-medium text-slate-900 cursor-pointer hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                 >
                   <option value="distance">Sort by Distance</option>
                   <option value="price">Sort by Price</option>
                 </select>
                 <ChevronDown
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-300 pointer-events-none"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
                   size={16}
                 />
               </div>
@@ -659,3 +659,4 @@ export default function SearchResults() {
     </div>
   );
 }
+

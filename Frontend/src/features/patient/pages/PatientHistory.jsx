@@ -15,6 +15,7 @@ import {
   MapPin,
   Phone,
   Timer,
+  ChevronDown,
   ShoppingCart,
   Sparkles,
 } from "lucide-react";
@@ -102,6 +103,7 @@ export default function PatientHistory() {
   const [sosLoading, setSOSLoading] = useState(true);
   const [sosError, setSOSError] = useState(null);
   const [sosFilter, setSOSFilter] = useState("all"); // "all" | "7days"
+  const [visibleSOSCount, setVisibleSOSCount] = useState(5);
 
   // Favorites state
   const [favorites, setFavorites] = useState([]);
@@ -143,8 +145,15 @@ export default function PatientHistory() {
   }, [loadSOSHistory]);
 
   useEffect(() => {
+    // Reset pagination window when history scope changes
+    setVisibleSOSCount(5);
+  }, [sosFilter]);
+
+  useEffect(() => {
     loadFavorites();
   }, [loadFavorites]);
+
+  const displayedSOS = sosHistory.slice(0, visibleSOSCount);
 
   const handleQuickReorder = (favorite) => {
     navigate("/patient/checkout", {
@@ -261,14 +270,14 @@ export default function PatientHistory() {
             ) : sosHistory.length === 0 ? (
               <div className="flex flex-col items-center py-16 text-slate-400">
                 <Clock size={48} className="mb-4 text-slate-300" />
-                <p className="text-lg font-semibold text-slate-600 mb-1">No SOS requests yet</p>
+                <p className="text-lg font-semibold text-slate-600 mb-1">No SOS history found</p>
                 <p className="text-sm text-slate-400">
                   Your emergency requests will appear here
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
-                {sosHistory.map((sos) => (
+                {displayedSOS.map((sos) => (
                   <div
                     key={sos.id}
                     className="group flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl border border-slate-100 hover:border-blue-200 hover:bg-blue-50/30 transition-all cursor-pointer"
@@ -317,6 +326,19 @@ export default function PatientHistory() {
                     </div>
                   </div>
                 ))}
+
+                {sosHistory.length > visibleSOSCount && (
+                  <div className="pt-2 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleSOSCount(sosHistory.length)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                    >
+                      <ChevronDown size={16} />
+                      See More
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

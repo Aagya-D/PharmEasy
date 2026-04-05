@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck,
   CircleDollarSign,
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import Modal from "../../../shared/components/ui/Modal";
 import { Input, TextArea } from "../../../shared/components/ui/Input";
+import MedicineImage from "../../../shared/components/ui/MedicineImage";
 
 const FALLBACK_VALUE = "Not specified";
 
@@ -29,6 +30,7 @@ const getInitialEditData = (source) => {
     form: source.form || "",
     manufacturer: source.manufacturer || "",
     batchNumber: source.batchNumber || "",
+    imageUrl: source.imageUrl || "",
     quantity:
       source.quantity !== null && source.quantity !== undefined ? String(source.quantity) : "",
     price: source.price !== null && source.price !== undefined ? String(source.price) : "",
@@ -81,6 +83,18 @@ export default function MedicineDetailModal({
   const [viewData, setViewData] = useState(() => medicine || null);
   const [editData, setEditData] = useState(() => getInitialEditData(medicine));
   const [errors, setErrors] = useState({});
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(medicine?.imageUrl || "");
+  const [removeImage, setRemoveImage] = useState(false);
+  const [imageError, setImageError] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview && imagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
 
   const sections = useMemo(() => {
     const source = viewData || {};
@@ -196,6 +210,8 @@ export default function MedicineDetailModal({
       form: editData.form.trim(),
       manufacturer: editData.manufacturer.trim(),
       batchNumber: editData.batchNumber.trim(),
+      imageFile,
+      removeImage,
       quantity: Number(editData.quantity),
       price: Number(editData.price),
       expiryDate: editData.expiryDate,
@@ -204,13 +220,50 @@ export default function MedicineDetailModal({
     const updated = await onSave(payload);
     setViewData(updated || { ...(viewData || {}), ...payload });
     setEditData(getInitialEditData(updated || { ...(viewData || {}), ...payload }));
+    setImageFile(null);
+    setImagePreview(updated?.imageUrl || (removeImage ? "" : imagePreview));
+    setRemoveImage(false);
+    setImageError("");
     setIsEditMode(false);
+  };
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setImageError("Please select a valid image file.");
+      return;
+    }
+
+    const maxSize = 4 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setImageError("Image must be 4MB or smaller.");
+      return;
+    }
+
+    const preview = URL.createObjectURL(file);
+    setImageFile(file);
+    setImagePreview(preview);
+    setRemoveImage(false);
+    setImageError("");
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview("");
+    setRemoveImage(true);
+    setImageError("");
   };
 
   const handleCancelEdit = () => {
     setIsEditMode(false);
     setViewData(medicine || null);
     setEditData(getInitialEditData(medicine));
+    setImageFile(null);
+    setImagePreview(medicine?.imageUrl || "");
+    setRemoveImage(false);
+    setImageError("");
     setErrors({});
   };
 
@@ -221,7 +274,10 @@ export default function MedicineDetailModal({
       isOpen={isOpen}
       onClose={onClose}
       title={title}
-      size="xl"
+      size="lg"
+      backdropClassName="bg-slate-900/20 backdrop-blur-sm"
+      contentClassName="bg-white/80 backdrop-blur-lg border border-white/50 rounded-2xl"
+      headerClassName="bg-transparent border-slate-200/80"
       headerActions={
         !isEditMode && (
           <button
@@ -369,6 +425,54 @@ export default function MedicineDetailModal({
                 error={errors.batchNumber}
                 required
               />
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Medicine Photo</p>
+                  <p className="text-xs text-slate-500">Upload a new product image or remove the current one.</p>
+                </div>
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handleImageChange}
+                  />
+                  Upload Photo
+                </label>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="h-24 w-24 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                  <MedicineImage
+                    src={imagePreview}
+                    alt={editData?.name || "Medicine preview"}
+                    className="object-cover"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-600">
+                    {imageFile
+                      ? `${imageFile.name} selected`
+                      : imagePreview
+                      ? "Current medicine image"
+                      : "No photo selected. Placeholder will be shown to patients."}
+                  </p>
+                  {(imageFile || imagePreview) && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-100"
+                    >
+                      Remove Photo
+                    </button>
+                  )}
+                  {imageError && <p className="text-xs text-red-600">{imageError}</p>}
+                </div>
+              </div>
             </div>
           </div>
 

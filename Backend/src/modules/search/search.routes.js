@@ -51,6 +51,12 @@ router.get(
 );
 
 router.get(
+  "/search/top-medicines",
+  authenticate({ optional: true }),
+  searchController.getTopMedicinesNearUser
+);
+
+router.get(
   "/search",
   authenticate({ optional: true }), // Optional auth for analytics
   searchController.searchMedicines

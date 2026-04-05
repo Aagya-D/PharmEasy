@@ -7,9 +7,8 @@ import patientService from "../../services/patient.service";
 import {
   User,
   Mail,
-  Phone,
-  MapPin,
-  Calendar,
+  Camera,
+  Upload,
   LogOut,
   Save,
   AlertCircle,
@@ -17,9 +16,12 @@ import {
 } from "lucide-react";
 
 export function ProfilePage() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(user?.avatarUrl || "");
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [confirmLogout, setConfirmLogout] = useState(false);
@@ -47,6 +49,10 @@ export function ProfilePage() {
       }));
     }
   }, [user]);
+
+  useEffect(() => {
+    setAvatarPreview(user?.avatarUrl || "");
+  }, [user?.avatarUrl]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -79,6 +85,52 @@ export function ProfilePage() {
   const handleLogout = () => {
     setConfirmLogout(true);
   };
+
+  const handleAvatarFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      toast.error("Only JPG, PNG, or WEBP images are allowed");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Profile photo must be under 2MB");
+      return;
+    }
+
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const handleAvatarUpload = async () => {
+    if (!avatarFile) {
+      toast.error("Please choose an image first");
+      return;
+    }
+
+    try {
+      setAvatarUploading(true);
+      setError(null);
+      await patientService.uploadAvatar(avatarFile);
+      await refreshUser();
+      setAvatarFile(null);
+      toast.success("Profile photo updated successfully");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to upload profile photo");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const initials = (formData.name || formData.email || "P")
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <>
@@ -121,8 +173,14 @@ export function ProfilePage() {
             {/* Profile Header */}
             <div className="flex justify-between items-start mb-8">
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white">
-                  <User size={40} />
+                <div className="w-20 h-20 rounded-full border-2 border-blue-200 bg-white overflow-hidden flex items-center justify-center text-white">
+                  {avatarPreview ? (
+                    <img src={avatarPreview} alt={formData.name || "Patient avatar"} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="h-full w-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-2xl font-bold">
+                      {initials}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">
@@ -143,6 +201,36 @@ export function ProfilePage() {
                   Edit Profile
                 </button>
               )}
+            </div>
+
+            <div className="mb-8 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Profile Photo
+              </label>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-gray-500">Upload JPG, PNG, or WEBP up to 2MB.</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                    <Upload size={16} />
+                    Choose Photo
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      onChange={handleAvatarFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAvatarUpload}
+                    disabled={!avatarFile || avatarUploading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {avatarUploading ? <Loader className="animate-spin" size={16} /> : <Camera size={16} />}
+                    Save Photo
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Form */}

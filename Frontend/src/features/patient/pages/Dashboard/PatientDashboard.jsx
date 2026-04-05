@@ -1,500 +1,711 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../../../context/AuthContext";
-import { OrderCard } from "../../components/Dashboard/OrderCard";
-import { AnnouncementBanner } from "../../../../shared/components/AnnouncementBanner";
-import patientService from "../../services/patient.service";
-import contentService from "../../../../core/services/content.service";
-import { 
-  Package, 
-  MapPin, 
-  Pill, 
-  Lightbulb, 
-  Clock, 
-  Activity,
-  TrendingUp,
-  ShoppingBag,
-  Sparkles,
+import toast from "react-hot-toast";
+import {
   AlertCircle,
+  BadgeCheck,
+  Baby,
+  Bandage,
+  CircleGauge,
+  Clock3,
+  Megaphone,
+  HeartPulse,
+  Leaf,
+  LocateFixed,
+  Pill,
+  ShieldCheck,
+  Store,
+  Stethoscope,
+  Syringe,
+  Thermometer,
   Timer,
 } from "lucide-react";
+import { useAuth } from "../../../../context/AuthContext";
+import { useLocation as useLocationContext } from "../../../../context/LocationContext";
+import { useCart } from "../../../../context/CartContext";
+import { AnnouncementBanner } from "../../../../shared/components/AnnouncementBanner";
+import StarRating from "../../../../shared/components/StarRating";
+import patientService from "../../services/patient.service";
+import contentService from "../../../../core/services/content.service";
+import searchService from "../../../../core/services/search.service";
+import heroVisual from "../../../../assets/image.png";
+import network1 from "../../../../assets/forgot-password-hero.svg";
+import network2 from "../../../../assets/register-hero.svg";
+import network3 from "../../../../assets/reset-password-hero.svg";
+import network4 from "../../../../assets/verify-otp-hero.svg";
+import network5 from "../../../../assets/react.svg";
+import network6 from "../../../../assets/image.png";
 
-export function ActiveSOSCard({ sos, ttlMinutes, navigate }) {
+const formatCurrency = (value) => {
+  const amount = Number(value || 0);
+  return `Rs. ${amount.toLocaleString("en-NP", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
+
+const formatDistance = (medicine) => {
+  const value = medicine?.distanceFormatted || medicine?.distance;
+  if (value === null || value === undefined || value === "") {
+    return "Distance unavailable";
+  }
+
+  if (typeof value === "string") {
+    return value.includes("away") ? value : `${value} away`;
+  }
+
+  const distance = Number(value);
+  if (!Number.isFinite(distance)) return "Distance unavailable";
+  if (distance < 1) return `${Math.max(1, Math.round(distance * 1000))}m away`;
+  return `${distance.toFixed(1)}km away`;
+};
+
+const categoryItems = [
+  {
+    id: "fever",
+    label: "Fever/Cold",
+    icon: Thermometer,
+    accent: "from-rose-500 to-orange-500",
+  },
+  {
+    id: "chronic",
+    label: "Chronic Care",
+    icon: HeartPulse,
+    accent: "from-blue-600 to-cyan-500",
+  },
+  {
+    id: "baby",
+    label: "Baby Care",
+    icon: Baby,
+    accent: "from-pink-500 to-fuchsia-500",
+  },
+  {
+    id: "ayurvedic",
+    label: "Ayurvedic",
+    icon: Leaf,
+    accent: "from-emerald-600 to-lime-500",
+  },
+  {
+    id: "firstaid",
+    label: "First Aid",
+    icon: Bandage,
+    accent: "from-red-600 to-rose-500",
+  },
+  {
+    id: "surgical",
+    label: "Surgical",
+    icon: Syringe,
+    accent: "from-violet-600 to-indigo-500",
+  },
+];
+
+const promiseItems = [
+  {
+    title: "Live Medicine Search",
+    description: "Search medicines across nearby pharmacies with real-time stock snapshots.",
+    icon: BadgeCheck,
+  },
+  {
+    title: "Nearby Pharmacy Finder",
+    description: "See which pharmacy can fulfill your order near your current location.",
+    icon: LocateFixed,
+  },
+  {
+    title: "Emergency SOS",
+    description: "Raise urgent medicine requests and track the response flow.",
+    icon: Timer,
+  },
+  {
+    title: "Secure Orders",
+    description: "Add to cart, place orders, and keep checkout data protected.",
+    icon: ShieldCheck,
+  },
+  {
+    title: "Fast Support",
+    description: "Move urgent medicine needs into SOS flow without waiting in long queues.",
+    icon: Clock3,
+  },
+  {
+    title: "Health Guidance",
+    description: "See CMS health tips and practical guidance posted for patients.",
+    icon: HeartPulse,
+  },
+  {
+    title: "Safe Experience",
+    description: "Work with verified partners and a consistent, protected patient flow.",
+    icon: Stethoscope,
+  },
+];
+
+const networkTiles = [
+  { src: network1, alt: "Modern pharmacy interior" },
+  { src: network2, alt: "Patient receiving guidance" },
+  { src: network3, alt: "Medicine shelf network" },
+  { src: network4, alt: "Digital healthcare support" },
+  { src: network5, alt: "Verified partner ecosystem" },
+  { src: network6, alt: "Community care in Nepal" },
+];
+
+function ActiveSOSCard({ sos, ttlMinutes, navigate }) {
   const [remaining, setRemaining] = useState(0);
 
   useEffect(() => {
     const ttlMs = ttlMinutes * 60 * 1000;
     const created = new Date(sos.createdAt).getTime();
-    const tick = () => setRemaining(Math.max(0, created + ttlMs - Date.now()));
-    tick();
-    const interval = setInterval(tick, 1000);
+    const update = () => setRemaining(Math.max(0, created + ttlMs - Date.now()));
+
+    update();
+    const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, [sos.createdAt, ttlMinutes]);
 
-  if (remaining <= 0) return null; // already expired, hide card
+  if (remaining <= 0) return null;
 
   const mins = Math.floor(remaining / 60000);
   const secs = Math.floor((remaining % 60000) / 1000);
-  const pct = Math.max(0, (remaining / (ttlMinutes * 60 * 1000)) * 100);
   const isLow = mins < 5;
 
   return (
-    <div
+    <button
+      type="button"
       onClick={() => navigate(`/sos/${sos.id}`)}
-      className={`mb-6 rounded-2xl p-5 border-2 cursor-pointer transition-all hover:shadow-lg ${
+      className={`mb-5 w-full rounded-2xl border px-5 py-4 text-left transition-all hover:shadow-lg ${
         isLow
-          ? "bg-gradient-to-r from-red-50 to-orange-50 border-red-200"
-          : "bg-gradient-to-r from-orange-50 to-amber-50 border-orange-200"
+          ? "border-red-300 bg-red-50/90 text-red-800"
+          : "border-orange-200 bg-orange-50/90 text-orange-800"
       }`}
     >
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isLow ? "bg-red-100" : "bg-orange-100"}`}>
-            <AlertCircle size={24} className={isLow ? "text-red-600 animate-pulse" : "text-orange-600"} />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-900 text-base">Active SOS Request</h3>
-            <p className="text-sm text-slate-600">{sos.medicineName} &middot; Qty: {sos.quantity}</p>
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide">Active SOS Request</p>
+          <p className="mt-1 text-sm">
+            {sos.medicineName} - Qty {sos.quantity}
+          </p>
         </div>
-
-        <div className="flex items-center gap-4">
-          {/* Timer */}
-          <div className="text-right">
-            <p className={`text-xs font-semibold uppercase tracking-wide ${isLow ? "text-red-600" : "text-orange-600"}`}>
-              Expires in
-            </p>
-            <p className={`text-3xl font-mono font-bold tabular-nums ${isLow ? "text-red-600 animate-pulse" : "text-orange-700"}`}>
-              {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
-            </p>
-          </div>
-
-          {/* Circular progress */}
-          <div className="relative w-14 h-14">
-            <svg className="w-14 h-14 -rotate-90" viewBox="0 0 56 56">
-              <circle cx="28" cy="28" r="24" fill="none" stroke="#e5e7eb" strokeWidth="4" />
-              <circle
-                cx="28" cy="28" r="24" fill="none"
-                stroke={isLow ? "#ef4444" : "#f97316"}
-                strokeWidth="4"
-                strokeLinecap="round"
-                strokeDasharray={`${(pct / 100) * 150.8} 150.8`}
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Timer size={18} className={isLow ? "text-red-500" : "text-orange-500"} />
-            </div>
-          </div>
+        <div className="font-mono text-2xl font-bold tabular-nums">
+          {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
         </div>
       </div>
-
-      {/* Progress bar */}
-      <div className="mt-3 w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-1000 ${isLow ? "bg-red-500" : "bg-orange-500"}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
+    </button>
   );
 }
 
 export function PatientDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  
-  // State Management
-  const [dashboardData, setDashboardData] = useState(null);
-  const [orders, setOrders] = useState([]);
+  const { selectedLocation } = useLocationContext();
+  const { addToCart, clearCart, isPharmacyMismatchError } = useCart();
+
+  const [activeCategory, setActiveCategory] = useState("all");
+  const [topMedicines, setTopMedicines] = useState([]);
+  const [medicinesLoading, setMedicinesLoading] = useState(true);
   const [healthTip, setHealthTip] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [ordersLoading, setOrdersLoading] = useState(true);
   const [tipLoading, setTipLoading] = useState(true);
+  const [announcements, setAnnouncements] = useState([]);
+  const [announcementsLoading, setAnnouncementsLoading] = useState(true);
   const [activeSOS, setActiveSOS] = useState(null);
   const [sosTTL, setSosTTL] = useState(30);
 
+  const districtLabel =
+    selectedLocation?.district || selectedLocation?.name || "your district";
+
   useEffect(() => {
-    loadDashboardData();
-    loadOrders();
-    loadHealthTip();
+    const loadActiveSOS = async () => {
+      try {
+        const response = await patientService.getActiveSOS();
+        setActiveSOS(response?.data?.activeSOS || null);
+        setSosTTL(response?.data?.ttlMinutes || 30);
+      } catch {
+        setActiveSOS(null);
+      }
+    };
+
     loadActiveSOS();
   }, []);
 
-  const loadActiveSOS = async () => {
-    try {
-      const res = await patientService.getActiveSOS();
-      setActiveSOS(res?.data?.activeSOS || null);
-      setSosTTL(res?.data?.ttlMinutes || 30);
-    } catch {
-      setActiveSOS(null);
-    }
-  };
-
-  const loadDashboardData = async () => {
-    try {
-      setStatsLoading(true);
-      const response = await patientService.getDashboard();
-      setDashboardData(response?.data || null);
-    } catch (err) {
-      console.error("[PATIENT DASHBOARD] Dashboard stats error:", err);
-      setDashboardData(null);
-    } finally {
-      setStatsLoading(false);
-      setIsLoading(false);
-    }
-  };
-
-  const loadOrders = async () => {
-    try {
-      setOrdersLoading(true);
-      const response = await patientService.getOrders({ limit: 5 });
-      setOrders(response?.data?.orders || []);
-    } catch (err) {
-      console.error("[PATIENT DASHBOARD] Load orders error:", err);
-      setOrders([]);
-    } finally {
-      setOrdersLoading(false);
-    }
-  };
-
-  const loadHealthTip = async () => {
-    try {
-      setTipLoading(true);
-      const response = await contentService.getLatestHealthTip();
-      if (response?.success && response?.data) {
-        setHealthTip(response.data);
+  useEffect(() => {
+    const loadHealthTip = async () => {
+      try {
+        setTipLoading(true);
+        const response = await contentService.getLatestHealthTip();
+        if (response?.success && response?.data) {
+          setHealthTip(response.data);
+          return;
+        }
+      } catch {
+        // fallback below
+      } finally {
+        setTipLoading(false);
       }
-    } catch (err) {
-      console.error("[PATIENT DASHBOARD] Error loading health tip:", err);
-      setHealthTip(null);
-    } finally {
-      setTipLoading(false);
+
+      setHealthTip({
+        title: "Hydration + Timing Improves Outcomes",
+        content:
+          "Take daily medicines at consistent times and maintain hydration. A steady routine improves response, especially for blood pressure and sugar control.",
+        category: "Medication Routine",
+      });
+    };
+
+    loadHealthTip();
+  }, []);
+
+  useEffect(() => {
+    const loadAnnouncements = async () => {
+      try {
+        setAnnouncementsLoading(true);
+        const response = await contentService.getAnnouncements("PATIENT");
+        const list = Array.isArray(response?.data) ? response.data : [];
+        const sorted = [...list].sort(
+          (a, b) => new Date(b.publishDate || b.createdAt || 0) - new Date(a.publishDate || a.createdAt || 0)
+        );
+        setAnnouncements(sorted.slice(0, 3));
+      } catch {
+        setAnnouncements([]);
+      } finally {
+        setAnnouncementsLoading(false);
+      }
+    };
+
+    loadAnnouncements();
+  }, []);
+
+  useEffect(() => {
+    const loadTopMedicines = async () => {
+      try {
+        setMedicinesLoading(true);
+        const response = await searchService.getTopMedicines({
+          lat: selectedLocation?.lat,
+          lng: selectedLocation?.lng,
+          limit: 8,
+          category: activeCategory === "all" ? undefined : activeCategory,
+        });
+
+        setTopMedicines(Array.isArray(response?.data?.data) ? response.data.data : []);
+      } catch {
+        setTopMedicines([]);
+      } finally {
+        setMedicinesLoading(false);
+      }
+    };
+
+    loadTopMedicines();
+  }, [activeCategory, selectedLocation?.lat, selectedLocation?.lng]);
+
+  const firstName = useMemo(() => {
+    return user?.name?.split(" ")?.[0] || user?.email?.split("@")?.[0] || "Patient";
+  }, [user?.email, user?.name]);
+
+  const bestSellingPharmacies = useMemo(() => {
+    const grouped = new Map();
+
+    topMedicines.forEach((medicine) => {
+      const pharmacy = medicine?.pharmacy;
+      if (!pharmacy?.id) return;
+
+      const key = String(pharmacy.id);
+      const current = grouped.get(key) || {
+        id: pharmacy.id,
+        name: pharmacy.name || "Unknown Pharmacy",
+        address: pharmacy.address || "Address unavailable",
+        averageRating: Number(pharmacy.averageRating || 0),
+        totalReviews: Number(pharmacy.totalReviews || 0),
+        featuredMedicines: 0,
+        distanceFormatted: formatDistance(medicine),
+      };
+
+      current.featuredMedicines += 1;
+      grouped.set(key, current);
+    });
+
+    return Array.from(grouped.values())
+      .sort((a, b) => {
+        if (b.featuredMedicines !== a.featuredMedicines) {
+          return b.featuredMedicines - a.featuredMedicines;
+        }
+        return b.averageRating - a.averageRating;
+      })
+      .slice(0, 4);
+  }, [topMedicines]);
+
+  const handleAddToCart = async (medicine) => {
+    try {
+      await addToCart(medicine);
+      toast.success("Added to cart");
+    } catch (error) {
+      if (!isPharmacyMismatchError(error)) {
+        toast.error("Unable to add medicine right now");
+        return;
+      }
+
+      const shouldReplace = window.confirm(
+        "Your cart has items from another pharmacy. Clear cart and add this medicine instead?"
+      );
+
+      if (!shouldReplace) return;
+
+      try {
+        await clearCart();
+        await addToCart(medicine);
+        toast.success("Added to cart");
+      } catch {
+        toast.error("Unable to replace cart items right now");
+      }
     }
   };
 
-  // Extract stats from dashboard data
-  const stats = {
-    pendingOrders: orders?.filter(order => order?.status === 'PENDING')?.length || 0,
-    purchasedMedicines: dashboardData?.stats?.purchasedMedicines || 0,
-    totalOrders: dashboardData?.stats?.totalOrders || 0,
+  const handleBuyNow = (medicine) => {
+    const medicineId = String(medicine?.id || medicine?.medicine || "medicine");
+
+    navigate("/patient/checkout", {
+      state: {
+        mode: "buy-now",
+        items: [
+          {
+            id: medicineId,
+            medicineId,
+            pharmacyId: medicine?.pharmacy?.id || medicine?.pharmacyId || null,
+            medicineName: medicine?.medicine || medicine?.name || "Medicine",
+            genericName: medicine?.genericName || null,
+            quantity: 1,
+            price: Number(medicine?.price || 0),
+            pharmacyName: medicine?.pharmacy?.name || "Unknown Pharmacy",
+            pharmacyAddress: medicine?.pharmacy?.address || null,
+            pharmacyContact: medicine?.pharmacy?.contactNumber || null,
+          },
+        ],
+      },
+    });
   };
-
-  // Get user first name with null safety
-  const firstName = user?.name?.split(' ')?.[0] || user?.email?.split('@')?.[0] || 'Patient';
-
-  // Skeleton Loader Component
-  const StatCardSkeleton = () => (
-    <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 animate-pulse">
-      <div className="flex items-center gap-4">
-        <div className="w-16 h-16 bg-slate-200 rounded-2xl"></div>
-        <div className="flex-1">
-          <div className="h-4 bg-slate-200 rounded w-24 mb-2"></div>
-          <div className="h-8 bg-slate-200 rounded w-16"></div>
-        </div>
-      </div>
-    </div>
-  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Welcome Header - Premium Design */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Sparkles className="text-blue-500" size={28} />
-            <h1 className="text-4xl font-bold text-slate-900">
-              Welcome back, {firstName}!
-            </h1>
-          </div>
-          <p className="text-slate-600 text-lg font-medium ml-11">
-            Your health journey continues today
-          </p>
-        </div>
+    <div className="min-h-screen bg-slate-50 py-4" style={{ fontFamily: "Nunito, Poppins, ui-sans-serif, system-ui" }}>
+      <div className="w-full px-4 sm:px-6 lg:px-8">
+        <AnnouncementBanner targetRole="PATIENT" className="mb-4 rounded-2xl" />
 
-        {/* Announcement Banner */}
-        <AnnouncementBanner targetRole="PATIENT" className="mb-6" />
+        {activeSOS && <ActiveSOSCard sos={activeSOS} ttlMinutes={sosTTL} navigate={navigate} />}
 
-        {/* Active SOS Countdown Card */}
-        {activeSOS && (
-          <ActiveSOSCard sos={activeSOS} ttlMinutes={sosTTL} navigate={navigate} />
-        )}
-
-        {/* Classy Stats Cards - Soft UI with Gradients */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6 mb-8">
-          {statsLoading ? (
-            <>
-              <StatCardSkeleton />
-              <StatCardSkeleton />
-              <StatCardSkeleton />
-            </>
-          ) : (
-            <>
-              {/* Pending Orders */}
-              <div className="group bg-gradient-to-br from-amber-50 to-white rounded-2xl shadow-sm hover:shadow-lg border border-amber-100 p-6 transition-all duration-300 hover:-translate-y-1">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl shadow-md group-hover:shadow-xl transition-all">
-                    <Clock className="text-white" size={28} />
-                  </div>
-                  <div className="flex flex-col">
-                    <p className="text-sm text-slate-600 font-semibold mb-1">Pending Orders</p>
-                    <p className="text-4xl font-bold text-slate-900">{stats.pendingOrders}</p>
-                  </div>
-                </div>
+        <section className="overflow-hidden rounded-[28px] bg-gradient-to-r from-blue-700 via-blue-600 to-cyan-600 p-4 sm:p-6">
+          <div className="grid grid-cols-1 items-center gap-4 lg:grid-cols-12">
+            <div className="order-2 lg:order-1 lg:col-span-3">
+              <div className="mx-auto h-44 w-44 overflow-hidden rounded-full border-[6px] border-white/90 shadow-2xl sm:h-52 sm:w-52">
+                <img src={heroVisual} alt="Healthcare essentials" className="h-full w-full object-cover" />
               </div>
+            </div>
 
-              {/* Purchased Medicines */}
-              <div className="group bg-gradient-to-br from-teal-50 to-white rounded-2xl shadow-sm hover:shadow-lg border border-teal-100 p-6 transition-all duration-300 hover:-translate-y-1">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-teal-500 to-teal-600 rounded-2xl shadow-md group-hover:shadow-xl transition-all">
-                    <Pill className="text-white" size={28} />
-                  </div>
-                  <div className="flex flex-col">
-                    <p className="text-sm text-slate-600 font-semibold mb-1">Purchased Medicines</p>
-                    <p className="text-4xl font-bold text-slate-900">{stats.purchasedMedicines}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Total Orders */}
-              <div className="group bg-gradient-to-br from-emerald-50 to-white rounded-2xl shadow-sm hover:shadow-lg border border-emerald-100 p-6 transition-all duration-300 hover:-translate-y-1">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl shadow-md group-hover:shadow-xl transition-all">
-                    <Activity className="text-white" size={28} />
-                  </div>
-                  <div className="flex flex-col">
-                    <p className="text-sm text-slate-600 font-semibold mb-1">Total Orders</p>
-                    <p className="text-4xl font-bold text-slate-900">{stats.totalOrders}</p>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Recent Orders - Main Section */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200">
-              <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-md">
-                    <ShoppingBag className="text-white" size={24} />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Recent Orders</h2>
-                    <p className="text-sm text-slate-500">Track your medication orders</p>
-                  </div>
-                </div>
+            <div className="order-3 text-white lg:order-2 lg:col-span-6">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-white/90">Your Health, Simplified</p>
+              <h1 className="mt-2 text-3xl font-black leading-tight sm:text-5xl">YOUR HEALTH, PRIORITIZED.</h1>
+              <p className="mt-2 text-sm text-white/90 sm:text-base">
+                Real-time medicine access across Nepal for {districtLabel}. Welcome back, {firstName}.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
                 <button
-                  onClick={() => navigate("/patient/orders")}
-                  className="px-5 py-2.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl font-semibold transition-all border border-blue-200 hover:border-blue-300"
+                  type="button"
+                  onClick={() => navigate("/medicine-search")}
+                  className="rounded-full bg-white px-4 py-2 text-sm font-bold text-blue-700 transition-colors hover:bg-blue-50"
                 >
-                  View All →
+                  Explore Medicines
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/sos")}
+                  className="rounded-full border border-white/70 bg-blue-700 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-800"
+                >
+                  Emergency SOS
                 </button>
               </div>
+            </div>
 
-              {ordersLoading ? (
-                <div className="space-y-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="animate-pulse">
-                      <div className="h-32 bg-slate-100 rounded-2xl">
-                        <div className="p-4 space-y-3">
-                          <div className="h-4 bg-slate-200 rounded w-1/3"></div>
-                          <div className="h-3 bg-slate-200 rounded w-2/3"></div>
-                          <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+            <div className="order-1 grid grid-cols-2 gap-3 lg:order-3 lg:col-span-3 lg:grid-cols-1">
+              <div className="overflow-hidden rounded-2xl border-4 border-white/70 bg-white/20">
+                <img src={network2} alt="Trusted partner" className="h-24 w-full object-cover" />
+              </div>
+              <div className="overflow-hidden rounded-2xl border-4 border-white/70 bg-white/20">
+                <img src={network3} alt="Medicine availability" className="h-24 w-full object-cover" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="-mt-3 rounded-[26px] border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+          <div className="mb-4 flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-3xl font-black text-slate-900">Medication Types</h2>
+              <p className="text-sm font-semibold text-slate-600">Choose a type to filter nearby bestsellers.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveCategory("all")}
+              className={`rounded-full px-4 py-1.5 text-xs font-black uppercase ${
+                activeCategory === "all"
+                  ? "bg-blue-700 text-white"
+                  : "bg-blue-100 text-slate-900"
+              }`}
+            >
+              All
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {categoryItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeCategory === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveCategory(item.id)}
+                  className={`rounded-2xl border p-3 text-left transition-all ${
+                    isActive
+                      ? "border-blue-300 bg-blue-50"
+                      : "border-slate-200 bg-white hover:border-blue-200"
+                  }`}
+                >
+                  <span
+                    className={`mb-2 inline-flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br ${item.accent} text-white shadow`}
+                  >
+                    <Icon size={18} />
+                  </span>
+                  <p className="text-xs font-extrabold uppercase tracking-wide text-slate-900">{item.label}</p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="mt-4 rounded-[26px] border border-slate-200 bg-white p-4 sm:p-6">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-black text-slate-900">Bestsellers Near You</h2>
+              <p className="text-sm font-semibold text-slate-600">Frequently needed in {districtLabel}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/medicine-search")}
+              className="rounded-full bg-blue-700 px-5 py-2 text-xs font-black uppercase text-white transition-colors hover:bg-blue-800"
+            >
+              View All
+            </button>
+          </div>
+
+          {medicinesLoading ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <div key={idx} className="h-52 animate-pulse rounded-2xl border border-slate-200 bg-white" />
+              ))}
+            </div>
+          ) : topMedicines.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+              <p className="text-sm font-bold text-slate-900">No medicine records were found for this category nearby.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {topMedicines.slice(0, 8).map((medicine) => (
+                <article
+                  key={medicine.id}
+                  className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                    <img src={medicine?.imageUrl || heroVisual} alt={medicine.medicine} className="h-28 w-full object-cover" />
+                  </div>
+
+                  <h3 className="text-sm font-black text-slate-900 line-clamp-2">{medicine.medicine}</h3>
+                  <p className="mt-1 text-xs font-semibold text-slate-500 line-clamp-1">
+                    {medicine.genericName || "Generic data unavailable"}
+                  </p>
+
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-base font-black text-slate-900">{formatCurrency(medicine.price)}</span>
+                    <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-bold text-slate-900">
+                      {formatDistance(medicine)}
+                    </span>
+                  </div>
+
+                  <p className="mt-2 text-[11px] font-semibold text-slate-600 line-clamp-1">
+                    {medicine?.pharmacy?.name || "Unknown Pharmacy"}
+                  </p>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleAddToCart(medicine)}
+                      className="rounded-xl bg-blue-700 px-3 py-2 text-xs font-black text-white transition-colors hover:bg-blue-800"
+                    >
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleBuyNow(medicine)}
+                      className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-slate-900 transition-colors hover:bg-blue-100"
+                    >
+                      Buy
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-4 rounded-[26px] border border-slate-200 bg-white p-4 sm:p-6">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-2xl font-black text-slate-900">Best Selling Pharmacies</h2>
+              <p className="text-sm font-semibold text-slate-600">Pharmacies showing the strongest nearby medicine demand.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/nearby-pharmacies")}
+              className="rounded-full bg-blue-700 px-5 py-2 text-xs font-black uppercase text-white transition-colors hover:bg-blue-800"
+            >
+              View All
+            </button>
+          </div>
+
+          {bestSellingPharmacies.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+              <p className="text-sm font-bold text-slate-900">Pharmacy rankings will appear once nearby stock data is available.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {bestSellingPharmacies.map((pharmacy) => (
+                <button
+                  key={pharmacy.id}
+                  type="button"
+                  onClick={() => navigate(`/patient/pharmacy/${encodeURIComponent(pharmacy.id)}`)}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md"
+                >
+                  <p className="line-clamp-1 text-sm font-black text-slate-900">{pharmacy.name}</p>
+                  <p className="mt-1 line-clamp-1 text-[11px] font-semibold text-slate-500">{pharmacy.address}</p>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
+                      {pharmacy.featuredMedicines} top medicines
+                    </span>
+                    <span className="text-[10px] font-semibold text-slate-500">{pharmacy.distanceFormatted}</span>
+                  </div>
+                  <div className="mt-2 border-t border-slate-100 pt-2">
+                    <StarRating rating={pharmacy.averageRating || 0} totalReviews={pharmacy.totalReviews || 0} size={12} />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-4 rounded-[26px] border border-slate-200 bg-white p-4 sm:p-6">
+          <h2 className="text-4xl font-black text-slate-900">Our Promises</h2>
+          <p className="text-sm font-semibold text-slate-600">What the project provides for patients, pharmacies, and urgent requests.</p>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
+            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:col-span-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {promiseItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.title} className="rounded-xl border border-slate-200 bg-white p-3">
+                      <div className="flex items-start gap-3">
+                        <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-slate-900">
+                          <Icon size={16} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-wide text-slate-900">{item.title}</p>
+                          <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-600">
+                            {item.description}
+                          </p>
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : orders?.length > 0 ? (
-                <div className="space-y-3">
-                  {orders.slice(0, 2).map((order) => (
-                    <OrderCard
-                      key={order?.id}
-                      order={order}
-                      onViewDetails={(id) => navigate(`/patient/orders/${id}`)}
-                    />
-                  ))}
-                  
-                  {orders.length > 2 && (
-                    <button
-                      onClick={() => navigate("/patient/orders")}
-                      className="w-full mt-4 p-3 text-center text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl font-semibold transition-all border border-blue-200 hover:border-blue-300"
-                    >
-                      See More Orders →
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-16 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 rounded-2xl border-2 border-dashed border-slate-300">
-                  <div className="relative inline-block mb-4">
-                    <Package size={80} className="text-slate-300" />
-                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                      <Sparkles className="text-white" size={16} />
-                    </div>
-                  </div>
-                  <h3 className="text-2xl font-bold text-slate-900 mb-2">No orders yet</h3>
-                  <p className="text-slate-600 mb-6 max-w-md mx-auto">
-                    Start your healthcare journey by finding pharmacies near you and ordering your medications
-                  </p>
-                  <button
-                    onClick={() => navigate("/search")}
-                    className="px-8 py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                  >
-                    Search Pharmacies
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Quick Actions Card - Mobile-First Grid Design */}
-            <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200">
-              <h3 className="font-bold text-slate-900 text-lg mb-5 flex items-center gap-2">
-                <TrendingUp size={22} className="text-blue-600" />
-                Quick Actions
-              </h3>
-              <div className="grid grid-cols-1 gap-3">
-                <button
-                  onClick={() => navigate("/medicine-search")}
-                  className="group w-full p-5 bg-gradient-to-br from-blue-50 via-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-700 font-semibold rounded-2xl transition-all flex items-center gap-4 text-left shadow-sm hover:shadow-md hover:-translate-y-0.5"
-                >
-                  <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all">
-                    <Pill size={24} className="text-blue-600" />
-                  </div>
-                  <span className="text-base">Find Medicines</span>
-                </button>
-                
-                <button
-                  onClick={() => navigate("/search")}
-                  className="group w-full p-5 bg-gradient-to-br from-teal-50 via-teal-50 to-teal-100 hover:from-teal-100 hover:to-teal-200 text-teal-700 font-semibold rounded-2xl transition-all flex items-center gap-4 text-left shadow-sm hover:shadow-md hover:-translate-y-0.5"
-                >
-                  <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all">
-                    <MapPin size={24} className="text-teal-600" />
-                  </div>
-                  <span className="text-base">Search Medicine</span>
-                </button>
-                
-                <button
-                  onClick={() => navigate("/nearby-pharmacies")}
-                  className="group w-full p-5 bg-gradient-to-br from-orange-50 via-orange-50 to-orange-100 hover:from-orange-100 hover:to-orange-200 text-orange-700 font-semibold rounded-2xl transition-all flex items-center gap-4 text-left shadow-sm hover:shadow-md hover:-translate-y-0.5"
-                >
-                  <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all">
-                    <MapPin size={24} className="text-orange-600" />
-                  </div>
-                  <span className="text-base">Nearby Pharmacies</span>
-                </button>
-                
-                <button
-                  onClick={() => navigate("/patient/history")}
-                  className="group w-full p-5 bg-gradient-to-br from-emerald-50 via-emerald-50 to-emerald-100 hover:from-emerald-100 hover:to-emerald-200 text-emerald-700 font-semibold rounded-2xl transition-all flex items-center gap-4 text-left shadow-sm hover:shadow-md hover:-translate-y-0.5"
-                >
-                  <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all">
-                    <Package size={24} className="text-emerald-600" />
-                  </div>
-                  <span className="text-base">History</span>
-                </button>
+                  );
+                })}
               </div>
-            </div>
+            </article>
 
-            {/* Featured Health Insight - CMS Integration */}
-            <div className="relative bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 rounded-2xl shadow-sm p-6 border-2 border-amber-200 overflow-hidden">
-              {/* Decorative Background Pattern */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-amber-200/30 to-transparent rounded-full blur-3xl"></div>
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-orange-200/30 to-transparent rounded-full blur-2xl"></div>
-              
-              <div className="relative flex items-start gap-3">
-                <div className="p-3 bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl shadow-md">
-                  <Lightbulb className="text-white" size={28} />
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 lg:col-span-7">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <Megaphone size={17} className="text-blue-700" />
+                  <h3 className="text-lg font-black text-slate-900">Notice with Care</h3>
                 </div>
-                <div className="flex-1">
+                <p className="mb-3 text-sm font-semibold text-slate-600">
+                  CMS notices and admin announcements posted for patients will appear here.
+                </p>
+
+                <div className="mb-4 rounded-xl border border-blue-200 bg-white p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-sm font-black text-slate-900">Latest Health Tip</p>
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black uppercase text-blue-700">
+                      CMS Tip
+                    </span>
+                  </div>
                   {tipLoading ? (
-                    <div className="animate-pulse space-y-3">
-                      <div className="h-6 bg-amber-200 rounded w-2/3"></div>
-                      <div className="h-4 bg-amber-100 rounded"></div>
-                      <div className="h-4 bg-amber-100 rounded w-5/6"></div>
+                    <div className="space-y-2">
+                      <div className="h-4 w-1/2 animate-pulse rounded bg-blue-100" />
+                      <div className="h-4 w-5/6 animate-pulse rounded bg-blue-100" />
+                      <div className="h-4 w-3/4 animate-pulse rounded bg-blue-100" />
                     </div>
-                  ) : healthTip ? (
-                    <>
-                      <h3 className="font-bold text-slate-900 mb-3 text-xl flex items-center gap-2">
-                        <Sparkles className="text-amber-600" size={20} />
-                        {healthTip?.title || 'Health Tip'}
-                      </h3>
-                      <p className="text-sm text-slate-700 leading-relaxed mb-4">
-                        {healthTip?.content}
-                      </p>
-                      {healthTip?.category && (
-                        <div className="flex flex-wrap gap-2">
-                          <span className="inline-block px-3 py-1.5 bg-white/80 backdrop-blur-sm text-amber-700 text-xs font-bold rounded-full border border-amber-200 shadow-sm">
-                            {healthTip.category}
-                          </span>
-                        </div>
-                      )}
-                      <button 
-                        className="mt-4 text-sm font-semibold text-amber-700 hover:text-amber-800 underline decoration-2 underline-offset-4"
-                      >
-                        Read More →
-                      </button>
-                    </>
                   ) : (
                     <>
-                      <h3 className="font-bold text-slate-900 mb-3 text-xl flex items-center gap-2">
-                        <Sparkles className="text-amber-600" size={20} />
-                        Health Tip of the Day
-                      </h3>
-                      <p className="text-sm text-slate-700 leading-relaxed mb-4">
-                        Take your medications at the same time daily for better effectiveness. Set phone reminders to help maintain consistency and improve treatment outcomes.
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                        {healthTip?.category || "Health Tip"}
                       </p>
-                      <span className="inline-block px-3 py-1.5 bg-white/80 backdrop-blur-sm text-amber-700 text-xs font-bold rounded-full border border-amber-200 shadow-sm">
-                        💊 Medication Tips
-                      </span>
+                      <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-700">
+                        {healthTip?.title || "Daily care reminder"}
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                        {healthTip?.content || "CMS health guidance will appear here when published by the admin team."}
+                      </p>
                     </>
                   )}
                 </div>
-              </div>
-            </div>
 
-            {/* Profile Card - Premium Gradient Design */}
-            <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 rounded-2xl shadow-lg p-6 text-white border border-slate-700">
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-md">
-                  <span className="text-xl font-bold">
-                    {firstName?.[0]?.toUpperCase() || 'P'}
-                  </span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg">My Profile</h3>
-                  <p className="text-xs text-slate-400">Patient Information</p>
-                </div>
+                {announcementsLoading ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 3 }).map((_, idx) => (
+                      <div key={idx} className="h-14 animate-pulse rounded-xl border border-slate-200 bg-slate-50" />
+                    ))}
+                  </div>
+                ) : announcements.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
+                    <p className="text-sm font-semibold text-slate-600">No CMS notices or admin announcements have been posted yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {announcements.map((announcement) => (
+                      <div key={announcement.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <p className="line-clamp-1 text-sm font-black text-slate-900">{announcement.title}</p>
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black uppercase text-blue-700">
+                            {announcement.priority || "normal"}
+                          </span>
+                        </div>
+                        <p className="line-clamp-2 text-xs font-semibold text-slate-600">{announcement.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              
-              <div className="space-y-4">
-                <div className="p-4 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
-                  <p className="text-xs text-slate-300 mb-1 font-medium">Full Name</p>
-                  <p className="text-white font-semibold truncate">{user?.name || 'N/A'}</p>
-                </div>
-                <div className="p-4 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
-                  <p className="text-xs text-slate-300 mb-1 font-medium">Email Address</p>
-                  <p className="text-white font-medium truncate text-sm">{user?.email || 'N/A'}</p>
-                </div>
-                <button
-                  onClick={() => navigate("/patient/profile")}
-                  className="w-full p-4 text-center bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                >
-                  View Full Profile →
-                </button>
-              </div>
-            </div>
+            </article>
           </div>
-        </div>
+        </section>
+
+        <section className="mt-4 rounded-2xl bg-blue-700 px-5 py-3 text-center text-white shadow-lg">
+          <div className="inline-flex flex-wrap items-center justify-center gap-2 text-xs font-bold uppercase tracking-wide sm:text-sm">
+            <Stethoscope size={14} />
+            <span>District-aware medicine visibility</span>
+            <span className="opacity-60">|</span>
+            <CircleGauge size={14} />
+            <span>Live stock snapshots</span>
+            <span className="opacity-60">|</span>
+            <Clock3 size={14} />
+            <span>Emergency workflow continuity</span>
+          </div>
+        </section>
       </div>
     </div>
   );
 }
 
 export default PatientDashboard;
+
+

@@ -204,13 +204,13 @@ export default function PharmacyInventory() {
     } else if (daysUntilExpiry <= 30) {
       return <span className="text-xs text-orange-600">Expires in {daysUntilExpiry} days</span>;
     } else {
-      return <span className="text-xs text-slate-600 dark:text-slate-400">{new Date(expiryDate).toLocaleDateString()}</span>;
+      return <span className="text-xs text-slate-600">{new Date(expiryDate).toLocaleDateString()}</span>;
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <LoadingSpinner />
       </div>
     );
@@ -218,9 +218,9 @@ export default function PharmacyInventory() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-        <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-6">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Inventory Management</h1>
+      <div className="min-h-screen bg-slate-50">
+        <header className="bg-white border-b border-slate-200 px-6 py-6">
+          <h1 className="text-2xl font-bold text-slate-900">Inventory Management</h1>
         </header>
         <div className="p-6">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -238,20 +238,20 @@ export default function PharmacyInventory() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-6">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Inventory Management</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">Manage your pharmacy stock and medicines</p>
+    <div className="min-h-screen bg-slate-50">
+      <header className="bg-white border-b border-slate-200 px-6 py-6">
+        <h1 className="text-2xl font-bold text-slate-900">Inventory Management</h1>
+        <p className="text-sm text-slate-500">Manage your pharmacy stock and medicines</p>
       </header>
 
       <main className="p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat) => (
-            <div key={stat.title} className="bg-white dark:bg-slate-900 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+            <div key={stat.title} className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">{stat.title}</p>
-                  <p className="text-2xl font-bold text-slate-900 dark:text-slate-50">{stat.value}</p>
+                  <p className="text-sm text-slate-500 mb-1">{stat.title}</p>
+                  <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-blue-50">
                   <stat.icon size={24} className="text-blue-600" />
@@ -261,16 +261,16 @@ export default function PharmacyInventory() {
           ))}
         </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
-          <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-4 justify-between">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+          <div className="p-6 border-b border-slate-200 flex flex-col sm:flex-row gap-4 justify-between">
             <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={20} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
               <input
                 type="text"
                 placeholder="Search medicines by name or generic name..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
             <button
@@ -284,7 +284,7 @@ export default function PharmacyInventory() {
 
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+              <thead className="text-slate-500 border-b border-slate-200">
                 <tr>
                   <th className="text-left px-6 py-4">Medicine Name</th>
                   <th className="text-left px-6 py-4">Generic Name</th>
@@ -300,10 +300,10 @@ export default function PharmacyInventory() {
                   <tr>
                     <td colSpan="7" className="px-6 py-16 text-center">
                       <Package className="mx-auto mb-3 text-gray-300" size={48} />
-                      <p className="text-slate-700 dark:text-slate-300 font-semibold text-lg">
+                      <p className="text-slate-700 font-semibold text-lg">
                         {searchTerm ? "No matches found" : "No medicines in inventory"}
                       </p>
-                      <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
+                      <p className="text-slate-500 text-sm mt-1">
                         {searchTerm
                           ? `No medicines match "${searchTerm}". Try a different search term.`
                           : "Add your first medicine to start managing your inventory."}
@@ -320,11 +320,11 @@ export default function PharmacyInventory() {
                   </tr>
                 ) : (
                   filteredInventory.map((item) => (
-                    <tr key={item.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800">
-                      <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-50">{item.name}</td>
-                      <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{item.genericName}</td>
-                      <td className="px-6 py-4"><span className="text-slate-600 dark:text-slate-400">{item.quantity}</span></td>
-                      <td className="px-6 py-4"><span className="text-slate-600 dark:text-slate-400">₹{item.price.toFixed(2)}</span></td>
+                    <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="px-6 py-4 font-medium text-slate-900">{item.name}</td>
+                      <td className="px-6 py-4 text-slate-600">{item.genericName}</td>
+                      <td className="px-6 py-4"><span className="text-slate-600">{item.quantity}</span></td>
+                      <td className="px-6 py-4"><span className="text-slate-600">₹{item.price.toFixed(2)}</span></td>
                       <td className="px-6 py-4">
                         {getExpiryBadge(item.expiryDate)}
                       </td>
@@ -358,22 +358,22 @@ export default function PharmacyInventory() {
           </div>
 
           {pagination.totalPages > 1 && (
-            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <p className="text-sm text-slate-600 dark:text-slate-400">
+            <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
+              <p className="text-sm text-slate-600">
                 Showing {inventory.length} of {pagination.totalItems} items
               </p>
               <div className="flex gap-2">
                 <button
                   onClick={() => fetchInventory(pagination.currentPage - 1)}
                   disabled={!pagination.hasPreviousPage}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800"
+                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
                 >
                   Previous
                 </button>
                 <button
                   onClick={() => fetchInventory(pagination.currentPage + 1)}
                   disabled={!pagination.hasNextPage}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800"
+                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
                 >
                   Next
                 </button>
@@ -412,6 +412,7 @@ export default function PharmacyInventory() {
         message={`Are you sure you want to permanently remove "${confirmDelete.itemName}" from your inventory? This action cannot be undone.`}
         confirmLabel="Yes, Remove"
         variant="danger"
+        backdropClassName="bg-slate-900/20 backdrop-blur-sm"
       />
 
     </div>
@@ -439,3 +440,4 @@ function AddMedicineModal({ isOpen, onClose, onSubmit, submitting }) {
     </Modal>
   );
 }
+

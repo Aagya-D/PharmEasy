@@ -19,6 +19,15 @@ import useGeoLocation from "../../../shared/hooks/useGeoLocation";
 import { useLocation } from "../../../context/LocationContext";
 import { useCart } from "../../../context/CartContext";
 import StarRating from "../../../shared/components/StarRating";
+import MedicineImage from "../../../shared/components/ui/MedicineImage";
+
+const formatCurrency = (value) => {
+  const amount = Number(value || 0);
+  return `Rs. ${amount.toLocaleString("en-NP", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
 
 /**
  * Medicine Search & Discovery Page
@@ -292,26 +301,26 @@ export default function MedicineSearch() {
         )}
 
         {/* Search Form */}
-        <form onSubmit={handleSearch} className="mb-8 bg-white rounded-lg shadow-md p-6">
+        <form onSubmit={handleSearch} className="mb-8 rounded-2xl border border-white/60 bg-white/80 p-5 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-lg">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
               <Search
                 size={20}
-                className="absolute left-4 top-3 text-slate-400"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
               />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by medicine name, composition, or condition..."
-                className="w-full pl-12 pr-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder:text-slate-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                className="w-full rounded-xl border border-slate-200 bg-white/95 pl-12 pr-4 py-3 text-slate-900 placeholder:text-slate-400 shadow-sm transition-all duration-200 focus:border-blue-400 focus:outline-none focus:ring-4 focus:ring-blue-100"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
             >
               {loading ? (
                 <>
@@ -330,7 +339,7 @@ export default function MedicineSearch() {
               type="button"
               onClick={getLocation}
               disabled={locationLoading}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-4 py-3 font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
               <Navigation size={18} />
               {locationLoading ? "Locating..." : "My Location"}
@@ -340,14 +349,14 @@ export default function MedicineSearch() {
           {/* Filters */}
           <div className="mt-4 flex flex-wrap gap-4">
             <div className="flex items-center gap-2">
-              <MapPin size={16} className="text-gray-600" />
-              <label className="text-sm text-gray-700 mr-2">Search Radius:</label>
+              <MapPin size={16} className="text-slate-500" />
+              <label className="text-sm font-medium text-slate-700 mr-2">Search Radius:</label>
               <select
                 value={filters.searchRadius}
                 onChange={(e) =>
                   setFilters({ ...filters, searchRadius: parseInt(e.target.value) })
                 }
-                className="px-3 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                className="rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-sm text-slate-900 shadow-sm transition-all duration-200 focus:border-blue-400 focus:outline-none focus:ring-4 focus:ring-blue-100"
               >
                 <option value={10}>10 km</option>
                 <option value={25}>25 km</option>
@@ -356,30 +365,30 @@ export default function MedicineSearch() {
               </select>
             </div>
 
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer rounded-full border border-emerald-200 bg-emerald-50/70 px-3 py-2">
               <input
                 type="checkbox"
                 checked={filters.inStock}
                 onChange={(e) =>
                   setFilters({ ...filters, inStock: e.target.checked })
                 }
-                className="w-4 h-4 rounded border-gray-300"
+                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-200"
               />
               <CheckCircle size={16} className="text-green-600" />
-              <span className="text-sm text-gray-700">In stock only</span>
+              <span className="text-sm font-medium text-slate-700">In stock only</span>
             </label>
 
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-center gap-2 cursor-pointer rounded-full border border-slate-200 bg-white/80 px-3 py-2">
               <input
                 type="checkbox"
                 checked={filters.nearbyOnly}
                 onChange={(e) =>
                   setFilters({ ...filters, nearbyOnly: e.target.checked })
                 }
-                className="w-4 h-4 rounded border-gray-300"
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-200"
               />
-              <MapPin size={16} className="text-gray-600" />
-              <span className="text-sm text-gray-700">Strict radius only</span>
+              <MapPin size={16} className="text-slate-500" />
+              <span className="text-sm font-medium text-slate-700">Strict radius only</span>
             </label>
           </div>
         </form>
@@ -405,7 +414,7 @@ export default function MedicineSearch() {
             {medicines.length > 0 && (
               <>
                 <h3 className="text-xl font-semibold text-gray-800">Medicines</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {medicines.map((medicine) => (
                 <div
                   key={getMedicineRouteId(medicine)}
@@ -418,7 +427,7 @@ export default function MedicineSearch() {
                   }}
                   role="button"
                   tabIndex={0}
-                  className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow relative cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mx-auto w-full max-w-xs rounded-2xl border border-white/70 bg-white/90 p-3 shadow-[0_14px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_48px_rgba(15,23,42,0.12)] relative cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {/* Favorite Heart Button */}
                   <button
@@ -427,7 +436,7 @@ export default function MedicineSearch() {
                       toggleFavorite(medicine);
                     }}
                     disabled={togglingFav === (medicine.medicine || medicine.brandName)}
-                    className="absolute top-4 right-4 p-2 rounded-full hover:bg-pink-50 transition-colors z-10"
+                    className="absolute top-2 right-2 p-1.5 rounded-full hover:bg-pink-50 transition-colors z-10"
                     title={favoritedNames.has(medicine.medicine || medicine.brandName) ? "Remove from favorites" : "Add to favorites"}
                   >
                     <Heart
@@ -439,25 +448,34 @@ export default function MedicineSearch() {
                       }`}
                     />
                   </button>
+
+                  <div className="mb-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 aspect-[4/3]">
+                    <MedicineImage
+                      src={medicine?.imageUrl}
+                      alt={medicine?.medicine || medicine?.brandName || "Medicine"}
+                      className="object-cover"
+                    />
+                  </div>
+
                   {/* Medicine Name */}
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">
+                  <h3 className="text-base font-bold text-gray-900 leading-tight line-clamp-2">
                     {medicine.medicine || medicine.brandName}
                   </h3>
-                  <p className="text-sm text-gray-600 mb-1">
+                  <p className="text-xs text-gray-600 mt-1 line-clamp-1">
                     {medicine.genericName && `Generic: ${medicine.genericName}`}
                   </p>
 
                   {/* Price & Availability */}
-                  <div className="mb-4 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Price</span>
-                      <span className="text-lg font-bold text-blue-600">
-                        ₹{medicine.price}
+                  <div className="mt-3 mb-3 space-y-1.5 rounded-2xl bg-slate-50/90 p-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs uppercase tracking-wide text-slate-500">Price</span>
+                      <span className="text-sm font-black text-blue-700">
+                        {formatCurrency(medicine.price)}
                       </span>
                     </div>
 
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Stock</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs uppercase tracking-wide text-slate-500">Stock</span>
                       <span className={`text-sm font-medium ${medicine.inStock ? 'text-green-600' : 'text-red-600'}`}>
                         {medicine.quantity > 0 ? `${medicine.quantity} available` : 'Out of stock'}
                       </span>
@@ -467,15 +485,15 @@ export default function MedicineSearch() {
                   {/* Top Pharmacy */}
                   {medicine.pharmacy && (
                     <div
-                      className="bg-gray-50 rounded-lg p-3 mb-4 cursor-pointer hover:bg-blue-50 transition-colors"
+                      className="mb-3 rounded-2xl border border-slate-200 bg-white/80 p-3 cursor-pointer hover:bg-blue-50/80 transition-colors"
                       onClick={(event) => {
                         event.stopPropagation();
                         handleOpenStore(medicine?.pharmacy?.id);
                       }}
                     >
-                      <p className="text-xs text-gray-600 mb-1">Available at</p>
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500">Available at</p>
                       <p
-                        className="text-sm font-medium text-gray-900 hover:text-blue-700 hover:underline underline-offset-2"
+                        className="text-sm font-semibold text-gray-900 hover:text-blue-700 hover:underline underline-offset-2 leading-tight"
                         onClick={(event) => {
                           event.stopPropagation();
                           handleOpenStore(medicine?.pharmacy?.id);
@@ -483,12 +501,12 @@ export default function MedicineSearch() {
                       >
                         {medicine.pharmacy.name}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">{medicine.pharmacy.address}</p>
-                      <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs text-gray-600">
+                      <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">{medicine.pharmacy.address}</p>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center rounded-full bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-700">
                           {medicine.distanceFormatted || (medicine.distance ? `${parseFloat(medicine.distance).toFixed(1)} km` : 'Distance unavailable')} away
                         </span>
-                        <span className="text-xs text-blue-600 font-medium">
+                        <span className="text-[11px] font-medium text-blue-600 truncate">
                           {medicine.pharmacy.contactNumber}
                         </span>
                       </div>
@@ -506,7 +524,7 @@ export default function MedicineSearch() {
 
                   {/* Failsafe Warning */}
                   {medicine.failsafeNote && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                    <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
                       <p className="text-xs text-amber-700 flex items-start gap-2">
                         <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
                         <span>{medicine.failsafeNote}</span>
@@ -521,7 +539,7 @@ export default function MedicineSearch() {
                         event.stopPropagation();
                         handleAddToCart(medicine);
                       }}
-                      className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                      className="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                     >
                       Add to Cart
                     </button>
@@ -530,7 +548,7 @@ export default function MedicineSearch() {
                         event.stopPropagation();
                         handlePlaceOrder(medicine);
                       }}
-                      className="w-full px-4 py-2 bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-medium rounded-lg transition-colors"
+                      className="w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
                     >
                       Place Order
                     </button>
@@ -549,7 +567,7 @@ export default function MedicineSearch() {
                     <button
                       key={pharmacy.id}
                       onClick={() => handleOpenStore(pharmacy.id)}
-                      className="text-left bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+                      className="text-left rounded-2xl bg-white/90 p-4 shadow-[0_14px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm hover:shadow-[0_18px_48px_rgba(15,23,42,0.12)] transition-shadow"
                     >
                       <h4 className="text-lg font-bold text-gray-900 mb-1">{pharmacy.name}</h4>
                       <p className="text-sm text-gray-600 mb-3">{pharmacy.address}</p>

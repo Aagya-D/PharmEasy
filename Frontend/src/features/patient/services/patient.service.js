@@ -19,6 +19,20 @@ const patientService = {
     return response.data;
   },
 
+  // Upload patient avatar/profile photo
+  uploadAvatar: async (avatarFile) => {
+    const formData = new FormData();
+    formData.append("avatar", avatarFile);
+
+    const response = await httpClient.patch("/user/avatar", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    return response.data;
+  },
+
   // Get patient orders
   getOrders: async (filters = {}) => {
     const response = await httpClient.get("/patient/orders", { params: filters });

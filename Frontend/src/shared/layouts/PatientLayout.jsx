@@ -45,6 +45,23 @@ export function PatientLayout({ children, searchEnabled = true }) {
   const { unreadNotifications: notificationCount, unreadMessages: unreadChatCount } = useNotification();
   const { cartCount } = useCart();
 
+  const userInitials = (user?.name || user?.email || "P")
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  const locationButtonLabel = (() => {
+    if (!selectedLocation) return "Select Location";
+
+    const primary = selectedLocation.name || selectedLocation.district || selectedLocation.province;
+    const secondary = [selectedLocation.district, selectedLocation.province]
+      .find((value) => value && value !== primary);
+
+    return secondary ? `${primary}, ${secondary}` : primary || "Select Location";
+  })();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState({ medicines: [], pharmacies: [] });
   const [searchLoading, setSearchLoading] = useState(false);
@@ -153,14 +170,15 @@ export function PatientLayout({ children, searchEnabled = true }) {
     { label: "Nearby Pharmacies", href: "/nearby-pharmacies", icon: MapPin },
     { label: "History", href: "/patient/history", icon: ActivitySquare },
     { label: "Orders", href: "/patient/orders", icon: Package },
+    { label: "Medications", href: "/patient/medications", icon: Pill },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col" style={{ fontFamily: "Nunito, Poppins, ui-sans-serif, system-ui" }}>
       {/* ===== STICKY TOP NAVBAR ===== */}
-      <nav className="sticky top-0 z-50 bg-white shadow-sm border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+      <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
             {/* Logo/Brand */}
             <div
               onClick={() => navigate("/patient")}
@@ -170,21 +188,23 @@ export function PatientLayout({ children, searchEnabled = true }) {
                 <Stethoscope size={20} />
               </div>
               <div className="hidden sm:block">
-                <span className="font-bold text-xl text-blue-600 block leading-none">PharmEasy</span>
-                <span className="text-[10px] text-teal-600 font-medium">Healthcare Simplified</span>
+                <span className="font-black text-2xl text-slate-900 block leading-none">PharmEasy</span>
+                <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wide">Healthcare Simplified</span>
               </div>
             </div>
 
             {/* Desktop Search Bar with Location */}
             {searchEnabled && (
-              <div className="hidden md:flex flex-1 mx-8 gap-2">
+              <div className="mx-8 hidden flex-1 gap-2 md:flex">
                 {/* Location Selector Button */}
                 <button
                   onClick={() => setIsLocationModalOpen(true)}
-                  className="h-full px-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg flex items-center gap-2 text-sm font-medium text-gray-700 transition-all hover:shadow-md whitespace-nowrap min-w-fit"
+                  className="h-full min-w-fit whitespace-nowrap rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-blue-300 hover:bg-blue-50"
                 >
-                  <MapPin size={16} className="text-teal-600 flex-shrink-0" />
-                  <span className="hidden lg:inline max-w-[150px] truncate">{selectedLocation?.name || "Select Location"}</span>
+                  <MapPin size={16} className="flex-shrink-0 text-blue-700" />
+                  <span className="hidden max-w-[170px] truncate lg:inline">
+                    {locationButtonLabel}
+                  </span>
                 </button>
                 {/* Search Bar */}
                 <form onSubmit={handleSearch} className="flex-1 relative" ref={searchBoxRef}>
@@ -198,12 +218,12 @@ export function PatientLayout({ children, searchEnabled = true }) {
                       }
                     }}
                     placeholder="Search medicines, health conditions, pharmacies..."
-                    className="w-full px-4 py-2 pl-10 rounded-lg bg-white border border-slate-200 shadow-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    className="w-full rounded-full border border-slate-300 bg-white px-5 py-2.5 pl-11 text-sm font-semibold text-slate-900 shadow-sm placeholder:text-slate-400 transition-all duration-200 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100"
                   />
-                  <Search size={18} strokeWidth={2.5} className="absolute left-3 top-2.5 text-blue-600" />
+                  <Search size={18} strokeWidth={2.5} className="absolute left-4 top-2.5 text-blue-700" />
 
                   {showSearchDropdown && searchQuery.trim().length >= 2 && (
-                    <div className="absolute left-0 right-0 mt-2 rounded-xl border border-gray-200 bg-white shadow-xl z-50">
+                    <div className="absolute left-0 right-0 z-50 mt-2 rounded-2xl border border-slate-300 bg-white shadow-xl">
                       {searchLoading ? (
                         <div className="px-4 py-3 text-sm text-gray-500">Searching...</div>
                       ) : (
@@ -256,11 +276,19 @@ export function PatientLayout({ children, searchEnabled = true }) {
             )}
 
             {/* Right Section - Desktop */}
-            <div className="hidden sm:flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-3">
+              <button
+                onClick={() => navigate("/sos")}
+                className="hidden items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-xs font-black uppercase tracking-wide text-white shadow-md transition-all hover:bg-red-700 lg:inline-flex"
+              >
+                <AlertCircle size={14} />
+                Emergency SOS
+              </button>
+
               {/* Cart Button */}
               <button
                 onClick={() => navigate("/patient/cart")}
-                className="relative p-2 hover:bg-blue-50 rounded-lg transition-colors"
+                className="relative rounded-lg p-2 transition-colors hover:bg-blue-50"
                 title="Cart"
               >
                 <ShoppingCart size={20} className="text-slate-700" />
@@ -280,9 +308,17 @@ export function PatientLayout({ children, searchEnabled = true }) {
                   onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
                   className="flex items-center gap-2 p-2 hover:bg-blue-50 rounded-lg transition-colors"
                 >
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-teal-500 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-md">
-                    {user?.name?.charAt(0) || "P"}
-                  </div>
+                  {user?.avatarUrl ? (
+                    <img
+                      src={user.avatarUrl}
+                      alt={user?.name || "Patient avatar"}
+                      className="w-8 h-8 rounded-full object-cover ring-2 ring-blue-200"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-teal-500 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-md">
+                      {userInitials}
+                    </div>
+                  )}
                   <span className="hidden lg:inline text-sm font-medium text-slate-700 max-w-[120px] truncate">
                     {user?.name?.split(" ")[0]}
                   </span>
@@ -348,16 +384,16 @@ export function PatientLayout({ children, searchEnabled = true }) {
           </div>
 
           {/* Desktop Navigation Links */}
-          <div className="hidden md:flex items-center gap-1 border-t border-slate-100 py-2">
+          <div className="hidden items-center gap-1 border-t border-slate-100 py-2 md:flex">
             {navLinks.map((link) => {
               const Icon = link.icon;
               return (
                 <button
                   key={link.href}
                   onClick={() => navigate(link.href)}
-                  className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all ${
+                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
                     isActive(link.href)
-                      ? "bg-blue-600 text-white shadow-md"
+                      ? "bg-blue-700 text-white shadow-md"
                       : "text-slate-700 hover:bg-blue-50"
                   }`}
                 >
@@ -366,15 +402,6 @@ export function PatientLayout({ children, searchEnabled = true }) {
                 </button>
               );
             })}
-            
-            {/* Desktop SOS Button */}
-            <button
-              onClick={() => navigate("/sos")}
-              className="ml-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg flex items-center gap-2 text-sm font-semibold transition-all shadow-md hover:shadow-lg"
-            >
-              <AlertCircle size={16} />
-              Emergency SOS
-            </button>
           </div>
 
           {/* Mobile Search Bar */}
@@ -396,11 +423,10 @@ export function PatientLayout({ children, searchEnabled = true }) {
               </form>
             </div>
           )}
-        </div>
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-200 bg-white">
+          <div className="md:hidden border-t border-slate-100 bg-white rounded-b-3xl">
             <div className="px-4 py-2 space-y-1">
               {navLinks.map((link) => {
                 const Icon = link.icon;
@@ -462,6 +488,7 @@ export function PatientLayout({ children, searchEnabled = true }) {
             </div>
           </div>
         )}
+        </div>
       </nav>
 
       {/* Main Content Area */}
@@ -484,28 +511,30 @@ export function PatientLayout({ children, searchEnabled = true }) {
       </button>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-slate-300 text-sm py-8 border-t border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+      <footer className="mt-5 border-t border-slate-200 bg-white py-10 text-sm text-slate-600">
+        <div className="w-full px-4 sm:px-6 lg:px-8">
+          <div className="mb-6 rounded-2xl bg-blue-700 px-4 py-3 text-center text-sm font-black text-white sm:text-lg">
+            PharmEasy - Your trusted healthcare partner for every district in Nepal
+          </div>
+          <div className="mb-8 grid grid-cols-1 gap-8 md:grid-cols-4">
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-teal-500 rounded-lg flex items-center justify-center">
                   <Stethoscope size={16} className="text-white" />
                 </div>
-                <h3 className="font-bold text-white">PharmEasy</h3>
+                <h3 className="font-black text-slate-900 text-2xl">PharmEasy</h3>
               </div>
-              <p className="text-xs leading-relaxed text-slate-400">
-                Your trusted healthcare partner for quick access to medicines and
-                professional medical guidance.
+              <p className="text-xs leading-relaxed text-slate-500">
+                Trusted healthcare marketplace for timely medicine access, district-level visibility, and emergency response.
               </p>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Quick Links</h4>
+              <h4 className="font-black text-slate-900 mb-4 uppercase text-sm">Quick Links</h4>
               <ul className="space-y-2 text-xs">
                 <li>
                   <button
                     onClick={() => navigate("/patient")}
-                    className="hover:text-blue-400 transition-colors"
+                    className="hover:text-slate-900 transition-colors"
                   >
                     Home
                   </button>
@@ -513,62 +542,88 @@ export function PatientLayout({ children, searchEnabled = true }) {
                 <li>
                   <button
                     onClick={() => navigate("/medicine-search")}
-                    className="hover:text-blue-400 transition-colors"
+                    className="hover:text-slate-900 transition-colors"
                   >
                     Find Medicines
                   </button>
                 </li>
                 <li>
                   <button
-                    onClick={() => navigate("/search")}
-                    className="hover:text-blue-400 transition-colors"
+                    onClick={() => navigate("/nearby-pharmacies")}
+                    className="hover:text-slate-900 transition-colors"
                   >
-                    Search Pharmacies
+                    Nearby Pharmacies
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => navigate("/patient/orders")}
+                    className="hover:text-slate-900 transition-colors"
+                  >
+                    Orders
                   </button>
                 </li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Support</h4>
+              <h4 className="font-black text-slate-900 mb-4 uppercase text-sm">Need Help</h4>
               <ul className="space-y-2 text-xs">
                 <li>
-                  <a href="tel:+977-9999999999" className="hover:text-blue-400 transition-colors">
-                    📞 Call: +977 999-999-999
+                  <a href="tel:+977-9800000000" className="font-bold text-slate-900 hover:text-slate-900 transition-colors">
+                    +977 9800-000-000
                   </a>
                 </li>
                 <li>
-                  <a href="mailto:support@pharmeasy.com" className="hover:text-blue-400 transition-colors">
-                    ✉️ support@pharmeasy.com
+                  <a href="tel:+977-9811111111" className="font-bold text-slate-900 hover:text-slate-900 transition-colors">
+                    +977 9811-111-111
+                  </a>
+                </li>
+                <li>
+                  <a href="mailto:support@pharmeasy.com" className="hover:text-slate-900 transition-colors">
+                    support@pharmeasy.com
                   </a>
                 </li>
                 <li className="pt-2">
-                  <span className="text-[10px] text-slate-500">24/7 Customer Support</span>
+                  <span className="text-[10px] text-slate-400">24/7 patient and pharmacy support</span>
                 </li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4 flex items-center gap-2">
+              <h4 className="mb-3 flex items-center gap-2 font-black text-slate-900 uppercase text-sm">
                 <Heart size={16} className="text-red-500" />
-                Emergency
+                Emergency & Alerts
               </h4>
-              <p className="text-xs text-slate-400 mb-3">
-                Need urgent medication? We're here 24/7.
+              <p className="mb-3 text-xs text-slate-500">
+                Trigger SOS and subscribe for district-level health alerts.
               </p>
               <button
                 onClick={() => navigate("/sos")}
-                className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg text-sm transition-all flex items-center justify-center gap-2 shadow-lg"
+                className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-black text-white shadow-lg transition-all hover:bg-red-700"
               >
                 <AlertCircle size={16} />
                 Emergency SOS
               </button>
+              <div className="rounded-xl border border-slate-300 bg-blue-50 p-2">
+                <input
+                  type="email"
+                  placeholder="Sign up for health alerts"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-700 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  className="mt-2 w-full rounded-md bg-blue-700 px-3 py-2 text-xs font-black text-white hover:bg-blue-800"
+                >
+                  Subscribe
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="border-t border-slate-800 pt-8 text-center">
+          <div className="border-t border-slate-200 pt-8 text-center">
             <p className="text-xs text-slate-500">
               © 2026 PharmEasy. All rights reserved. | 
-              <button className="hover:text-blue-400 transition-colors mx-1">Terms of Service</button> | 
-              <button className="hover:text-blue-400 transition-colors mx-1">Privacy Policy</button>
+              <button className="hover:text-slate-900 transition-colors mx-1">Terms of Service</button> | 
+              <button className="hover:text-slate-900 transition-colors mx-1">Privacy Policy</button>
             </p>
           </div>
         </div>
@@ -584,3 +639,5 @@ export function PatientLayout({ children, searchEnabled = true }) {
 }
 
 export default PatientLayout;
+
+
