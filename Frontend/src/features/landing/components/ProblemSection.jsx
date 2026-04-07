@@ -2,20 +2,24 @@ import { AlertCircle, Eye, TrendingUp, LogIn } from "lucide-react";
 
 export function ProblemSection() {
   return (
-    <section className="px-6 py-20 bg-gray-50">
+    <section className="px-6 py-20 bg-[#f7f6f3]">
       <div className="max-w-7xl mx-auto">
-        <h2 className="text-4xl font-bold text-gray-900 mb-4 text-center">
+        <p className="mb-3 text-center text-xs font-semibold tracking-[0.18em] text-[#007f95]/80">
+          THE HEALTHCARE GAP
+        </p>
+
+        <h2 className="landing-display text-4xl text-slate-900 mb-4 text-center md:text-5xl">
           The Healthcare Gap We're Solving
         </h2>
 
-        <p className="text-base text-gray-600 max-w-4xl mx-auto mb-16 text-center leading-relaxed">
+        <p className="text-base text-slate-600 max-w-4xl mx-auto mb-14 text-center leading-8">
           Fragmented pharmaceutical supply chains create information asymmetry.
           Patients waste time and resources searching for medicines across
           multiple locations, while pharmacies lack visibility into demand and
           inventory optimization.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           {[
             {
               icon: AlertCircle,
@@ -42,13 +46,15 @@ export function ProblemSection() {
             return (
               <div
                 key={idx}
-                className="p-8 bg-white rounded-xl border border-gray-200 hover:shadow-lg transition-shadow duration-300"
+                className="group rounded-2xl border border-cyan-900/10 bg-white p-7 shadow-[0_12px_35px_rgba(15,23,42,0.06)] transition-all duration-300 hover:-translate-y-1 hover:border-[#0097b2]/40 hover:shadow-[0_24px_50px_rgba(15,23,42,0.12)]"
               >
-                <Icon size={40} className="text-red-500 mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#e0f7fb] text-[#0097b2] transition-colors duration-300 group-hover:bg-[#c8f0f8]">
+                  <Icon size={24} />
+                </div>
+                <h3 className="mb-3 text-lg font-semibold text-slate-900">
                   {problem.title}
                 </h3>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm leading-7 text-slate-600">
                   {problem.desc}
                 </p>
               </div>

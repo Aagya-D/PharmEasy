@@ -6,31 +6,33 @@ export function FinalCTASection() {
   const { isAuthenticated } = useAuth();
 
   return (
-    <section className="px-6 py-20 bg-white text-center">
-      <div className="max-w-3xl mx-auto">
-        <h2 className="text-4xl font-bold text-gray-900 mb-8">
+    <section className="relative overflow-hidden px-6 py-20 text-center bg-[#042b35]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(0,151,178,0.28),transparent_35%),radial-gradient(circle_at_80%_85%,rgba(125,211,252,0.2),transparent_35%)]" />
+
+      <div className="relative max-w-4xl mx-auto rounded-[2rem] border border-cyan-100/20 bg-white/[0.05] px-6 py-12 shadow-[0_30px_70px_rgba(2,8,23,0.5)] backdrop-blur-sm md:px-10">
+        <h2 className="landing-display text-4xl text-white mb-6 md:text-5xl">
           Ready to Transform Your Healthcare Experience?
         </h2>
 
-        <p className="text-base text-gray-600 mb-16 leading-relaxed">
+        <p className="mx-auto max-w-3xl text-base leading-8 text-cyan-50/85 mb-12">
           Join thousands of patients and pharmacy partners who are already using
           PharmEasy to streamline their medication access and pharmacy
           operations.
         </p>
 
-        <div className="flex gap-8 justify-center flex-wrap mb-16">
+        <div className="mb-10 flex flex-wrap justify-center gap-4">
           {!isAuthenticated ? (
             <>
               <button
                 onClick={() => navigate("/register")}
-                className="px-8 py-4 bg-blue-600 text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-all duration-300 shadow-md hover:-translate-y-1 hover:shadow-lg"
+                className="rounded-xl bg-[#0097b2] px-8 py-3.5 text-base font-semibold text-white shadow-[0_14px_32px_rgba(0,151,178,0.34)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#007f95]"
               >
                 Get Started Now
               </button>
 
               <button
                 onClick={() => navigate("/login")}
-                className="px-8 py-4 bg-transparent text-blue-600 border-2 border-blue-600 rounded-lg text-base font-semibold cursor-pointer transition-all duration-300 hover:bg-blue-600 hover:text-white"
+                className="rounded-xl border border-cyan-100/35 bg-white/5 px-8 py-3.5 text-base font-semibold text-cyan-50 transition-all duration-300 hover:border-[#7dd3fc]/75 hover:bg-cyan-50/10"
               >
                 Sign In
               </button>
@@ -38,14 +40,14 @@ export function FinalCTASection() {
           ) : (
             <button
               onClick={() => navigate("/dashboard")}
-              className="px-8 py-4 bg-blue-600 text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-all duration-300 shadow-md hover:-translate-y-1 hover:shadow-lg"
+              className="rounded-xl bg-[#0097b2] px-8 py-3.5 text-base font-semibold text-white shadow-[0_14px_32px_rgba(0,151,178,0.34)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#007f95]"
             >
               Go to Dashboard
             </button>
           )}
         </div>
 
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-cyan-50/70">
           No credit card required. Start exploring PharmEasy instantly.
         </p>
       </div>

@@ -6,7 +6,7 @@ import { Input } from "../../../shared/components/ui";
 import { Button } from "../../../shared/components/ui";
 import { Alert } from "../../../shared/components/ui";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
-import pharmacyImage from "../../../assets/image.png";
+import pharmacyImage from "../../../assets/c.jpg";
 import { getDashboardPath } from "../../../utils/roleHelpers";
 
 export function Login() {
@@ -32,31 +32,24 @@ export function Login() {
 
     try {
       const result = await login(email, password);
-      
+
       if (result.success) {
-        // Use helper function for role-based navigation
         const dashboardPath = getDashboardPath(result.user);
         navigate(dashboardPath);
       } else if (result.code === "EMAIL_NOT_VERIFIED") {
-        // Redirect to verify OTP page with email pre-filled
         navigate("/verify-otp", {
           state: {
-            email: email,
-            isFromLogin: true, // Flag to indicate coming from login
-            message:
-              "Please verify your email with the OTP sent to your inbox.",
+            email,
+            isFromLogin: true,
+            message: "Please verify your email with the OTP sent to your inbox.",
           },
         });
       } else {
-        // ✅ FIX: Display the specific error message from backend
-        // This will be "Invalid email or password" for failed login
-        const errorMessage = result.error || "Login failed";
-        setError(errorMessage);
-        console.error("[LOGIN] Failed:", errorMessage);
+        setError(result.error || "Login failed");
       }
     } catch (err) {
-      // ✅ FIX: Catch unexpected errors, not from API response
-      const errorMessage = err.response?.data?.message || err.message || "An unexpected error occurred";
+      const errorMessage =
+        err.response?.data?.message || err.message || "An unexpected error occurred";
       setError(errorMessage);
       console.error("[LOGIN] Unexpected error:", err);
     } finally {
@@ -68,92 +61,79 @@ export function Login() {
     <AuthLayout
       heroImage={pharmacyImage}
       title="Welcome Back"
-      subtitle="Enter your credentials to login to your account"
-      slogan="Your trusted pharmacy partner, available 24/7 to serve your healthcare needs with expertise and care."
-      accentColor="#3B82F6"
+      subtitle="Sign in to your account"
+      slogan="Access your trusted pharmacy workspace with a secure, fast, and easy sign-in experience."
+      accentColor="#0097b2"
     >
-      <div className="auth-light bg-white text-slate-900">
-      <form onSubmit={handleSubmit} className="space-y-6 bg-white text-slate-900">
-        {/* Error Alert */}
+      <form onSubmit={handleSubmit} className="space-y-5">
         {error && (
-          <Alert 
-            type="error" 
-            message={error}
-            onDismiss={() => setError("")}
-          />
+          <Alert type="error" message={error} onDismiss={() => setError("")} />
         )}
 
-        {/* Email Field */}
         <Input
           label="Email Address"
           type="email"
-          placeholder="pharmacy@example.com"
+          placeholder="you@pharmeasy.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={isLoading}
           required
           icon={<Mail size={18} />}
+          inputClassName="rounded-xl border-slate-200 bg-slate-50 px-4 py-3 shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500"
         />
 
-        {/* Password Field */}
-        <div className="relative">
-          <Input
-            label="Password"
-            type={showPassword ? "text" : "password"}
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={isLoading}
-            required
-            icon={<Lock size={18} />}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-[38px] text-slate-500 hover:text-slate-700 transition-colors"
-            tabIndex={-1}
-          >
-            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-          </button>
-        </div>
+        <Input
+          label="Password"
+          type={showPassword ? "text" : "password"}
+          placeholder="Enter your password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={isLoading}
+          required
+          icon={<Lock size={18} />}
+          rightElement={
+            <button
+              type="button"
+              onClick={() => setShowPassword((current) => !current)}
+              className="text-slate-500 transition-colors hover:text-slate-700"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          }
+          inputClassName="rounded-xl border-slate-200 bg-slate-50 px-4 py-3 shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500"
+        />
 
-        {/* Forgot Password Link */}
         <div className="text-right">
           <Link
             to="/forgot-password"
-            className="text-sm text-cyan-600 font-medium hover:text-cyan-700 transition-colors"
+            className="text-sm font-medium text-teal-700 transition-colors hover:text-teal-800"
           >
             Forgot password?
           </Link>
         </div>
 
-        {/* Sign In Button */}
         <Button
           type="submit"
-          variant="primary"
-          size="lg"
           loading={isLoading}
           disabled={isLoading}
-          className="w-full"
+          className="w-full rounded-2xl bg-[#0097b2] px-6 py-3.5 text-base font-bold text-white shadow-lg shadow-teal-900/10 transition hover:bg-[#007f95] hover:shadow-xl focus:ring-2 focus:ring-[#0097b2] focus:ring-offset-2"
         >
           Sign In
         </Button>
 
-        {/* Sign Up Link */}
-        <p className="text-center text-sm text-slate-600 mt-6">
-          Don't have an account?{" "}
+        <p className="text-center text-sm text-slate-600">
+          Don&apos;t have an account?{" "}
           <Link
             to="/register"
-            className="text-cyan-600 font-semibold hover:text-cyan-700 transition-colors"
+            className="font-semibold text-teal-700 transition-colors hover:text-teal-800"
           >
             Sign Up
           </Link>
         </p>
       </form>
-      </div>
     </AuthLayout>
   );
 }
 
 export default Login;
-

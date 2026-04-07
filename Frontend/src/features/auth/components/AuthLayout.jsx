@@ -1,11 +1,12 @@
 import React from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Pill, Sparkles } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowLeft, Pill, ShieldCheck, Sparkles } from "lucide-react";
 
 /**
  * Shared authentication page layout
- * Minimal, modern split-screen design with professional spacing
- * Fully responsive for mobile, tablet, and desktop
+ * Centered floating card over a medical background image with teal overlay.
+ * Keeps auth pages visually isolated and strictly light-themed.
  */
 export function AuthLayout({
   children,
@@ -13,295 +14,122 @@ export function AuthLayout({
   subtitle,
   heroImage,
   slogan,
-  sloganIcon = "pill",
-  accentColor = "#3B82F6",
+  accentColor = "#0097b2",
+  cardClassName = "max-w-[460px]",
 }) {
-  const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
+  const location = useLocation();
 
-  React.useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  const backgroundStyle = heroImage
+    ? { backgroundImage: `url(${heroImage})` }
+    : {
+        backgroundImage:
+          "linear-gradient(135deg, rgba(8, 47, 73, 0.95), rgba(13, 148, 136, 0.7)), radial-gradient(circle at top, rgba(255, 255, 255, 0.16), transparent 52%)",
+      };
 
   return (
     <div
-      className="auth-light light"
-      style={{
-        display: "flex",
-        flexDirection: isMobile ? "column" : "row",
-        minHeight: "100vh",
-        backgroundColor: "#ffffff",
-        color: "#0f172a",
-      }}
+      className="auth-light relative min-h-screen overflow-hidden text-slate-900"
+      style={{ colorScheme: "light", backgroundColor: "#f8fafc" }}
     >
-      {/* Left side - Hero section with image background */}
       <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
-          flex: isMobile ? "0 0 auto" : "1",
-          display: isMobile ? "none" : "flex",
-          flexDirection: "column",
-          justifyContent: "flex-start",
-          alignItems: "flex-start",
-          padding: isMobile ? "20px" : "40px",
-          minHeight: isMobile ? "auto" : "100vh",
-          height: isMobile ? "auto" : "100vh",
-          position: "relative",
-          backgroundImage: heroImage ? `url(${heroImage})` : "none",
+          ...backgroundStyle,
           backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundAttachment: "fixed",
-          overflow: "hidden",
+          filter: "saturate(1) contrast(1.02)",
         }}
+      />
+
+      {/* Keep the right side image readable while maintaining card contrast */}
+      <div className="absolute inset-0 bg-slate-950/30" />
+
+      {/* Diagonal split with blurred background on the left */}
+      <div
+        className="absolute inset-y-0 left-0 hidden w-[62%] overflow-hidden md:block"
+        style={{ clipPath: "polygon(0 0, 84% 0, 61% 100%, 0 100%)" }}
       >
-        {/* Dark overlay for better text contrast */}
         <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.55)",
-            zIndex: 0,
+            ...backgroundStyle,
+            filter: "blur(8px) brightness(0.97)",
           }}
         />
-
-        {/* Back button - Top left */}
-        <Link
-          to="/"
-          style={{
-            position: "relative",
-            zIndex: 2,
-            marginTop: "0px",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            padding: "10px 16px",
-            color: "white",
-            textDecoration: "none",
-            fontWeight: "600",
-            fontSize: "13px",
-            borderRadius: "8px",
-            transition: "all 200ms ease",
-            backgroundColor: "rgba(255, 255, 255, 0.15)",
-            border: "1px solid rgba(255, 255, 255, 0.3)",
-            backdropFilter: "blur(10px)",
-            width: "fit-content",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.25)";
-            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.5)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.15)";
-            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.3)";
-          }}
-        >
-          <ArrowLeft size={16} />
-          Back
-        </Link>
-
-        {/* Slogan section - Bottom left */}
-        <div
-          style={{
-            position: "relative",
-            zIndex: 2,
-            marginTop: "auto",
-            paddingBottom: "40px",
-            width: "100%",
-            maxWidth: "500px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              marginBottom: "12px",
-            }}
-          >
-            <Sparkles size={18} color={accentColor} />
-            <span
-              style={{
-                fontSize: "12px",
-                color: accentColor,
-                fontWeight: "700",
-                textTransform: "uppercase",
-                letterSpacing: "0.5px",
-              }}
-            >
-              Our Mission
-            </span>
-          </div>
-          <p
-            style={{
-              fontSize: "16px",
-              fontWeight: "600",
-              color: "rgba(255, 255, 255, 0.98)",
-              lineHeight: 1.8,
-              margin: 0,
-              letterSpacing: "0.3px",
-            }}
-          >
-            {slogan || "Empowering Pharmacy Care, One Click at a Time"}
-          </p>
-
-          {/* Bottom stats */}
-          <div
-            style={{
-              display: "flex",
-              gap: "20px",
-              marginTop: "24px",
-              fontSize: "12px",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  color: accentColor,
-                  fontWeight: "700",
-                  fontSize: "18px",
-                }}
-              >
-                100%
-              </div>
-              <div style={{ color: "rgba(255,255,255,0.6)", marginTop: "4px" }}>
-                Secure
-              </div>
-            </div>
-            <div>
-              <div
-                style={{
-                  color: accentColor,
-                  fontWeight: "700",
-                  fontSize: "18px",
-                }}
-              >
-                24/7
-              </div>
-              <div style={{ color: "rgba(255,255,255,0.6)", marginTop: "4px" }}>
-                Available
-              </div>
-            </div>
-            <div>
-              <div
-                style={{
-                  color: accentColor,
-                  fontWeight: "700",
-                  fontSize: "18px",
-                }}
-              >
-                Fast
-              </div>
-              <div style={{ color: "rgba(255,255,255,0.6)", marginTop: "4px" }}>
-                Processing
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* Right side - Form container with scrollable content */}
+      {/* Delicate seam highlight where split meets the image side */}
       <div
-        style={{
-          flex: isMobile ? "0 0 auto" : "1",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          padding: isMobile ? "20px 16px" : "40px",
-          height: isMobile ? "auto" : "100vh",
-          minHeight: isMobile ? "auto" : "100vh",
-          position: "relative",
-          overflow: isMobile ? "visible" : "hidden",
-          width: isMobile ? "100%" : "auto",
-          backgroundColor: "#ffffff",
-          color: "#0f172a",
-        }}
+        className="absolute inset-y-0 left-[52.5%] hidden w-[2px] bg-white/25 blur-[0.6px] md:block"
+        style={{ transform: "skewX(-14deg)" }}
+      />
+
+      {/* Mobile fallback: full subtle teal wash */}
+      <div className="absolute inset-0 bg-teal-700/45 md:hidden" />
+
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.18),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.12),transparent_32%)]" />
+
+      <Link
+        to="/"
+        className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white/90 shadow-lg backdrop-blur-md transition hover:bg-white/18 hover:text-white sm:left-6 sm:top-6"
       >
-        {/* Form container */}
-        <div
-          style={{
-            width: "100%",
-            maxWidth: "400px",
-            height: isMobile ? "auto" : "100%",
-            display: "flex",
-            flexDirection: "column",
-            overflow: isMobile ? "visible" : "hidden",
-          }}
+        <ArrowLeft size={16} />
+        Back home
+      </Link>
+
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 16, scale: 0.985 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+          className={`w-full rounded-3xl bg-white/96 shadow-2xl shadow-slate-950/25 ring-1 ring-slate-200/80 backdrop-blur-xl ${cardClassName}`}
         >
-          {/* Header with Welcome message - Fixed */}
-          <div
-            style={{
-              marginBottom: "36px",
-              marginTop: isMobile ? "20px" : "0",
-              display: "flex",
-              flexDirection: "column",
-              gap: "12px",
-              flexShrink: 0,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                fontSize: "14px",
-                fontWeight: "700",
-                color: "#0ea5e9",
-                textTransform: "uppercase",
-                letterSpacing: "0.5px",
-              }}
-            >
-              <Pill size={20} />
-              PharmEasy
+          <div className="px-6 pb-6 pt-7 sm:px-8 sm:pb-8 sm:pt-8">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex h-14 w-14 items-center justify-center rounded-full shadow-lg"
+                  style={{ backgroundColor: accentColor }}
+                >
+                  <Pill size={24} className="text-white" />
+                </div>
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-teal-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-teal-700">
+                    <ShieldCheck size={12} />
+                    Secure Access
+                  </div>
+                </div>
+              </div>
+              <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600 sm:inline-flex">
+                <Sparkles size={14} className="text-teal-600" />
+                PharmEasy
+              </div>
             </div>
 
-            {title && (
-              <h1
-                style={{
-                  fontSize: isMobile ? "24px" : "28px",
-                  fontWeight: "700",
-                  color: "#0f172a",
-                  margin: 0,
-                  letterSpacing: "-0.2px",
-                }}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={location.pathname}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
               >
-                {title}
-              </h1>
-            )}
+                <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+                  {title || "Welcome"}
+                </h1>
+                <p className="mt-2 text-sm leading-6 text-slate-500 sm:text-[15px]">
+                  {subtitle || "Sign in to continue"}
+                </p>
+                {slogan ? (
+                  <p className="mt-4 text-sm leading-6 text-slate-600">
+                    {slogan}
+                  </p>
+                ) : null}
 
-            {subtitle && (
-              <p
-                style={{
-                  fontSize: isMobile ? "13px" : "14px",
-                  color: "#475569",
-                  margin: 0,
-                  fontWeight: "400",
-                  lineHeight: 1.5,
-                }}
-              >
-                {subtitle}
-              </p>
-            )}
+                <div className="mt-7 space-y-6">{children}</div>
+              </motion.div>
+            </AnimatePresence>
           </div>
-
-          {/* Scrollable form content */}
-          <div
-            style={{
-              flex: isMobile ? "0 0 auto" : "1",
-              overflowY: isMobile ? "visible" : "auto",
-              overflowX: "hidden",
-              paddingRight: isMobile ? "0" : "8px",
-              marginTop: isMobile ? "12px" : "0",
-            }}
-          >
-            {children}
-          </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

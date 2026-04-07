@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
 html,
@@ -9,6 +10,17 @@ body,
 body {
   background-color: #ffffff;
   color: #0f172a;
+}
+
+.landing-shell {
+  font-family: "Manrope", "Segoe UI", sans-serif;
+  background-image: radial-gradient(circle at 6% 0%, rgba(0, 151, 178, 0.05), transparent 28%);
+}
+
+.landing-display {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
 }
 
 html.dark body {

@@ -2,6 +2,7 @@
   "private": true,
   "name": "pharmeasy-root",
   "scripts": {
+    "dev": "npm run dev:frontend",
     "dev:backend": "npm --prefix Backend run dev",
     "dev:frontend": "npm --prefix Frontend run dev",
     "start:backend": "npm --prefix Backend run start",

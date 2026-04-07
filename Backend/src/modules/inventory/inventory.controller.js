@@ -105,6 +105,7 @@ export const addMedicine = async (req, res, next) => {
     const medicineData = {
       name: req.body.name,
       genericName: req.body.genericName,
+      category: req.body.category,
       quantity: parseInt(req.body.quantity),
       price: parseFloat(req.body.price),
       expiryDate: req.body.expiryDate,
@@ -266,6 +267,7 @@ export const updateInventoryItem = async (req, res, next) => {
         id: true,
         name: true,
         genericName: true,
+        category: true,
         quantity: true,
         price: true,
         expiryDate: true,
@@ -289,6 +291,7 @@ export const updateInventoryItem = async (req, res, next) => {
     const updateData = {
       name: req.body.name,
       genericName: req.body.genericName,
+      category: req.body.category,
       quantity: req.body.quantity !== undefined ? parseInt(req.body.quantity) : undefined,
       price: req.body.price !== undefined ? parseFloat(req.body.price) : undefined,
       expiryDate: req.body.expiryDate,
@@ -353,6 +356,7 @@ export const updateInventoryItem = async (req, res, next) => {
         id: updatedItem.id,
         name: updatedItem.name,
         genericName: updatedItem.genericName,
+        category: updatedItem.category,
         quantity: updatedItem.quantity,
         price: updatedItem.price,
         expiryDate: updatedItem.expiryDate,

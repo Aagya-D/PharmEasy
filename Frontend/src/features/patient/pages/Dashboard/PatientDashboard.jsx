@@ -28,12 +28,12 @@ import StarRating from "../../../../shared/components/StarRating";
 import patientService from "../../services/patient.service";
 import contentService from "../../../../core/services/content.service";
 import searchService from "../../../../core/services/search.service";
-import heroVisual from "../../../../assets/image.png";
-import network1 from "../../../../assets/forgot-password-hero.svg";
-import network2 from "../../../../assets/register-hero.svg";
-import network3 from "../../../../assets/reset-password-hero.svg";
-import network4 from "../../../../assets/verify-otp-hero.svg";
-import network5 from "../../../../assets/react.svg";
+import heroVisual from "../../../../assets/do.jpg";
+import network1 from "../../../../assets/save.jpg";
+import network2 from "../../../../assets/medicine.jpg";
+import network3 from "../../../../assets/i.jpg";
+import network4 from "../../../../assets/ph.jpg";
+import network5 from "../../../../assets/sa.jpg";
 import network6 from "../../../../assets/image.png";
 
 const formatCurrency = (value) => {
@@ -416,13 +416,15 @@ export function PatientDashboard() {
               </div>
             </div>
 
-            <div className="order-1 grid grid-cols-2 gap-3 lg:order-3 lg:col-span-3 lg:grid-cols-1">
-              <div className="overflow-hidden rounded-2xl border-4 border-white/70 bg-white/20">
-                <img src={network2} alt="Trusted partner" className="h-24 w-full object-cover" />
-              </div>
-              <div className="overflow-hidden rounded-2xl border-4 border-white/70 bg-white/20">
-                <img src={network3} alt="Medicine availability" className="h-24 w-full object-cover" />
-              </div>
+            <div className="order-1 grid grid-cols-3 gap-2 lg:order-3 lg:col-span-3 lg:grid-cols-2">
+              {networkTiles.map((tile) => (
+                <div
+                  key={tile.src}
+                  className="overflow-hidden rounded-xl border-2 border-white/70 bg-white/20 shadow-md"
+                >
+                  <img src={tile.src} alt={tile.alt} className="h-16 w-full object-cover sm:h-20" />
+                </div>
+              ))}
             </div>
           </div>
         </section>

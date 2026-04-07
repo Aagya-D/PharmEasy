@@ -42,26 +42,29 @@ export function BenefitsSection() {
   return (
     <section className="px-6 py-20 bg-white">
       <div className="max-w-7xl mx-auto">
-        <h2 className="text-4xl font-bold text-gray-900 mb-16 text-center">
+        <p className="mb-3 text-center text-xs font-semibold tracking-[0.18em] text-[#007f95]/80">
+          VALUE DELIVERED
+        </p>
+
+        <h2 className="landing-display text-4xl text-gray-900 mb-14 text-center md:text-5xl">
           Why Choose PharmEasy?
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {benefits.map((benefit, idx) => {
             const Icon = benefit.icon;
             return (
               <div
                 key={idx}
-                className="p-8 bg-gray-50 rounded-xl text-center border border-gray-200 transition-all duration-300 cursor-pointer hover:-translate-y-2 hover:shadow-lg hover:border-blue-600"
+                className="group rounded-2xl border border-cyan-900/10 bg-[#f5fcff] p-7 text-left transition-all duration-300 hover:-translate-y-1 hover:border-[#0097b2]/45 hover:shadow-[0_22px_45px_rgba(15,23,42,0.12)]"
               >
-                <Icon
-                  size={48}
-                  className="text-blue-600 mx-auto mb-4"
-                />
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#0097b2] text-white shadow-md transition-colors duration-300 group-hover:bg-[#007f95]">
+                  <Icon size={22} />
+                </div>
+                <h3 className="mb-3 text-lg font-semibold text-gray-900">
                   {benefit.title}
                 </h3>
-                <p className="text-gray-600 text-sm leading-relaxed">
+                <p className="text-sm leading-7 text-slate-600">
                   {benefit.description}
                 </p>
               </div>

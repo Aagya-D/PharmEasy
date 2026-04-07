@@ -21,6 +21,9 @@ import notificationService from "../../../core/services/notification.service";
 import { connectSocket } from "../../../core/services/socket";
 import { useNotification } from "../../../context/NotificationContext";
 
+const MotionSpan = motion.span;
+const MotionDiv = motion.div;
+
 // ── Type visual config
 const TYPE_CONFIG = {
   SOS_ALERT: {
@@ -139,17 +142,17 @@ export default function PharmacyNotificationBell() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const isAuthReady = Boolean(token && storedUser?.id);
 
   const panelRef = useRef(null);
   const bellRef = useRef(null);
 
-  // If auth state is incomplete, render nothing (avoids 401 cascade)
-  if (!token || !storedUser?.id) {
-    return null;
-  }
-
   // ── Fetch notifications list (for dropdown display) ──
   const fetchNotifications = useCallback(async () => {
+    if (!isAuthReady) {
+      setNotifications([]);
+      return;
+    }
     setLoading(true);
     try {
       const res = await notificationService.getNotifications(20, 0);
@@ -170,22 +173,23 @@ export default function PharmacyNotificationBell() {
     } finally {
       setLoading(false);
     }
-  }, [setUnreadNotifications, setHasHighPriority]);
+  }, [isAuthReady, setUnreadNotifications, setHasHighPriority]);
 
   // ── Refresh notifications when dropdown opens ────────
   useEffect(() => {
-    if (isOpen) fetchNotifications();
-  }, [isOpen, fetchNotifications]);
+    if (isOpen && isAuthReady) fetchNotifications();
+  }, [isOpen, isAuthReady, fetchNotifications]);
 
   // ── Also refresh list on SOS alert (keep list fresh) ─
   // NotificationContext already handles sound + badge increment.
   // We just need to refresh the list so the new SOS row appears.
   useEffect(() => {
+    if (!isAuthReady) return;
     const socket = connectSocket();
     const onSOS = () => { if (isOpen) fetchNotifications(); };
     socket.on("NEW_SOS_ALERT", onSOS);
     return () => { socket.off("NEW_SOS_ALERT", onSOS); };
-  }, [isOpen, fetchNotifications]);
+  }, [isOpen, isAuthReady, fetchNotifications]);
 
   // ── Click-outside to close popover ───────────────────
   useEffect(() => {
@@ -265,6 +269,11 @@ export default function PharmacyNotificationBell() {
     return new Date(b.createdAt) - new Date(a.createdAt);
   });
 
+  // Avoid request churn when auth is not ready, while keeping hook order stable.
+  if (!isAuthReady) {
+    return null;
+  }
+
   return (
     <div className="relative">
       {/* ── Bell Button ──────────────────────────────── */}
@@ -293,7 +302,7 @@ export default function PharmacyNotificationBell() {
         {/* Badge */}
         <AnimatePresence>
           {unreadCount > 0 && (
-            <motion.span
+            <MotionSpan
               key="badge"
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -303,7 +312,7 @@ export default function PharmacyNotificationBell() {
               }`}
             >
               {unreadCount > 99 ? "99+" : unreadCount}
-            </motion.span>
+            </MotionSpan>
           )}
         </AnimatePresence>
       </button>
@@ -311,7 +320,7 @@ export default function PharmacyNotificationBell() {
       {/* ── Dropdown Panel ───────────────────────────── */}
       <AnimatePresence>
         {isOpen && (
-          <motion.div
+          <MotionDiv
             ref={panelRef}
             key="panel"
             initial={{ opacity: 0, y: 8, scale: 0.96 }}
@@ -529,7 +538,7 @@ export default function PharmacyNotificationBell() {
                 </p>
               </div>
             )}
-          </motion.div>
+          </MotionDiv>
         )}
       </AnimatePresence>
     </div>

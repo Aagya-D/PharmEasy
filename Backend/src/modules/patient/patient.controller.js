@@ -349,6 +349,12 @@ export const getMedications = async (req, res) => {
             },
           },
         },
+        inventory: {
+          select: {
+            id: true,
+            imageUrl: true,
+          },
+        },
       },
     });
 
@@ -363,6 +369,8 @@ export const getMedications = async (req, res) => {
           id: key,
           medicineName: item.medicineName,
           genericName: item.genericName || null,
+          medicineId: item.inventoryId || null,
+          imageUrl: item.inventory?.imageUrl || null,
           purchaseCount: 1,
           totalQuantity: item.quantity,
           totalSpent: item.lineTotal,
@@ -383,6 +391,12 @@ export const getMedications = async (req, res) => {
         existing.lastPurchasedAt = item.order?.createdAt || item.createdAt;
         existing.lastOrderId = item.order?.id || null;
         existing.lastPharmacyName = item.order?.pharmacy?.pharmacyName || null;
+        existing.medicineId = item.inventoryId || existing.medicineId || null;
+        existing.imageUrl = item.inventory?.imageUrl || existing.imageUrl || null;
+      }
+
+      if (!existing.imageUrl && item.inventory?.imageUrl) {
+        existing.imageUrl = item.inventory.imageUrl;
       }
     });
 

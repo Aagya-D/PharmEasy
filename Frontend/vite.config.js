@@ -10,7 +10,7 @@ export default defineConfig({
   ],
   server: {
     port: 5175,
-    strictPort: true,
+    strictPort: false,
     // Allow error overlay to be dismissed (press Esc)
     hmr: {
       overlay: true,
@@ -22,11 +22,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         // Log proxy requests for debugging
-        configure: (proxy, options) => {
-          proxy.on('error', (err, req, res) => {
+        configure: (proxy) => {
+          proxy.on('error', (err, _req, _res) => {
             console.log('Proxy error:', err);
           });
-          proxy.on('proxyReq', (proxyReq, req, res) => {
+          proxy.on('proxyReq', (_proxyReq, req, _res) => {
             console.log('Proxying:', req.method, req.url);
           });
         }

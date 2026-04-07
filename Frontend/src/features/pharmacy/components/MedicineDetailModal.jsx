@@ -13,12 +13,23 @@ import MedicineImage from "../../../shared/components/ui/MedicineImage";
 
 const FALLBACK_VALUE = "Not specified";
 
+const PRESET_MEDICINE_CATEGORIES = [
+  { value: "fever", label: "Fever / Cold" },
+  { value: "chronic", label: "Chronic Care" },
+  { value: "baby", label: "Baby Care" },
+  { value: "ayurvedic", label: "Ayurvedic" },
+  { value: "firstaid", label: "First Aid" },
+  { value: "surgical", label: "Surgical" },
+  { value: "general", label: "General" },
+];
+
 const getInitialEditData = (source) => {
   if (!source) return null;
 
   return {
     name: source.name || "",
     genericName: source.genericName || "",
+    category: source.category || "general",
     sideEffects: source.sideEffects || "",
     contraindications: source.contraindications || "",
     warnings: source.warnings || "",
@@ -128,6 +139,7 @@ export default function MedicineDetailModal({
         fields: [
           { label: "Medicine Name", value: source.name },
           { label: "Generic Name", value: source.genericName },
+          { label: "Category", value: source.category ? String(source.category).replace(/_/g, " ") : FALLBACK_VALUE },
           { label: "Strength", value: source.strength },
           { label: "Form", value: source.form },
           { label: "Manufacturer", value: source.manufacturer },
@@ -157,6 +169,7 @@ export default function MedicineDetailModal({
 
     if (!editData?.name?.trim()) nextErrors.name = "Medicine name is required";
     if (!editData?.genericName?.trim()) nextErrors.genericName = "Generic name is required";
+    if (!editData?.category?.trim()) nextErrors.category = "Category is required";
     if (!editData?.sideEffects?.trim()) nextErrors.sideEffects = "Side effects are required";
     if (!editData?.contraindications?.trim()) {
       nextErrors.contraindications = "Contraindications are required";
@@ -199,6 +212,7 @@ export default function MedicineDetailModal({
     const payload = {
       name: editData.name.trim(),
       genericName: editData.genericName.trim(),
+      category: editData.category.trim(),
       sideEffects: editData.sideEffects.trim(),
       contraindications: editData.contraindications.trim(),
       warnings: editData.warnings.trim(),
@@ -316,6 +330,42 @@ export default function MedicineDetailModal({
               error={errors.genericName}
               required
             />
+            <Input
+              label="Category"
+              value={editData?.category || ""}
+              onChange={(e) => updateEditField("category", e.target.value)}
+              error={errors.category}
+              placeholder="e.g. fever, chronic, first_aid"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Category (Dropdown)</label>
+              <select
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-200 focus:border-cyan-500"
+                value=""
+                onChange={(e) => {
+                  const selected = e.target.value;
+                  if (!selected) return;
+                  updateEditField("category", selected);
+                  e.target.value = "";
+                }}
+              >
+                <option value="">Select from presets...</option>
+                {PRESET_MEDICINE_CATEGORIES.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-slate-500">Pick a preset, or keep typing manually in Category field above.</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500">Current Category</p>
+              <p className="mt-1 text-sm font-medium text-slate-800">{(editData?.category || "general").replace(/_/g, " ")}</p>
+            </div>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">

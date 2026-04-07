@@ -37,16 +37,27 @@ const STEPS = [
 ];
 
 const STEP_FIELDS = {
-  1: ["name", "genericName"],
+  1: ["name", "genericName", "category"],
   2: ["sideEffects", "contraindications", "warnings"],
   3: ["dosageInstructions"],
   4: ["strength", "form", "manufacturer", "batchNumber", "quantity", "price", "expiryDate"],
 };
 
+const PRESET_MEDICINE_CATEGORIES = [
+  { value: "fever", label: "Fever / Cold" },
+  { value: "chronic", label: "Chronic Care" },
+  { value: "baby", label: "Baby Care" },
+  { value: "ayurvedic", label: "Ayurvedic" },
+  { value: "firstaid", label: "First Aid" },
+  { value: "surgical", label: "Surgical" },
+  { value: "general", label: "General" },
+];
+
 const getDefaultFormData = () => ({
   id: "",
   name: "",
   genericName: "",
+  category: "",
   sideEffects: "",
   contraindications: "",
   warnings: "",
@@ -75,6 +86,7 @@ const mapInitialData = (initialData) => {
     id: initialData.id || "",
     name: initialData.name || "",
     genericName: initialData.genericName || "",
+    category: initialData.category || "",
     sideEffects: initialData.sideEffects || "",
     contraindications: initialData.contraindications || "",
     warnings: initialData.warnings || "",
@@ -199,7 +211,7 @@ export default function MedicineForm({
   const isStepComplete = (stepId) => {
     const v = getValues();
 
-    if (stepId === 1) return Boolean(v.name?.trim() && v.genericName?.trim());
+    if (stepId === 1) return Boolean(v.name?.trim() && v.genericName?.trim() && v.category?.trim());
     if (stepId === 2) return Boolean(v.sideEffects?.trim() && v.contraindications?.trim() && v.warnings?.trim());
     if (stepId === 3) return Boolean(v.dosageInstructions?.trim());
     if (stepId === 4) {
@@ -263,6 +275,7 @@ export default function MedicineForm({
     onSubmit({
       name: formData.name.trim(),
       genericName: formData.genericName.trim(),
+      category: formData.category.trim(),
       sideEffects: formData.sideEffects.trim(),
       contraindications: formData.contraindications.trim(),
       warnings: formData.warnings.trim(),
@@ -367,6 +380,45 @@ export default function MedicineForm({
               </button>
             ))}
           </div>
+        )}
+      </div>
+
+      <div className="md:col-span-1">
+        {isViewMode ? (
+          <ReadOnlyField label="Category" value={values?.category} hint="Used for dashboard medication type results." />
+        ) : (
+          <FloatingField label="Category (Dropdown)" error={errors.category?.message} hint="Pick a preset, or type your own in manual field below.">
+            <select
+              className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value=""
+              onChange={(e) => {
+                const selected = e.target.value;
+                if (!selected) return;
+                setValue("category", selected, { shouldValidate: true, shouldDirty: true });
+                e.target.value = "";
+              }}
+            >
+              <option value="">Select from presets...</option>
+              {PRESET_MEDICINE_CATEGORIES.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </FloatingField>
+        )}
+      </div>
+
+      <div className="md:col-span-1">
+        {isViewMode ? null : (
+          <FloatingField label="Category (Manual Entry)" error={errors.category?.message} hint="Example: fever, chronic, baby, firstaid">
+            <input
+              type="text"
+              className="w-full rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Type category (e.g., fever)"
+              {...register("category", { required: "Category is required" })}
+            />
+          </FloatingField>
         )}
       </div>
 
@@ -657,6 +709,7 @@ export default function MedicineForm({
         {[
           ["Brand Name", values?.name],
           ["Generic Name", values?.genericName],
+          ["Category", values?.category],
           ["Prescription", values?.isPrescriptionRequired ? "Required" : "Not Required"],
           ["Route", values?.route],
           ["Timing", values?.timing],

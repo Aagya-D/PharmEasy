@@ -1,111 +1,103 @@
 import { User, Stethoscope, Settings } from "lucide-react";
 
 export function HowItWorksSection() {
+  const flows = [
+    {
+      icon: User,
+      title: "Patient Workflow",
+      iconClass: "text-[#007f95]",
+      ringClass: "ring-cyan-200",
+      stepClass: "bg-[#0097b2]",
+      steps: [
+        { step: "Search Medicine", desc: null },
+        { step: "View Nearby Pharmacies", desc: null },
+        { step: "Check Real-Time Stock", desc: null },
+        { step: "Get Directions or SOS", desc: "Submit SOS if unavailable" },
+        { step: "Receive Notifications", desc: null },
+      ],
+    },
+    {
+      icon: Stethoscope,
+      title: "Pharmacy Admin Workflow",
+      iconClass: "text-[#0a6c80]",
+      ringClass: "ring-cyan-200",
+      stepClass: "bg-[#0a8aa4]",
+      steps: [
+        { step: "Register & Verify Pharmacy", desc: null },
+        { step: "Upload/Manage Inventory", desc: null },
+        { step: "Set Stock Thresholds", desc: null },
+        { step: "Respond to SOS Requests", desc: "Real-time notifications" },
+        { step: "View Demand Analytics", desc: null },
+      ],
+    },
+    {
+      icon: Settings,
+      title: "System Admin Workflow",
+      iconClass: "text-[#075f72]",
+      ringClass: "ring-cyan-200",
+      stepClass: "bg-[#0d7489]",
+      steps: [
+        { step: "Verify Pharmacies", desc: null },
+        { step: "Monitor Platform", desc: null },
+        { step: "View System Analytics", desc: null },
+        { step: "Manage User Disputes", desc: null },
+        { step: "Generate Reports", desc: null },
+      ],
+    },
+  ];
+
   return (
     <section
       id="how-it-works"
-      className="px-6 py-20 bg-gray-50"
+      className="px-6 py-20 bg-[#f7f6f3]"
     >
       <div className="max-w-7xl mx-auto">
-        <h2 className="text-4xl font-bold text-gray-900 mb-16 text-center">
+        <p className="mb-3 text-center text-xs font-semibold tracking-[0.18em] text-[#007f95]/80">
+          WORKFLOW DESIGN
+        </p>
+
+        <h2 className="landing-display text-4xl text-gray-900 mb-14 text-center md:text-5xl">
           How It Works
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Patient Flow */}
-          <div className="p-8 bg-white rounded-xl border-2 border-blue-200">
-            <div className="flex items-center gap-4 mb-6">
-              <User size={28} className="text-blue-600" />
-              <h3 className="text-lg font-semibold text-blue-600 m-0">
-                Patient Workflow
-              </h3>
-            </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {flows.map((flow) => {
+            const Icon = flow.icon;
 
-            {[
-              { step: "Search Medicine", desc: null },
-              { step: "View Nearby Pharmacies", desc: null },
-              { step: "Check Real-Time Stock", desc: null },
-              { step: "Get Directions or SOS", desc: "Submit SOS if unavailable" },
-              { step: "Receive Notifications", desc: null },
-            ].map((item, idx) => (
-              <div key={idx} className={`flex gap-4 ${idx < 4 ? 'mb-6' : ''}`}>
-                <div className="min-w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
-                  {idx + 1}
+            return (
+              <div
+                key={flow.title}
+                className={`rounded-2xl bg-white p-7 shadow-[0_16px_45px_rgba(15,23,42,0.08)] ring-1 ${flow.ringClass}`}
+              >
+                <div className="mb-6 flex items-center gap-3">
+                  <div className={`inline-flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 ${flow.iconClass}`}>
+                    <Icon size={21} />
+                  </div>
+                  <h3 className={`m-0 text-lg font-semibold ${flow.iconClass}`}>
+                    {flow.title}
+                  </h3>
                 </div>
-                <div>
-                  <p className="font-medium text-gray-900 mb-1">
-                    {item.step}
-                  </p>
-                  {item.desc && (
-                    <p className="text-sm text-gray-600">
-                      {item.desc}
-                    </p>
-                  )}
-                </div>
+
+                {flow.steps.map((item, idx) => (
+                  <div key={item.step} className={`flex gap-4 ${idx < flow.steps.length - 1 ? "mb-5" : ""}`}>
+                    <div className={`flex h-8 w-8 min-w-8 items-center justify-center rounded-full text-sm font-bold text-white ${flow.stepClass}`}>
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <p className="mb-1 font-medium text-gray-900">
+                        {item.step}
+                      </p>
+                      {item.desc ? (
+                        <p className="text-sm text-gray-600">
+                          {item.desc}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-
-          {/* Pharmacy Admin Flow */}
-          <div className="p-8 bg-white rounded-xl border-2 border-green-200">
-            <div className="flex items-center gap-4 mb-6">
-              <Stethoscope size={28} className="text-green-600" />
-              <h3 className="text-lg font-semibold text-green-600 m-0">
-                Pharmacy Admin Workflow
-              </h3>
-            </div>
-
-            {[
-              { step: "Register & Verify Pharmacy", desc: null },
-              { step: "Upload/Manage Inventory", desc: null },
-              { step: "Set Stock Thresholds", desc: null },
-              { step: "Respond to SOS Requests", desc: "Real-time notifications" },
-              { step: "View Demand Analytics", desc: null },
-            ].map((item, idx) => (
-              <div key={idx} className={`flex gap-4 ${idx < 4 ? 'mb-6' : ''}`}>
-                <div className="min-w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
-                  {idx + 1}
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900 mb-1">
-                    {item.step}
-                  </p>
-                  {item.desc && (
-                    <p className="text-sm text-gray-600">
-                      {item.desc}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* System Admin Flow */}
-          <div className="p-8 bg-white rounded-xl border-2 border-yellow-200">
-            <div className="flex items-center gap-4 mb-6">
-              <Settings size={28} className="text-yellow-600" />
-              <h3 className="text-lg font-semibold text-yellow-600 m-0">
-                System Admin Workflow
-              </h3>
-            </div>
-
-            {[
-              "Verify Pharmacies",
-              "Monitor Platform",
-              "View System Analytics",
-              "Manage User Disputes",
-              "Generate Reports",
-            ].map((step, idx) => (
-              <div key={idx} className={`flex gap-4 ${idx < 4 ? 'mb-6' : ''}`}>
-                <div className="min-w-8 h-8 bg-yellow-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
-                  {idx + 1}
-                </div>
-                <p className="font-medium text-gray-900">
-                  {step}
-                </p>
-              </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
     </section>

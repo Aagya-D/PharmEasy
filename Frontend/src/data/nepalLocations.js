@@ -707,18 +707,35 @@ export const haversineDistance = (lat1, lng1, lat2, lng2) => {
  * Returns the nearest known location within maxDistance km
  */
 export const findLocationByCoordinates = (lat, lng, maxDistance = 50) => {
-  let closest = null;
-  let minDistance = maxDistance;
+  const isDistrictLevel = (location) =>
+    String(location?.name || "").trim().toLowerCase() ===
+    String(location?.district || "").trim().toLowerCase();
 
-  nepalLocations.forEach((location) => {
-    const distance = haversineDistance(lat, lng, location.lat, location.lng);
-    if (distance < minDistance) {
-      minDistance = distance;
-      closest = { ...location, _matchDistance: distance };
-    }
-  });
+  const findClosestFrom = (locations) => {
+    let closest = null;
+    let minDistance = maxDistance;
 
-  return closest;
+    locations.forEach((location) => {
+      const distance = haversineDistance(lat, lng, location.lat, location.lng);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = { ...location, _matchDistance: distance };
+      }
+    });
+
+    return closest;
+  };
+
+  const closestAny = findClosestFrom(nepalLocations);
+
+  // If a non-district location is very close, treat it as exact detected place.
+  if (closestAny && closestAny._matchDistance <= 12) {
+    return closestAny;
+  }
+
+  // Otherwise prefer district-level anchors to avoid noisy municipality matches.
+  const districtLevelLocations = nepalLocations.filter(isDistrictLevel);
+  return findClosestFrom(districtLevelLocations) || closestAny;
 };
 
 export default nepalLocations;

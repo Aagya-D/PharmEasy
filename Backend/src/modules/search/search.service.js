@@ -63,18 +63,24 @@ class SearchService {
           }
         : {};
 
-    const inventoryItems = await prisma.inventory.findMany({
+    const baseWhere = {
+      quantity: { gt: 0 },
+      pharmacy: {
+        verificationStatus: "VERIFIED",
+      },
+    };
+
+    const findInventory = async (where = {}) =>
+      prisma.inventory.findMany({
       where: {
-        quantity: { gt: 0 },
-        pharmacy: {
-          verificationStatus: "VERIFIED",
-        },
-        ...keywordFilter,
+        ...baseWhere,
+        ...where,
       },
       select: {
         id: true,
         name: true,
         genericName: true,
+        category: true,
         imageUrl: true,
         price: true,
         quantity: true,
@@ -103,6 +109,27 @@ class SearchService {
       take: Math.max(limit * 10, 60),
     });
 
+    let inventoryItems = [];
+
+    if (normalizedCategory) {
+      inventoryItems = await findInventory({
+        category: {
+          equals: normalizedCategory,
+          mode: "insensitive",
+        },
+      });
+
+      if (inventoryItems.length === 0 && categoryKeywords.length > 0) {
+        inventoryItems = await findInventory(keywordFilter);
+      }
+
+      if (inventoryItems.length === 0) {
+        inventoryItems = await findInventory();
+      }
+    } else {
+      inventoryItems = await findInventory();
+    }
+
     const groupedMedicines = new Map();
 
     inventoryItems.forEach((item) => {
@@ -123,6 +150,7 @@ class SearchService {
         id: item.id,
         medicine: item.name,
         genericName: item.genericName,
+        category: item.category,
         imageUrl: item.imageUrl || null,
         price: item.price,
         quantity: item.quantity,

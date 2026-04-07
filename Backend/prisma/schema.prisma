@@ -236,6 +236,7 @@ model Inventory {
   id          String   @id @default(uuid())
   name        String
   genericName String
+  category    String   @default("general")
   imageUrl    String?
   quantity    Int
   price       Float
@@ -259,6 +260,7 @@ model Inventory {
 
   @@index([pharmacyId])
   @@index([genericName])
+  @@index([category])
   @@index([expiryDate])
 }
 

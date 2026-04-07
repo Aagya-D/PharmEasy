@@ -32,7 +32,9 @@ export function Input({
   required = false,
   hint,
   icon,
+  rightElement,
   className = "",
+  inputClassName = "",
   ...props
 }) {
   const inputId = props.id || label?.toLowerCase().replace(/\s+/g, "-");
@@ -56,6 +58,12 @@ export function Input({
             {icon}
           </div>
         )}
+
+        {rightElement && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
+            {rightElement}
+          </div>
+        )}
         
         <input
           id={inputId}
@@ -73,6 +81,7 @@ export function Input({
           className={`
             w-full px-4 py-2.5 text-base rounded-lg border transition-all
             ${icon ? "pl-10" : ""}
+            ${rightElement ? "pr-12" : ""}
             ${hasError 
               ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-200" 
               : "border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -83,11 +92,12 @@ export function Input({
             }
             focus:outline-none
             placeholder:text-slate-500
+            ${inputClassName}
           `}
           {...props}
         />
 
-        {hasError && (
+        {hasError && !rightElement && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500">
             <AlertCircle size={18} />
           </div>

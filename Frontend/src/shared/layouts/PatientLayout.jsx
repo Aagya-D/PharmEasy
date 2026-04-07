@@ -384,7 +384,7 @@ export function PatientLayout({ children, searchEnabled = true }) {
           </div>
 
           {/* Desktop Navigation Links */}
-          <div className="hidden items-center gap-1 border-t border-slate-100 py-2 md:flex">
+          <div className="hidden items-center justify-center gap-1 border-t border-slate-100 py-2 md:flex">
             {navLinks.map((link) => {
               const Icon = link.icon;
               return (

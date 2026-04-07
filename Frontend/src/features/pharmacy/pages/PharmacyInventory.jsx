@@ -102,9 +102,11 @@ export default function PharmacyInventory() {
   // Filter inventory based on search
   const filteredInventory = inventory.filter(item => {
     const searchLower = searchTerm.toLowerCase();
+    const normalizedCategory = (item.category || "").toLowerCase().replace(/_/g, " ");
     return (
       item.name.toLowerCase().includes(searchLower) ||
-      item.genericName.toLowerCase().includes(searchLower)
+      item.genericName.toLowerCase().includes(searchLower) ||
+      normalizedCategory.includes(searchLower)
     );
   });
 
@@ -267,7 +269,7 @@ export default function PharmacyInventory() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
               <input
                 type="text"
-                placeholder="Search medicines by name or generic name..."
+                placeholder="Search medicines by name, generic name, or category..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -288,6 +290,7 @@ export default function PharmacyInventory() {
                 <tr>
                   <th className="text-left px-6 py-4">Medicine Name</th>
                   <th className="text-left px-6 py-4">Generic Name</th>
+                  <th className="text-left px-6 py-4">Category</th>
                   <th className="text-left px-6 py-4">Quantity</th>
                   <th className="text-left px-6 py-4">Price (₹)</th>
                   <th className="text-left px-6 py-4">Expiry Date</th>
@@ -298,7 +301,7 @@ export default function PharmacyInventory() {
               <tbody>
                 {filteredInventory.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-6 py-16 text-center">
+                    <td colSpan="8" className="px-6 py-16 text-center">
                       <Package className="mx-auto mb-3 text-gray-300" size={48} />
                       <p className="text-slate-700 font-semibold text-lg">
                         {searchTerm ? "No matches found" : "No medicines in inventory"}
@@ -323,6 +326,11 @@ export default function PharmacyInventory() {
                     <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50">
                       <td className="px-6 py-4 font-medium text-slate-900">{item.name}</td>
                       <td className="px-6 py-4 text-slate-600">{item.genericName}</td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                          {(item.category || "general").replace(/_/g, " ")}
+                        </span>
+                      </td>
                       <td className="px-6 py-4"><span className="text-slate-600">{item.quantity}</span></td>
                       <td className="px-6 py-4"><span className="text-slate-600">₹{item.price.toFixed(2)}</span></td>
                       <td className="px-6 py-4">

@@ -18,6 +18,11 @@ const ALLOWED_TIMINGS = ["BEFORE_FOOD", "AFTER_FOOD"];
 
 const sanitizeText = (value) => String(value || "").trim();
 
+const normalizeCategory = (value) => {
+  const cleaned = String(value || "").trim().toLowerCase();
+  return cleaned.replace(/\s+/g, "_");
+};
+
 const sanitizeOptionalText = (value) => {
   if (value === undefined || value === null) return null;
   const cleaned = String(value).trim();
@@ -34,6 +39,7 @@ const sanitizeImageUrl = (value) => {
 const normalizeMedicineData = (medicineData) => ({
   name: sanitizeText(medicineData.name),
   genericName: sanitizeText(medicineData.genericName),
+  category: normalizeCategory(medicineData.category),
   quantity: Number(medicineData.quantity),
   price: Number(medicineData.price),
   expiryDate: medicineData.expiryDate,
@@ -52,8 +58,8 @@ const normalizeMedicineData = (medicineData) => ({
 });
 
 const validateMedicinePayload = (medicineData) => {
-  if (!medicineData.name || !medicineData.genericName) {
-    throw new AppError("Missing required fields: name, genericName", 400);
+  if (!medicineData.name || !medicineData.genericName || !medicineData.category) {
+    throw new AppError("Missing required fields: name, genericName, category", 400);
   }
 
   if (!Number.isFinite(medicineData.quantity) || medicineData.quantity < 0) {
@@ -145,6 +151,7 @@ export const addMedicine = async (pharmacyId, medicineData) => {
     data: {
       name: preparedData.name,
       genericName: preparedData.genericName,
+      category: preparedData.category,
       quantity: preparedData.quantity,
       price: preparedData.price,
       expiryDate: preparedData.expiryDate,

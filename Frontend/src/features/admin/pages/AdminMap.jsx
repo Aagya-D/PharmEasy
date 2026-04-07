@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
 import { MapPin, AlertCircle, Check, RefreshCw } from 'lucide-react';
 import AdminLayout from '../components/AdminLayout';
@@ -71,14 +71,7 @@ const AdminMap = () => {
   const [filter, setFilter] = useState('all'); // 'all', 'sos', 'pharmacies'
   const [regionFilter, setRegionFilter] = useState('All Nepal');
 
-  useEffect(() => {
-    fetchMapData();
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchMapData, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchMapData = async () => {
+  const fetchMapData = useCallback(async () => {
     try {
       // Fetch SOS requests and pharmacies in parallel
       const [sosResponse, pharmacyResponse] = await Promise.all([
@@ -114,7 +107,14 @@ const AdminMap = () => {
       console.error('Error fetching map data:', error);
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchMapData();
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchMapData, 30000);
+    return () => clearInterval(interval);
+  }, [fetchMapData]);
 
   const getFilteredMarkers = () => {
     if (filter === 'sos') return { sos: sosRequests, pharmacies: [] };
