@@ -12,6 +12,11 @@ export default function DashboardHeader({
 }) {
   const [searchText, setSearchText] = useState("");
 
+  const hubMeta = useMemo(() => {
+    if (title && subtitle) return `${title} · ${subtitle}`;
+    return title || subtitle || "";
+  }, [title, subtitle]);
+
   const welcomeText = useMemo(() => {
     const name = userName || "User";
     return `Welcome ${name}!`;
@@ -40,7 +45,7 @@ export default function DashboardHeader({
 
           <div className="min-w-0">
             <p className="truncate text-lg font-bold text-slate-900">{welcomeText}</p>
-            <p className="truncate text-xs text-slate-500">{title} · {subtitle}</p>
+            {hubMeta && <p className="truncate text-xs text-slate-500">{hubMeta}</p>}
           </div>
         </div>
 

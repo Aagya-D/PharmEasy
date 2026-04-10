@@ -23,6 +23,10 @@ export default function PharmacyReports() {
   const [exportingInventory, setExportingInventory] = useState(false);
   const [exportingSales, setExportingSales] = useState(false);
   const [exportSuccess, setExportSuccess] = useState(null);
+  const [activeExportType, setActiveExportType] = useState(null);
+  const [modalStartDate, setModalStartDate] = useState("");
+  const [modalEndDate, setModalEndDate] = useState("");
+  const [modalFileName, setModalFileName] = useState("");
 
   const fetchDashboard = async () => {
     setLoading(true);
@@ -41,22 +45,72 @@ export default function PharmacyReports() {
     fetchDashboard();
   }, []);
 
+  const openExportModal = (type) => {
+    const today = new Date().toISOString().split("T")[0];
+    setActiveExportType(type);
+    setModalStartDate("");
+    setModalEndDate("");
+    setModalFileName(`${type}_export_${today}`);
+  };
+
+  const closeExportModal = () => {
+    setActiveExportType(null);
+    setModalStartDate("");
+    setModalEndDate("");
+    setModalFileName("");
+  };
+
+  const saveBlobToLaptop = async (blob, filename) => {
+    if (window.showSaveFilePicker) {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [
+          {
+            description: "CSV Files",
+            accept: { "text/csv": [".csv"] },
+          },
+        ],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    }
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
   /**
    * Download a CSV blob from the API
    */
-  const downloadCSV = async (type) => {
+  const downloadCSV = async ({ type, startDate, endDate, fileName }) => {
+    if (startDate && endDate && startDate > endDate) {
+      toast.error("Start date cannot be after end date.");
+      return;
+    }
+
     const setExporting = type === "inventory" ? setExportingInventory : setExportingSales;
     setExporting(true);
     setExportSuccess(null);
     try {
+      const dateRange = {
+        ...(startDate ? { startDate } : {}),
+        ...(endDate ? { endDate } : {}),
+      };
+
       const response =
         type === "inventory"
-          ? await pharmacyService.exportInventoryCSV()
-          : await pharmacyService.exportSalesCSV();
+          ? await pharmacyService.exportInventoryCSV(dateRange)
+          : await pharmacyService.exportSalesCSV(dateRange);
 
       const blob = new Blob([response.data], { type: "text/csv;charset=utf-8;" });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
 
       // Extract filename from Content-Disposition header or use default
       const disposition = response.headers?.["content-disposition"];
@@ -65,22 +119,37 @@ export default function PharmacyReports() {
         const match = disposition.match(/filename="?(.+?)"?$/);
         if (match) filename = match[1];
       }
+      if (fileName?.trim()) {
+        filename = fileName.trim().endsWith(".csv") ? fileName.trim() : `${fileName.trim()}.csv`;
+      }
 
-      link.href = url;
-      link.setAttribute("download", filename);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      await saveBlobToLaptop(blob, filename);
 
       setExportSuccess(type);
       setTimeout(() => setExportSuccess(null), 3000);
+      closeExportModal();
     } catch (err) {
+      if (err?.name === "AbortError") {
+        toast("Save cancelled");
+        return;
+      }
       console.error(`Export ${type} failed:`, err);
       toast.error(`❌ Failed to export ${type} report. Please check your connection and try again.`);
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleExportSubmit = async (event) => {
+    event.preventDefault();
+    if (!activeExportType) return;
+
+    await downloadCSV({
+      type: activeExportType,
+      startDate: modalStartDate,
+      endDate: modalEndDate,
+      fileName: modalFileName,
+    });
   };
 
   const summaryStats = stats
@@ -202,6 +271,9 @@ export default function PharmacyReports() {
                   Export Data
                 </h2>
                 <p className="text-sm text-slate-500 mt-1">Download your business data as CSV files for accounting and analysis</p>
+                <p className="text-xs text-slate-500 mt-2">
+                  Click an export button to open a small form for date range and choose where to save the file.
+                </p>
               </div>
 
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -217,7 +289,7 @@ export default function PharmacyReports() {
                         Download your current medicine stock as CSV. Includes name, generic name, quantity, price, and expiry date.
                       </p>
                       <button
-                        onClick={() => downloadCSV("inventory")}
+                        onClick={() => openExportModal("inventory")}
                         disabled={exportingInventory}
                         className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm"
                       >
@@ -254,7 +326,7 @@ export default function PharmacyReports() {
                         Download all completed orders as CSV. Includes patient info, order status, amounts, and dates.
                       </p>
                       <button
-                        onClick={() => downloadCSV("sales")}
+                        onClick={() => openExportModal("sales")}
                         disabled={exportingSales}
                         className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 text-sm"
                       >
@@ -305,6 +377,72 @@ export default function PharmacyReports() {
           </>
         )}
       </main>
+
+      {activeExportType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl border border-slate-200">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <h3 className="text-base font-semibold text-slate-900">
+                {activeExportType === "inventory" ? "Export Inventory CSV" : "Export Sales CSV"}
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Select an optional date range and file name, then choose save location.
+              </p>
+            </div>
+
+            <form onSubmit={handleExportSubmit} className="px-5 py-4 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-600">Start Date</span>
+                  <input
+                    type="date"
+                    value={modalStartDate}
+                    onChange={(event) => setModalStartDate(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-medium text-slate-600">End Date</span>
+                  <input
+                    type="date"
+                    value={modalEndDate}
+                    onChange={(event) => setModalEndDate(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="text-xs font-medium text-slate-600">File Name</span>
+                <input
+                  type="text"
+                  value={modalFileName}
+                  onChange={(event) => setModalFileName(event.target.value)}
+                  placeholder="report_file_name"
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </label>
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={closeExportModal}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={activeExportType === "inventory" ? exportingInventory : exportingSales}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {activeExportType === "inventory" ? (exportingInventory ? "Generating..." : "Choose Location & Save") : exportingSales ? "Generating..." : "Choose Location & Save"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

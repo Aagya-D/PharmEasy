@@ -185,6 +185,24 @@ export const getPharmacyOrders = async (page = 1, limit = 50, status = 'all') =>
 };
 
 /**
+ * Get pharmacy order details by id
+ * Backend: GET /api/pharmacy/orders/:orderId
+ */
+export const getPharmacyOrderDetails = async (orderId) => {
+  const response = await httpClient.get(`/pharmacy/orders/${orderId}`);
+  return response.data;
+};
+
+/**
+ * Update pharmacy order status
+ * Backend: PATCH /api/pharmacy/orders/:orderId/status
+ */
+export const updatePharmacyOrderStatus = async (orderId, status) => {
+  const response = await httpClient.patch(`/pharmacy/orders/${orderId}/status`, { status });
+  return response.data;
+};
+
+/**
  * Get pharmacy customers (unique patients who ordered)
  * Backend: GET /api/pharmacy/customers
  */
@@ -232,8 +250,12 @@ export const getAnalyticsData = async () => {
  * Export inventory CSV — returns blob URL for download
  * Backend: GET /api/pharmacy/reports/export-inventory
  */
-export const exportInventoryCSV = async () => {
+export const exportInventoryCSV = async ({ startDate, endDate } = {}) => {
   const response = await httpClient.get("/pharmacy/reports/export-inventory", {
+    params: {
+      ...(startDate ? { startDate } : {}),
+      ...(endDate ? { endDate } : {}),
+    },
     responseType: 'blob',
   });
   return response;
@@ -243,8 +265,12 @@ export const exportInventoryCSV = async () => {
  * Export sales CSV — returns blob URL for download
  * Backend: GET /api/pharmacy/reports/export-sales
  */
-export const exportSalesCSV = async () => {
+export const exportSalesCSV = async ({ startDate, endDate } = {}) => {
   const response = await httpClient.get("/pharmacy/reports/export-sales", {
+    params: {
+      ...(startDate ? { startDate } : {}),
+      ...(endDate ? { endDate } : {}),
+    },
     responseType: 'blob',
   });
   return response;
@@ -294,6 +320,8 @@ const pharmacyService = {
   getPharmacyByUserId,
   getDashboardStats,
   getPharmacyOrders,
+  getPharmacyOrderDetails,
+  updatePharmacyOrderStatus,
   getPharmacyCustomers,
   getAnalyticsData,
   exportInventoryCSV,

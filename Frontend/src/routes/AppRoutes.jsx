@@ -42,6 +42,7 @@ import WaitingApproval from "../features/pharmacy/pages/WaitingApproval";
 import ApplicationRejected from "../features/pharmacy/pages/ApplicationRejected";
 import PharmacyInventory from "../features/pharmacy/pages/PharmacyInventory";
 import PharmacyOrders from "../features/pharmacy/pages/PharmacyOrders";
+import PharmacyOrderDetails from "../features/pharmacy/pages/PharmacyOrderDetails";
 import PharmacySOSRequests from "../features/pharmacy/pages/PharmacySOSRequests";
 import PharmacyCustomers from "../features/pharmacy/pages/PharmacyCustomers";
 import PharmacyAnalytics from "../features/pharmacy/pages/PharmacyAnalytics";
@@ -505,6 +506,10 @@ export const routes = [
           {
             path: "orders",
             element: <PharmacyOrders />,
+          },
+          {
+            path: "orders/:orderId",
+            element: <PharmacyOrderDetails />,
           },
           {
             path: "sos-requests",

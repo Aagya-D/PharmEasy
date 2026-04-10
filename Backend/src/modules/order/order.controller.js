@@ -247,6 +247,15 @@ const ORDER_STATUS_PATIENT_MESSAGES = {
 const shouldAttemptInventoryDeduction = (nextStatus) =>
   nextStatus === "ACCEPTED" || nextStatus === "COMPLETED";
 
+const NEXT_STATUS_HINTS = {
+  PENDING: ["ACCEPTED", "CANCELLED"],
+  ACCEPTED: ["PREPARING", "READY", "CANCELLED"],
+  PREPARING: ["READY", "CANCELLED"],
+  READY: ["COMPLETED", "CANCELLED"],
+  COMPLETED: [],
+  CANCELLED: [],
+};
+
 const deductOrderInventory = async (tx, order, pharmacyId) => {
   const items = Array.isArray(order.items) ? order.items : [];
 
@@ -848,6 +857,7 @@ const verifyKhaltiPaymentInternal = async ({ pidx, userId = null, purchaseOrderI
     const nextOrder = await tx.order.update({
       where: { id: order.id },
       data: {
+        ...(isSuccess && currentOrder.status === "PENDING" ? { status: "ACCEPTED" } : {}),
         paymentStatus: internalPaymentStatus,
         paymentTransactionId: lookup?.transaction_id || lookup?.tidx || null,
         paymentVerifiedAt: isSuccess ? new Date() : null,
@@ -1109,5 +1119,98 @@ export const updateOrderStatus = async (req, res) => {
   } catch (error) {
     console.error("[ORDER] updateOrderStatus error", error.message);
     return res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+export const getPharmacyOrderDetails = async (req, res) => {
+  const userId = req.user?.userId;
+  const orderId = String(req.params?.orderId || "").trim();
+
+  if (!userId) {
+    return res.status(401).json({ success: false, message: "Authentication required" });
+  }
+
+  if (!orderId) {
+    return res.status(400).json({ success: false, message: "Order id is required" });
+  }
+
+  try {
+    const pharmacy = await prisma.pharmacy.findUnique({
+      where: { userId },
+      select: { id: true, pharmacyName: true },
+    });
+
+    if (!pharmacy?.id) {
+      return res.status(404).json({ success: false, message: "Pharmacy not found" });
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        patient: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        items: {
+          select: {
+            id: true,
+            medicineName: true,
+            genericName: true,
+            quantity: true,
+            unitPrice: true,
+            lineTotal: true,
+          },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    if (!order || order.pharmacyId !== pharmacy.id) {
+      return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    const itemCount = order.items.reduce((total, item) => total + Number(item.quantity || 0), 0);
+    const medicineCount = order.items.length;
+    const subtotal = order.items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
+    const deliveryFee = Math.max(Number(order.totalAmount || 0) - subtotal, 0);
+
+    let nextAllowedStatuses = NEXT_STATUS_HINTS[order.status] || [];
+    if (order.paymentMethod === "KHALTI" && order.paymentStatus !== "COMPLETED") {
+      nextAllowedStatuses = nextAllowedStatuses.filter((status) => status === "CANCELLED");
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        order,
+        summary: {
+          medicineCount,
+          itemCount,
+          subtotal,
+          deliveryFee,
+          total: Number(order.totalAmount || 0),
+        },
+        process: {
+          currentStatus: order.status,
+          nextAllowedStatuses,
+        },
+      },
+      message: "Order details fetched successfully",
+    });
+  } catch (error) {
+    logger.error("ORDER", "Failed to fetch pharmacy order details", {
+      orderId,
+      userId,
+      error: error.message,
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch pharmacy order details",
+    });
   }
 };

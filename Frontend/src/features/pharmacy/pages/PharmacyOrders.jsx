@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, ClipboardList, Loader, Package, RefreshCw, Search } from "lucide-react";
+import { ClipboardList, Package, RefreshCw, Search, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import httpClient from "../../../core/services/httpClient";
 
 // Skeleton Pulse for loading
@@ -31,13 +32,13 @@ function SkeletonRow() {
 }
 
 export default function PharmacyOrders() {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [orderStats, setOrderStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filterStatus, setFilterStatus] = useState("all");
   const [orderSearch, setOrderSearch] = useState("");
-  const [updatingOrderId, setUpdatingOrderId] = useState(null);
 
   useEffect(() => {
     fetchOrders();
@@ -84,60 +85,6 @@ export default function PharmacyOrders() {
         {status?.replaceAll("_", " ")}
       </span>
     );
-  };
-
-  const updateOrderStatus = async (orderId, status) => {
-    try {
-      setUpdatingOrderId(orderId);
-      const normalizedStatus = String(status || "").trim().toUpperCase();
-      await httpClient.patch(`/pharmacy/orders/${orderId}/status`, { status: normalizedStatus });
-      await fetchOrders();
-    } catch (err) {
-      console.error("Failed to update order status", err);
-      setError(err.response?.data?.message || "Failed to update order status");
-    } finally {
-      setUpdatingOrderId(null);
-    }
-  };
-
-  const renderActionButton = (order) => {
-    if (order.status === "PENDING") {
-      return (
-        <button
-          onClick={() => updateOrderStatus(order.id, "ACCEPTED")}
-          disabled={updatingOrderId === order.id}
-          className="px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-xs font-semibold"
-        >
-          Accept
-        </button>
-      );
-    }
-
-    if (order.status === "ACCEPTED" || order.status === "PREPARING") {
-      return (
-        <button
-          onClick={() => updateOrderStatus(order.id, "READY")}
-          disabled={updatingOrderId === order.id}
-          className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white text-xs font-semibold"
-        >
-          Mark as Ready
-        </button>
-      );
-    }
-
-    if (order.status === "READY") {
-      return (
-        <button
-          onClick={() => updateOrderStatus(order.id, "COMPLETED")}
-          disabled={updatingOrderId === order.id}
-          className="px-3 py-1.5 rounded-md bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white text-xs font-semibold"
-        >
-          Complete
-        </button>
-      );
-    }
-
-    return <span className="text-xs text-slate-400">No actions</span>;
   };
 
   const statCards = orderStats ? [
@@ -335,7 +282,15 @@ export default function PharmacyOrders() {
                         {new Date(order.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4">
-                        {renderActionButton(order)}
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/pharmacy/orders/${order.id}`)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                          title="View order details"
+                          aria-label="View order details"
+                        >
+                          <ChevronRight size={18} />
+                        </button>
                       </td>
                     </tr>
                   ))

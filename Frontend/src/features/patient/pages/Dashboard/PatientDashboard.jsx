@@ -379,7 +379,7 @@ export function PatientDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50 py-4" style={{ fontFamily: "Nunito, Poppins, ui-sans-serif, system-ui" }}>
-      <div className="w-full px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
         <AnnouncementBanner targetRole="PATIENT" className="mb-4 rounded-2xl" />
 
         {activeSOS && <ActiveSOSCard sos={activeSOS} ttlMinutes={sosTTL} navigate={navigate} />}

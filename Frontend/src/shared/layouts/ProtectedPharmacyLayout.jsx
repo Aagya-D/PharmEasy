@@ -57,8 +57,8 @@ function ProtectedPharmacyLayoutInner({ children, isApprovedPharmacy }) {
           <DashboardHeader
             onOpenSidebar={() => setSidebarOpen(true)}
             userName={user?.name || user?.email || "Pharmacy User"}
-            title="Pharmacy Intelligence Hub"
-            subtitle="Operations and inventory control"
+            title=""
+            subtitle=""
             searchPlaceholder="Search medicines, customers, SOS records..."
             notificationSlot={(
               <div className="flex items-center gap-2">

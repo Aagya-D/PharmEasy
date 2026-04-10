@@ -19,7 +19,7 @@ import { authenticate } from "../../middlewares/auth.js";
 import { requirePharmacyAdmin, requireSystemAdmin } from "../../middlewares/roleCheck.js";
 import { uploadLicenseDocument, handleUploadError } from "../../middlewares/upload.middleware.js";
 import pharmacyController from "./pharmacy.controller.js";
-import { updateOrderStatus } from "../order/order.controller.js";
+import { getPharmacyOrderDetails, updateOrderStatus } from "../order/order.controller.js";
 
 const router = express.Router();
 
@@ -256,6 +256,13 @@ router.get(
   authenticate(),
   requirePharmacyAdmin,
   pharmacyController.getPharmacyOrders
+);
+
+router.get(
+  "/pharmacy/orders/:orderId",
+  authenticate(),
+  requirePharmacyAdmin,
+  getPharmacyOrderDetails
 );
 
 router.patch(

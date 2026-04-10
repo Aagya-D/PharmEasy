@@ -1821,13 +1821,42 @@ export const getAnalyticsData = async (req, res, next) => {
 export const exportInventoryCSV = async (req, res, next) => {
   try {
     const userId = req.user.userId;
+    const { startDate, endDate } = req.query;
+
+    let createdAtFilter;
+    if (startDate || endDate) {
+      const start = startDate ? new Date(`${startDate}T00:00:00.000Z`) : null;
+      const end = endDate ? new Date(`${endDate}T23:59:59.999Z`) : null;
+
+      if ((start && Number.isNaN(start.getTime())) || (end && Number.isNaN(end.getTime()))) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid date format. Use YYYY-MM-DD for startDate and endDate.",
+        });
+      }
+
+      if (start && end && start > end) {
+        return res.status(400).json({
+          success: false,
+          message: "startDate cannot be after endDate.",
+        });
+      }
+
+      createdAtFilter = {
+        ...(start ? { gte: start } : {}),
+        ...(end ? { lte: end } : {}),
+      };
+    }
 
     const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
     if (!pharmacy) return res.status(404).json({ success: false, message: "Pharmacy not found." });
     if (pharmacy.verificationStatus !== 'VERIFIED') return res.status(403).json({ success: false, message: "Not verified." });
 
     const inventory = await prisma.inventory.findMany({
-      where: { pharmacyId: pharmacy.id },
+      where: {
+        pharmacyId: pharmacy.id,
+        ...(createdAtFilter ? { createdAt: createdAtFilter } : {}),
+      },
       orderBy: { name: 'asc' },
     });
 
@@ -1861,13 +1890,42 @@ export const exportInventoryCSV = async (req, res, next) => {
 export const exportSalesCSV = async (req, res, next) => {
   try {
     const userId = req.user.userId;
+    const { startDate, endDate } = req.query;
+
+    let createdAtFilter;
+    if (startDate || endDate) {
+      const start = startDate ? new Date(`${startDate}T00:00:00.000Z`) : null;
+      const end = endDate ? new Date(`${endDate}T23:59:59.999Z`) : null;
+
+      if ((start && Number.isNaN(start.getTime())) || (end && Number.isNaN(end.getTime()))) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid date format. Use YYYY-MM-DD for startDate and endDate.",
+        });
+      }
+
+      if (start && end && start > end) {
+        return res.status(400).json({
+          success: false,
+          message: "startDate cannot be after endDate.",
+        });
+      }
+
+      createdAtFilter = {
+        ...(start ? { gte: start } : {}),
+        ...(end ? { lte: end } : {}),
+      };
+    }
 
     const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
     if (!pharmacy) return res.status(404).json({ success: false, message: "Pharmacy not found." });
     if (pharmacy.verificationStatus !== 'VERIFIED') return res.status(403).json({ success: false, message: "Not verified." });
 
     const orders = await prisma.order.findMany({
-      where: { pharmacyId: pharmacy.id },
+      where: {
+        pharmacyId: pharmacy.id,
+        ...(createdAtFilter ? { createdAt: createdAtFilter } : {}),
+      },
       include: {
         patient: { select: { name: true, email: true, phone: true } },
       },

@@ -8,9 +8,9 @@
     "start": "prisma generate && node src/index.js",
     "dev": "prisma generate && nodemon src/index.js",
     "prod": "prisma generate && NODE_ENV=production node src/index.js",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
     "build:frontend": "cd ../Frontend && npm run build",
     "build:all": "npm run build:frontend && echo \"Backend ready for production\"",
-    "test": "echo \"Error: no test specified\" && exit 1",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "node prisma/seed.js",
@@ -48,7 +48,7 @@
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^20.10.6",
-    "kill-port": "^2.0.1",
+    "jest": "^30.3.0",
     "nodemon": "^3.1.11",
     "prisma": "^7.4.2"
   }
