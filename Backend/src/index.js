@@ -308,7 +308,7 @@ if (NODE_ENV === "production") {
 
   // Catch-all route for SPA - must be AFTER API routes
   // Only serve index.html for non-API routes
-  app.get("*", (req, res, next) => {
+  app.get("/{*splat}", (req, res, next) => {
     // Never serve index.html for API routes
     if (req.path.startsWith('/api')) {
       return next();

@@ -22,13 +22,13 @@ services:
       - key: JWT_RESET_SECRET
         sync: false
       - key: FRONTEND_URL
-        sync: false
+        value: https://pharm-easy-sigma.vercel.app
       - key: CORS_ORIGIN
-        sync: false
+        value: https://pharm-easy-sigma.vercel.app
       - key: CORS_ORIGINS
         sync: false
       - key: CORS_ORIGIN_PATTERNS
-        sync: false
+        value: https://pharm-easy-sigma-*.vercel.app
       - key: EMAIL_HOST
         value: smtp.gmail.com
       - key: EMAIL_PORT
