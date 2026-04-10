@@ -48,15 +48,29 @@ try {
 }
 
 const app = express();
-const PORT = process.env.PORT || 5050;
-const HOST = process.env.HOST || "localhost";
 const NODE_ENV = process.env.NODE_ENV || "development";
+const PORT = process.env.PORT || 5050;
+const HOST =
+  process.env.HOST || (NODE_ENV === "production" ? "0.0.0.0" : "localhost");
 
 // ============================================
 // MIDDLEWARE
 // ============================================
 
 // CORS Configuration
+const parseOriginValues = (...rawValues) =>
+  rawValues
+    .flatMap((value) => String(value || "").split(","))
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+const toRegexFromWildcard = (pattern) => {
+  const escaped = pattern
+    .replace(/[|\\{}()[\]^$+?.]/g, "\\$&")
+    .replace(/\*/g, ".*");
+  return new RegExp(`^${escaped}$`);
+};
+
 const allowedOrigins = new Set(
   [
     "http://localhost:3000",
@@ -65,10 +79,17 @@ const allowedOrigins = new Set(
     "http://localhost:5175",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5173",
-    process.env.FRONTEND_URL,
-    process.env.CORS_ORIGIN,
+    ...parseOriginValues(
+      process.env.FRONTEND_URL,
+      process.env.CORS_ORIGIN,
+      process.env.CORS_ORIGINS
+    ),
   ].filter(Boolean)
 );
+
+const allowedOriginPatterns = parseOriginValues(
+  process.env.CORS_ORIGIN_PATTERNS
+).map((pattern) => toRegexFromWildcard(pattern));
 
 app.use(
   cors({
@@ -79,6 +100,11 @@ app.use(
       }
 
       if (allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      if (allowedOriginPatterns.some((pattern) => pattern.test(origin))) {
         callback(null, true);
         return;
       }
