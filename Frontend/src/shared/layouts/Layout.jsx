@@ -1,10 +1,7 @@
 import React from "react";
 
 /**
- * Simple Layout Wrapper for Public Pages
- * - No Sidebar
- * - No auth-related UI
- * - Used for Landing, Auth pages, etc.
+ * Simple layout for public pages that do not need the dashboard shell.
  */
 export function Layout({ children }) {
   return (

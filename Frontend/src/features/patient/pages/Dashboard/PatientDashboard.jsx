@@ -194,7 +194,7 @@ export function PatientDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { selectedLocation } = useLocationContext();
-  const { addToCart, clearCart, isPharmacyMismatchError } = useCart();
+  const { addToCart } = useCart();
 
   const [activeCategory, setActiveCategory] = useState("all");
   const [topMedicines, setTopMedicines] = useState([]);
@@ -210,6 +210,7 @@ export function PatientDashboard() {
     selectedLocation?.district || selectedLocation?.name || "your district";
 
   useEffect(() => {
+    // Keep the active SOS banner live without waiting for a full page refresh.
     const loadActiveSOS = async () => {
       try {
         const response = await patientService.getActiveSOS();
@@ -224,6 +225,7 @@ export function PatientDashboard() {
   }, []);
 
   useEffect(() => {
+    // Fall back to a local tip if the CMS call fails or returns empty data.
     const loadHealthTip = async () => {
       try {
         setTipLoading(true);
@@ -250,6 +252,7 @@ export function PatientDashboard() {
   }, []);
 
   useEffect(() => {
+    // Announcements are sorted newest-first so the dashboard shows the latest item first.
     const loadAnnouncements = async () => {
       try {
         setAnnouncementsLoading(true);
@@ -270,6 +273,7 @@ export function PatientDashboard() {
   }, []);
 
   useEffect(() => {
+    // Nearby medicine data depends on both location and category filters.
     const loadTopMedicines = async () => {
       try {
         setMedicinesLoading(true);
@@ -331,31 +335,15 @@ export function PatientDashboard() {
     try {
       await addToCart(medicine);
       toast.success("Added to cart");
-    } catch (error) {
-      if (!isPharmacyMismatchError(error)) {
-        toast.error("Unable to add medicine right now");
-        return;
-      }
-
-      const shouldReplace = window.confirm(
-        "Your cart has items from another pharmacy. Clear cart and add this medicine instead?"
-      );
-
-      if (!shouldReplace) return;
-
-      try {
-        await clearCart();
-        await addToCart(medicine);
-        toast.success("Added to cart");
-      } catch {
-        toast.error("Unable to replace cart items right now");
-      }
+    } catch {
+      toast.error("Unable to add medicine right now");
     }
   };
 
   const handleBuyNow = (medicine) => {
     const medicineId = String(medicine?.id || medicine?.medicine || "medicine");
 
+    // Checkout expects a normalized item payload, even when the user skips the cart.
     navigate("/patient/checkout", {
       state: {
         mode: "buy-now",

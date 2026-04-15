@@ -423,13 +423,9 @@ class NotificationService {
     );
   }
 
-  /**
-   * Announcement Broadcast — admin CMS announcements
-   */
+  // Broadcast CMS announcements.
   async notifyAnnouncement(announcement) {
     try {
-      // Map announcement targetRole → Prisma RoleType enum for user lookup
-      // CMS sends "PHARMACY" or "PATIENT"; RoleType uses PHARMACY_ADMIN / PATIENT
       const ROLE_TO_ENUM = {
         PHARMACY: "PHARMACY_ADMIN",
         PHARMACY_ADMIN: "PHARMACY_ADMIN",
@@ -437,7 +433,6 @@ class NotificationService {
         ADMIN: "SYSTEM_ADMIN",
       };
 
-      // Map announcement targetRole → notification targetRole convention
       const ROLE_TO_NOTIF = {
         PHARMACY: "PHARMACY",
         PHARMACY_ADMIN: "PHARMACY",
@@ -445,7 +440,6 @@ class NotificationService {
         ADMIN: "ADMIN",
       };
 
-      // Default action link per target
       const ROLE_TO_LINK = {
         PHARMACY: "/pharmacy/dashboard",
         PATIENT: "/patient",

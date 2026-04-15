@@ -6,7 +6,7 @@ import auditor from "../utils/auditor";
 
 const AuthContext = createContext(null);
 
-// Action types
+// Auth reducer action type constants.
 const ACTIONS = {
   LOGIN_START: "LOGIN_START",
   LOGIN_SUCCESS: "LOGIN_SUCCESS",
@@ -23,7 +23,7 @@ const ACTIONS = {
   RESTORE_SESSION: "RESTORE_SESSION",
 };
 
-// Initial state
+// Initial auth state before hydration and token verification.
 const initialState = {
   user: null,
   accessToken: null,
@@ -34,9 +34,9 @@ const initialState = {
   isInitializing: true,
 };
 
-// Reducer function
+// Auth reducer that coordinates login/register/refresh state transitions.
 function authReducer(state, action) {
-  // Log state change for audit
+  // Record reducer transitions for debug audit trace.
   if (typeof window !== 'undefined' && window.__auditor) {
     auditor.recordState(action.type, state, { ...state, ...action.payload });
   }
@@ -48,19 +48,19 @@ function authReducer(state, action) {
       return { ...state, isLoading: true, error: null };
 
     case ACTIONS.REGISTER_SUCCESS:
-      // After register: user is pending OTP, NOT fully authenticated
+      // Registration keeps user pending OTP and not yet authenticated.
       logger.authEvent("REGISTER_SUCCESS", { userId: action.payload.user?.id });
       return {
         ...state,
         user: action.payload.user,
-        isAuthenticated: false, // ✅ NOT authenticated yet
+        isAuthenticated: false,
         isOTPVerified: false,
         isLoading: false,
         error: null,
       };
 
     case ACTIONS.OTP_VERIFY_SUCCESS:
-      // After OTP verification: user is now fully authenticated
+      // OTP verification completes authentication.
       logger.authEvent("OTP_VERIFY_SUCCESS", { userId: action.payload.user?.id });
       auditor.auditAuth(action.payload.user, "OTP_VERIFY");
       return {
@@ -84,7 +84,7 @@ function authReducer(state, action) {
         user: action.payload.user,
         accessToken: action.payload.accessToken,
         isAuthenticated: true,
-        isOTPVerified: true, // Login means already verified
+        isOTPVerified: true,
         isLoading: false,
         error: null,
       };
@@ -162,7 +162,7 @@ function isTokenExpired(token) {
 }
 
 function extractRefreshPayload(response) {
-  // authService returns response.data, but keep this defensive for mixed callers
+  // Support different response wrappers used by service callers.
   const payload = response?.data?.data || response?.data || response;
 
   const refreshUser = payload?.user
@@ -191,6 +191,7 @@ function extractRefreshPayload(response) {
 }
 
 function shouldForceLogoutOnRefreshFailure(refreshError) {
+  // Treat definitive invalid/expired token failures as forced logout cases.
   const status = refreshError?.response?.status;
   const message = String(
     refreshError?.response?.data?.message || refreshError?.message || ""
@@ -206,6 +207,7 @@ function shouldForceLogoutOnRefreshFailure(refreshError) {
 }
 
 function isTransientRefreshFailure(refreshError) {
+  // Retry only for network and temporary server failures.
   const status = refreshError?.response?.status;
   const code = String(refreshError?.code || "").toUpperCase();
 
@@ -216,10 +218,12 @@ function isTransientRefreshFailure(refreshError) {
 }
 
 function wait(ms) {
+  // Small utility used by exponential backoff refresh retries.
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function requestTokenRefreshWithRetry(maxRetries = 2, baseDelayMs = 500) {
+  // Retry refresh with backoff to survive temporary outages.
   let attempt = 0;
 
   while (attempt <= maxRetries) {
@@ -247,8 +251,8 @@ async function requestTokenRefreshWithRetry(maxRetries = 2, baseDelayMs = 500) {
   throw new Error("Token refresh retries exhausted");
 }
 
-// ✅ TASK: Robust Initializer - read from localStorage on first mount
-// This runs BEFORE the component renders, ensuring state is hydrated immediately
+// Read local session from storage during reducer initialization.
+// This runs before the first render so auth state is immediately hydrated.
 function initAuthState(initial) {
   console.log('[AUTH INIT] Starting initialization from localStorage...');
   
@@ -260,6 +264,7 @@ function initAuthState(initial) {
       try {
         const user = JSON.parse(storedUser);
         
+        // Keep the session visible immediately, then verify it in the background.
         console.log('[AUTH INIT] ✅ Successfully loaded from localStorage:', {
           userId: user.id,
           roleId: user.roleId,
@@ -267,7 +272,7 @@ function initAuthState(initial) {
           isInitializing: true, // Still need to verify with server
         });
         
-        // Return state with localStorage data immediately available
+        // Return hydrated session while backend verification is still pending.
         return {
           ...initial,
           user,
@@ -288,20 +293,19 @@ function initAuthState(initial) {
     console.error('[AUTH INIT] Error reading localStorage:', error);
   }
   
-  // Return initial state (not initializing since no localStorage data to verify)
+  // No local session found, so initialization can finish immediately.
   return {
     ...initial,
     isInitializing: false,
   };
 }
 
-// AuthProvider component
+// Auth context provider.
 export function AuthProvider({ children }) {
-  // ✅ TASK: Pass initializer function as 3rd argument to useReducer
-  // This ensures localStorage is read on mount, before first render
+  // Initialize reducer with localStorage bootstrap function.
   const [state, dispatch] = useReducer(authReducer, initialState, initAuthState);
 
-  // Initialize logger and auditor on mount
+  // Initialize logger and auditor once user identity exists.
   useEffect(() => {
     if (state.user) {
       logger.init(state.user.id, state.user.roleId);
@@ -309,8 +313,7 @@ export function AuthProvider({ children }) {
     }
   }, [state.user]);
 
-  // ✅ ENABLED: Auto-restore session from localStorage on page load
-  // WITH TOKEN VERIFICATION via /api/auth/me endpoint
+  // Restore session from localStorage and verify it with backend.
   useEffect(() => {
     const restoreSession = async () => {
       try {
@@ -320,7 +323,7 @@ export function AuthProvider({ children }) {
         if (storedUser && storedAccessToken) {
           const user = JSON.parse(storedUser);
 
-          // If the stored access token is expired, try one refresh path before forcing logout.
+          // If access token is expired, try refresh before forcing logout.
           if (isTokenExpired(storedAccessToken)) {
             logger.warn("Stored access token expired during hydration, trying refresh", {
               userId: user.id,
@@ -328,6 +331,7 @@ export function AuthProvider({ children }) {
 
             const refreshToken = localStorage.getItem("refreshToken");
             if (!refreshToken) {
+              // Without a refresh token, the cached session cannot be recovered safely.
               clearAuth();
               dispatch({
                 type: ACTIONS.RESTORE_SESSION,
@@ -353,6 +357,7 @@ export function AuthProvider({ children }) {
                 throw new Error("Hydration refresh returned no access token");
               }
 
+              // Persist the rotated tokens before the next request runs.
               storedAccessToken = refreshedAccessToken;
               localStorage.setItem("accessToken", refreshedAccessToken);
               if (rotatedRefreshToken) {
@@ -388,19 +393,17 @@ export function AuthProvider({ children }) {
           });
 
           // Set the token in the httpClient for the verification request
+          // Attach the token so /auth/me can validate the stored session.
           httpClient.defaults.headers.common["Authorization"] = `Bearer ${storedAccessToken}`;
 
           try {
-            // ✅ VERIFICATION FETCH: Call GET /api/auth/me to verify token validity
+            // Confirm the session with the backend before trusting the cached user.
             const response = await authService.getProfile();
-            // authService.getProfile() already returns axios response.data
-            // Backend returns: { success, data: { user: {...}, pharmacy: {...} } }
             const responseData = response.data || response;
-            // Extract nested user object — backend nests it inside data.user
             const userData = responseData.user || responseData;
             const pharmacyData = responseData.pharmacy || null;
 
-            // Extract verified user data from backend response
+            // Rebuild the user object from the verified backend payload.
             const verifiedUser = {
               id: userData.userId || userData.id,
               email: userData.email,
@@ -422,7 +425,7 @@ export function AuthProvider({ children }) {
               role: verifiedUser.roleId 
             });
             
-            // ✅ HYDRATION: Restore session with verified user data
+            // Replace the cached session with the verified version.
             dispatch({
               type: ACTIONS.RESTORE_SESSION,
               payload: {
@@ -433,7 +436,7 @@ export function AuthProvider({ children }) {
               },
             });
           } catch (verificationError) {
-            // Token verification failed — token is invalid, expired, or revoked
+            // Verification failed, so the cached session is no longer trusted.
             const status = verificationError.response?.status;
             logger.warn("Token verification failed during hydration", {
               status,
@@ -441,13 +444,13 @@ export function AuthProvider({ children }) {
               userId: user.id,
             });
 
-            // Perform a clean logout: clear all session data
+            // Clear all auth artifacts tied to the invalid token.
             localStorage.removeItem("accessToken");
             localStorage.removeItem("refreshToken");
             localStorage.removeItem("user");
             localStorage.removeItem("pendingUserId");
             localStorage.removeItem("pendingEmail");
-            // Remove stale default Authorization header so no further requests leak the old token
+            // Remove the stale bearer token from the shared client.
             delete httpClient.defaults.headers.common["Authorization"];
 
             dispatch({
@@ -460,14 +463,13 @@ export function AuthProvider({ children }) {
               },
             });
 
-            // On 401/403 redirect immediately — don't rely solely on route guards
-            // during the initialization phase so the app never hangs on Access Denied.
+            // Redirect immediately when the backend rejects the session.
             if ((status === 401 || status === 403) && typeof window !== "undefined") {
               window.location.replace("/login");
             }
           }
         } else {
-          // No session - start unauthenticated
+          // No session found, proceed unauthenticated.
           logger.info("No stored session found");
           dispatch({
             type: ACTIONS.RESTORE_SESSION,
@@ -496,15 +498,16 @@ export function AuthProvider({ children }) {
     restoreSession();
   }, []);
 
-  // Setup axios interceptors
+  // Configure API request/response interceptors.
   useEffect(() => {
-    // Request interceptor - add token to headers
+    // Add bearer token and request timing metadata.
     const requestInterceptor = httpClient.interceptors.request.use(
       (config) => {
         const startTime = performance.now();
         config.metadata = { startTime };
         
         if (state.accessToken) {
+          // Keep every outgoing request authenticated while the user is signed in.
           config.headers.Authorization = `Bearer ${state.accessToken}`;
         }
         
@@ -517,7 +520,7 @@ export function AuthProvider({ children }) {
       }
     );
 
-    // Response interceptor - handle token refresh
+    // Handle API logging and automatic token refresh on 401.
     const responseInterceptor = httpClient.interceptors.response.use(
       (response) => {
         const duration = performance.now() - response.config.metadata?.startTime;
@@ -532,16 +535,14 @@ export function AuthProvider({ children }) {
       async (error) => {
         const originalRequest = error.config;
 
-        // Log API error
+        // Log failed API response.
         logger.apiError(
           originalRequest?.method?.toUpperCase(),
           originalRequest?.url,
           error
         );
 
-        // ✅ SKIP token refresh for auth endpoints (login, register, verify-otp, etc.)
-        // Also skip /auth/refresh itself — if it returns 401 there is nothing to
-        // retry and the circuit breaker in httpClient.js will call clearAuth().
+        // Skip refresh for auth endpoints that can fail legitimately.
         const authEndpoints = [
           "/auth/login",
           "/auth/register",
@@ -553,14 +554,13 @@ export function AuthProvider({ children }) {
           originalRequest?.url?.includes(endpoint)
         );
 
-        // If 401 and not already retried, try to refresh token
-        // BUT: Skip refresh if this is an auth endpoint (login/register fail legitimately)
+        // Refresh once on unauthorized responses from non-auth endpoints.
         if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
           originalRequest._retry = true;
 
           const refreshToken = localStorage.getItem("refreshToken");
           if (!refreshToken) {
-            // No refresh token at all — clear everything and redirect
+            // Missing refresh token means session cannot be recovered.
             logger.warn("No refresh token in storage, clearing auth");
             dispatch({ type: ACTIONS.LOGOUT });
             clearAuth();
@@ -571,7 +571,7 @@ export function AuthProvider({ children }) {
             logger.info("Attempting token refresh");
             const response = await requestTokenRefreshWithRetry();
 
-            // Backend returns { success, data: { accessToken, refreshToken }, ... }
+            // Extract tokens and optional user snapshot from refresh response.
             const {
               accessToken,
               refreshToken: rotatedRefreshToken,
@@ -587,14 +587,15 @@ export function AuthProvider({ children }) {
             }
 
             if (refreshUser?.id) {
+              // Refresh the stored user snapshot so the UI stays in sync.
               localStorage.setItem("user", JSON.stringify(refreshUser));
               dispatch({ type: ACTIONS.SET_USER, payload: refreshUser });
             }
 
-            // Keep axios default auth header in sync immediately.
+            // Keep default auth header in sync immediately.
             httpClient.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
 
-            // Refresh user snapshot so all app surfaces consume latest session context.
+            // Refresh /auth/me snapshot for latest role/status/pharmacy fields.
             try {
               const meResponse = await authService.getProfile();
               const mePayload = meResponse?.data || meResponse;
@@ -602,6 +603,7 @@ export function AuthProvider({ children }) {
               const profilePharmacy = mePayload?.pharmacy || null;
 
               if (profileUser?.id || profileUser?.userId) {
+                // Merge the latest profile and pharmacy data into auth state.
                 const refreshedUser = {
                   id: profileUser.userId || profileUser.id,
                   email: profileUser.email,
@@ -633,11 +635,11 @@ export function AuthProvider({ children }) {
               payload: accessToken,
             });
 
-            // Retry original request with new token
+            // Retry original request with updated bearer token.
             originalRequest.headers.Authorization = `Bearer ${accessToken}`;
             return httpClient(originalRequest);
           } catch (refreshError) {
-            // Only force logout on definitive token failures; avoid kicking user out on transient network blips.
+            // Force logout only for definitive refresh token failures.
             logger.warn("Token refresh failed", {
               error: refreshError.message,
               status: refreshError?.response?.status,
@@ -662,15 +664,14 @@ export function AuthProvider({ children }) {
     };
   }, [state.accessToken, state.isAuthenticated]);
 
-  // Silent token refresh — schedules a proactive refresh 1 minute before the
-  // access token expires so the user is never interrupted by a 401 error.
+  // Proactive silent refresh one minute before token expiry.
   useEffect(() => {
     if (!state.accessToken || !state.isAuthenticated) return;
 
     const payload = decodeTokenPayload(state.accessToken);
     if (!payload?.exp) return;
 
-    // Fire 60 s before expiry; if already within that window, fire immediately.
+    // Refresh 60 seconds before expiry, or immediately if already near expiry.
     const msUntilRefresh = payload.exp * 1000 - Date.now() - 60 * 1000;
     const delay = msUntilRefresh > 0 ? msUntilRefresh : 0;
 
@@ -714,7 +715,7 @@ export function AuthProvider({ children }) {
     return () => clearTimeout(timer);
   }, [state.accessToken]);
 
-  // Login action
+  // Login action.
   const login = async (email, password) => {
     dispatch({ type: ACTIONS.LOGIN_START });
     logger.userAction("LOGIN_ATTEMPT", { email });
@@ -724,7 +725,7 @@ export function AuthProvider({ children }) {
       const response = await authService.login({ email, password });
       timer.stop();
 
-      // Extract data from backend response (nested structure)
+      // Normalize backend response into frontend user shape.
       const userData = response.data?.data || response.data;
       const user = {
         id: userData.userId,
@@ -741,7 +742,7 @@ export function AuthProvider({ children }) {
         needsOnboarding: userData.needsOnboarding ?? false,
       };
 
-      // Store tokens and user info
+      // Persist session tokens and user snapshot.
       if (userData.accessToken) {
         localStorage.setItem("accessToken", userData.accessToken);
       }
@@ -750,7 +751,7 @@ export function AuthProvider({ children }) {
       }
       localStorage.setItem("user", JSON.stringify(user));
 
-      // Clear any pending registration data
+      // Clear temporary OTP registration state so the next flow starts cleanly.
       localStorage.removeItem("pendingUserId");
       localStorage.removeItem("pendingEmail");
 
@@ -761,8 +762,7 @@ export function AuthProvider({ children }) {
 
       return { success: true, user };
     } catch (error) {
-      // ✅ FIX: Extract error message from API response
-      // Handle different response structures
+      // Resolve API error message from supported response shapes.
       let message = "Login failed";
       let code = null;
       
@@ -780,11 +780,11 @@ export function AuthProvider({ children }) {
       // Extract error code if present
       code = error.response?.data?.code;
       
-      // ✅ Log error with proper status
+      // Log login failure with status metadata.
       const status = error.response?.status;
       logger.warn("AUTH", `[LOGIN] Authentication failed: ${message}`, { status, email });
       
-      // Dispatch structured error object
+      // Save structured error object to auth state.
       const errorPayload = {
         message: message,
         status: status || null,
@@ -796,14 +796,14 @@ export function AuthProvider({ children }) {
         payload: errorPayload,
       });
 
-      // ✅ Also log error safely
+      // Guard logger call so error handling never crashes UI.
       try {
         logger.error("Login failed", error);
       } catch (logError) {
         console.error("Failed to log error:", logError.message);
       }
 
-      // Return code so frontend can redirect to verify OTP page
+      // Preserve OTP-not-verified signal for login screen routing.
       if (code === "EMAIL_NOT_VERIFIED") {
         return {
           success: false,
@@ -812,27 +812,24 @@ export function AuthProvider({ children }) {
         };
       }
 
-      // Return error for all other cases (including 401 Invalid credentials)
+      // Return generic error payload for all other failures.
       return { success: false, error: message };
     }
   };
 
-  // Register action
+  // Register action.
   const register = async (userData) => {
     dispatch({ type: ACTIONS.REGISTER_START });
     try {
       const response = await authService.register(userData);
 
-      // Backend response structure:
-      // Success: { success, message, data: { userId, email, role } }
-      // Axios wraps this as: response.data = { success, message, data: { userId, email, role } }
-      // So response.data.data contains the user info
+      // Handle both nested and flat response payloads.
       const apiResponse = response.data;
       
       // Extract nested data - handle both cases
       let payload = apiResponse.data || apiResponse;
       
-      // If payload is still the wrapper object, try to get data
+      // Fallback when payload is still wrapped once more.
       if (payload && !payload.userId && apiResponse.data && apiResponse.data.userId) {
         payload = apiResponse.data;
       }
@@ -846,12 +843,12 @@ export function AuthProvider({ children }) {
         payload?.userId
       );
 
-      // Validate we have userId
+      // Ensure registration returned required identifiers.
       if (!payload?.userId) {
         throw new Error("No userId in registration response");
       }
 
-      // Store userId temporarily for OTP verification
+      // Store pending registration identifiers for OTP step.
       localStorage.setItem("pendingUserId", payload.userId);
       localStorage.setItem("pendingEmail", payload.email);
 
@@ -869,12 +866,12 @@ export function AuthProvider({ children }) {
 
       return { success: true, userId: payload.userId };
     } catch (error) {
-      // ✅ FIX: Extract error safely and dispatch structured error object
+      // Extract structured registration error details.
       const errorMessage = error.response?.data?.message || error.message || "Registration failed";
       const errorStatus = error.response?.status || null;
       const errorCode = error.response?.data?.code || null;
 
-      // ✅ Dispatch structured error object, NOT a string
+      // Dispatch structured error object to reducer.
       const errorPayload = {
         message: errorMessage,
         status: errorStatus,
@@ -886,7 +883,7 @@ export function AuthProvider({ children }) {
         payload: errorPayload,
       });
 
-      // ✅ Also log error safely
+      // Guard logger invocation.
       try {
         logger.error("Registration failed", error);
       } catch (logError) {
@@ -897,7 +894,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // ✅ NEW: OTP Verification action
+  // OTP verification action.
   const verifyOTP = async (email, otp) => {
     dispatch({ type: ACTIONS.OTP_VERIFY_START });
     try {
@@ -906,7 +903,7 @@ export function AuthProvider({ children }) {
         otp: otp,
       });
 
-      // Handle both nested and direct response structures
+      // Handle nested and flat response structures.
       const responseData = response.data;
       const apiData = responseData.data || responseData;
       
@@ -925,7 +922,7 @@ export function AuthProvider({ children }) {
         needsOnboarding: apiData.needsOnboarding ?? false,
       };
 
-      // Store tokens and user info
+      // Persist verified session.
       if (apiData.accessToken) {
         localStorage.setItem("accessToken", apiData.accessToken);
       }
@@ -934,7 +931,7 @@ export function AuthProvider({ children }) {
       }
       localStorage.setItem("user", JSON.stringify(user));
 
-      // Clear pending registration data - OTP is verified
+      // OTP is complete, clear temporary registration markers.
       localStorage.removeItem("pendingUserId");
       localStorage.removeItem("pendingEmail");
 
@@ -958,7 +955,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Logout action
+  // Logout action.
   const logout = async () => {
     try {
       const refreshToken = localStorage.getItem("refreshToken");
@@ -968,6 +965,7 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
+      // Always clear local session state on logout completion.
       localStorage.removeItem("accessToken");
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
@@ -977,7 +975,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Update user profile
+  // Update local user snapshot in storage and reducer.
   const updateUser = (user) => {
     localStorage.setItem("user", JSON.stringify(user));
     dispatch({
@@ -986,7 +984,7 @@ export function AuthProvider({ children }) {
     });
   };
 
-  // ✅ NEW: Refresh user profile from backend (fetches latest status, pharmacy data, etc.)
+  // Refresh user profile from backend to get latest status and pharmacy data.
   const refreshUser = async () => {
     try {
       const response = await httpClient.get("/auth/me");
@@ -1006,7 +1004,7 @@ export function AuthProvider({ children }) {
           pharmacy: userData.pharmacy || null,
         };
 
-        // Update state and localStorage
+        // Sync refreshed profile into local state and storage.
         updateUser(updatedUser);
 
         logger.info("User profile refreshed", {
@@ -1027,6 +1025,7 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Expose auth state and actions to children.
   const value = {
     ...state,
     login,
@@ -1035,6 +1034,7 @@ export function AuthProvider({ children }) {
     logout,
     updateUser,
     refreshUser,
+    // Save shipping address and merge updated user payload.
     updateShippingAddress: async (shippingAddress) => {
       const response = await authService.updateShippingAddress(shippingAddress);
       const updatedUserFromApi = response?.data?.user;
@@ -1054,7 +1054,7 @@ export function AuthProvider({ children }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// Custom hook to use auth context
+// Auth hook for consuming AuthContext safely.
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

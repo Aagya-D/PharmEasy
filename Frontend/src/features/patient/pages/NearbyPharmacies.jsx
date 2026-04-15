@@ -19,9 +19,7 @@ import MapContainer from "../../../shared/components/MapContainer";
 import StarRating from "../../../shared/components/StarRating";
 
 /**
- * Nearby Pharmacies Page
- * Shows all verified pharmacies within a specified radius from user's location
- * Includes map view and list view with pharmacy details
+ * Nearby pharmacies page with map and list views.
  */
 export default function NearbyPharmacies() {
   const navigate = useNavigate();
@@ -35,7 +33,7 @@ export default function NearbyPharmacies() {
     navigate(`/patient/pharmacy/${encodeURIComponent(normalizedId)}`);
   };
 
-  // State management
+  // Page state.
   const [pharmacies, setPharmacies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -43,23 +41,20 @@ export default function NearbyPharmacies() {
   const [viewMode, setViewMode] = useState("split"); // 'split', 'list', 'map'
   const [selectedPharmacy, setSelectedPharmacy] = useState(null);
 
-  // Geolocation hook - will fallback to Kathmandu if permission denied
+  // Geolocation hook with location fallback.
   const { location, loading: locationLoading, error: locationError, getLocation } =
     useGeoLocation(true); // Auto-fetch on mount
 
-  // Location context - user's selected search location
+  // Use the selected search location when available.
   const { selectedLocation } = useLocation();
 
-  /**
-   * Search for nearby pharmacies
-   */
+  // Search for nearby pharmacies.
   const findNearbyPharmacies = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // Use selected location from context (user's chosen location or detected geolocation)
-      // Fallback to selectedLocation context coordinates
+      // Use the selected location first, then geolocation, then a default fallback.
       const lat = selectedLocation?.lat || location?.latitude || 27.7172;
       const lng = selectedLocation?.lng || location?.longitude || 85.3240;
 
@@ -73,7 +68,7 @@ export default function NearbyPharmacies() {
 
       const response = await searchService.findNearbyPharmacies(lat, lng, radius, 50);
 
-      // Safely extract data - handle both response.data.data and response.data
+      // Support both response.data.data and response.data.
       const resultData = response.data?.data || response.data || [];
       const safeResults = Array.isArray(resultData) ? resultData : [];
 
@@ -104,18 +99,12 @@ export default function NearbyPharmacies() {
     }
   };
 
-  /**
-   * Auto-search when location becomes available, radius changes, or selected location changes
-   * Uses selectedLocation from context or geolocation as fallback
-   */
+  // Re-run the search when the location or radius changes.
   useEffect(() => {
-    // Search when: selected location changes, radius changes, or geolocation detected
     findNearbyPharmacies();
   }, [selectedLocation, radius]);
 
-  /**
-   * Format price for Nepal
-   */
+  // Format currency for Nepal.
   const formatPrice = (price) => {
     return new Intl.NumberFormat("en-NP", {
       style: "currency",
@@ -124,9 +113,7 @@ export default function NearbyPharmacies() {
     }).format(price);
   };
 
-  /**
-   * Get directions URL
-   */
+  // Build a Google Maps directions link.
   const getDirectionsUrl = (pharmacy) => {
     const { lat, lng } = pharmacy.location;
 
@@ -139,7 +126,7 @@ export default function NearbyPharmacies() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Page header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-4 mb-4">
@@ -158,7 +145,7 @@ export default function NearbyPharmacies() {
 
           {/* Controls */}
           <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-            {/* Radius Selector */}
+            {/* Radius selector */}
             <div className="flex items-center gap-4 w-full md:w-auto">
               <label className="text-sm font-medium text-gray-700">Search radius:</label>
               <div className="flex items-center gap-2">
@@ -177,7 +164,7 @@ export default function NearbyPharmacies() {
               </div>
             </div>
 
-            {/* View Mode Selector */}
+            {/* View mode selector */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setViewMode("list")}
@@ -211,7 +198,7 @@ export default function NearbyPharmacies() {
               </button>
             </div>
 
-            {/* Location Button */}
+            {/* Location button */}
             <button
               onClick={getLocation}
               disabled={locationLoading}

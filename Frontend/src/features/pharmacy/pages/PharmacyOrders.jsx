@@ -3,7 +3,7 @@ import { ClipboardList, Package, RefreshCw, Search, ChevronRight } from "lucide-
 import { useNavigate } from "react-router-dom";
 import httpClient from "../../../core/services/httpClient";
 
-// Skeleton Pulse for loading
+// Loading placeholder card.
 function SkeletonStatCard() {
   return (
     <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 animate-pulse">
@@ -19,6 +19,7 @@ function SkeletonStatCard() {
   );
 }
 
+// Loading placeholder row.
 function SkeletonRow() {
   return (
     <tr className="border-b border-slate-100 animate-pulse">
@@ -152,7 +153,7 @@ export default function PharmacyOrders() {
       </header>
 
       <main className="p-6">
-        {/* Stats Cards */}
+        {/* Stats cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {loading && !orderStats ? (
             <>
@@ -183,7 +184,7 @@ export default function PharmacyOrders() {
           ) : null}
         </div>
 
-        {/* Error */}
+        {/* Error message */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
             <p>{error}</p>
@@ -191,7 +192,7 @@ export default function PharmacyOrders() {
           </div>
         )}
 
-        {/* Filter and Search */}
+        {/* Filter and search */}
         <div className="mb-4 flex flex-col gap-4">
           <div className="relative w-full sm:max-w-md">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />

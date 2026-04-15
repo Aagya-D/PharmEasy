@@ -29,13 +29,8 @@ import {
 } from "lucide-react";
 
 /**
- * PatientLayout - Professional Top Navbar Layout for Patient Portal
- * Features:
- * - Sticky top navbar with search functionality
- * - Cart/Orders icon with badge
- * - Notifications bell
- * - User profile dropdown
- * - Mobile-responsive menu
+ * Patient layout for patient-facing pages.
+ * It keeps the main navigation, search, notifications, profile menu, and mobile menu in one place.
  */
 export function PatientLayout({ children, searchEnabled = true }) {
   const navigate = useNavigate();
@@ -175,11 +170,11 @@ export function PatientLayout({ children, searchEnabled = true }) {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col" style={{ fontFamily: "Nunito, Poppins, ui-sans-serif, system-ui" }}>
-      {/* ===== STICKY TOP NAVBAR ===== */}
+      {/* Top navigation bar */}
       <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
-            {/* Logo/Brand */}
+            {/* Brand area */}
             <div
               onClick={() => navigate("/patient")}
               className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
@@ -193,10 +188,10 @@ export function PatientLayout({ children, searchEnabled = true }) {
               </div>
             </div>
 
-            {/* Desktop Search Bar with Location */}
+            {/* Desktop search and location controls */}
             {searchEnabled && (
               <div className="mx-8 hidden flex-1 gap-2 md:flex">
-                {/* Location Selector Button */}
+                {/* Location picker */}
                 <button
                   onClick={() => setIsLocationModalOpen(true)}
                   className="h-full min-w-fit whitespace-nowrap rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-blue-300 hover:bg-blue-50"
@@ -206,7 +201,7 @@ export function PatientLayout({ children, searchEnabled = true }) {
                     {locationButtonLabel}
                   </span>
                 </button>
-                {/* Search Bar */}
+                {/* Search field */}
                 <form onSubmit={handleSearch} className="flex-1 relative" ref={searchBoxRef}>
                   <input
                     type="text"
@@ -275,7 +270,7 @@ export function PatientLayout({ children, searchEnabled = true }) {
               </div>
             )}
 
-            {/* Right Section - Desktop */}
+            {/* Desktop actions */}
             <div className="hidden sm:flex items-center gap-3">
               <button
                 onClick={() => navigate("/sos")}
@@ -285,7 +280,7 @@ export function PatientLayout({ children, searchEnabled = true }) {
                 Emergency SOS
               </button>
 
-              {/* Cart Button */}
+              {/* Cart button */}
               <button
                 onClick={() => navigate("/patient/cart")}
                 className="relative rounded-lg p-2 transition-colors hover:bg-blue-50"
@@ -299,10 +294,10 @@ export function PatientLayout({ children, searchEnabled = true }) {
                 )}
               </button>
 
-              {/* Notifications Dropdown */}
+              {/* Notifications menu */}
               <NotificationDropdown />
 
-              {/* Profile Dropdown */}
+              {/* Profile menu */}
               <div className="relative">
                 <button
                   onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
@@ -324,7 +319,7 @@ export function PatientLayout({ children, searchEnabled = true }) {
                   </span>
                 </button>
 
-                {/* Profile Dropdown Menu */}
+                {/* Profile dropdown */}
                 {isProfileMenuOpen && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-slate-200 py-2 z-50">
                     <div className="px-4 py-2 border-b border-slate-100">
@@ -370,7 +365,7 @@ export function PatientLayout({ children, searchEnabled = true }) {
               </div>
             </div>
 
-            {/* Mobile Menu Button */}
+            {/* Mobile menu toggle */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               className="sm:hidden p-2 hover:bg-blue-50 rounded-lg transition-colors"
@@ -383,7 +378,7 @@ export function PatientLayout({ children, searchEnabled = true }) {
             </button>
           </div>
 
-          {/* Desktop Navigation Links */}
+          {/* Desktop navigation links */}
           <div className="hidden items-center justify-center gap-1 border-t border-slate-100 py-2 md:flex">
             {navLinks.map((link) => {
               const Icon = link.icon;
@@ -404,7 +399,7 @@ export function PatientLayout({ children, searchEnabled = true }) {
             })}
           </div>
 
-          {/* Mobile Search Bar */}
+          {/* Mobile search field */}
           {searchEnabled && isMobileMenuOpen && (
             <div className="md:hidden pb-4">
               <form onSubmit={handleSearch} className="relative">
@@ -424,7 +419,7 @@ export function PatientLayout({ children, searchEnabled = true }) {
             </div>
           )}
 
-        {/* Mobile Menu */}
+        {/* Mobile navigation menu */}
         {isMobileMenuOpen && (
           <div className="md:hidden border-t border-slate-100 bg-white rounded-b-3xl">
             <div className="px-4 py-2 space-y-1">
@@ -491,12 +486,12 @@ export function PatientLayout({ children, searchEnabled = true }) {
         </div>
       </nav>
 
-      {/* Main Content Area */}
+      {/* Main content */}
       <main className="flex-1 w-full">
         {children}
       </main>
 
-      {/* Floating Chat Hub Button (FAB) */}
+      {/* Chat shortcut */}
       <button
         onClick={() => navigate("/patient/chat")}
         className="fixed bottom-6 right-6 w-14 h-14 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-2xl hover:shadow-3xl flex items-center justify-center transition-all hover:scale-110 z-40 group"

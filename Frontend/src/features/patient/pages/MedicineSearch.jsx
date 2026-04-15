@@ -30,12 +30,11 @@ const formatCurrency = (value) => {
 };
 
 /**
- * Medicine Search & Discovery Page
- * Real-time search with pharmacy availability and filters
+ * Medicine search page with pharmacy availability and filters.
  */
 export default function MedicineSearch() {
   const navigate = useNavigate();
-  const { addToCart, clearCart, isPharmacyMismatchError } = useCart();
+  const { addToCart } = useCart();
   const [searchQuery, setSearchQuery] = useState("");
   const [medicines, setMedicines] = useState([]);
   const [pharmacies, setPharmacies] = useState([]);
@@ -49,11 +48,11 @@ export default function MedicineSearch() {
     searchRadius: 50, // Default search radius in km
   });
 
-  // Favorites state - set of medicine names that are favorited
+  // Favorite medicine state.
   const [favoritedNames, setFavoritedNames] = useState(new Set());
   const [togglingFav, setTogglingFav] = useState(null);
 
-  // Load existing favorites on mount
+  // Load existing favorites on mount.
   useEffect(() => {
     (async () => {
       try {
@@ -96,10 +95,10 @@ export default function MedicineSearch() {
     }
   };
 
-  // Use custom geolocation hook
+  // Use the shared geolocation hook.
   const { location, loading: locationLoading, error: geoError, getLocation } = useGeoLocation(false);
 
-  // Location context - user's selected search location
+  // Use the selected search location when available.
   const { selectedLocation } = useLocation();
 
   const getMedicineRouteId = (medicine) => {
@@ -135,26 +134,8 @@ export default function MedicineSearch() {
         persistMedicineSnapshot(medicine);
         toast.success("✅ Added to cart!");
       })
-      .catch(async (error) => {
-        if (!isPharmacyMismatchError(error)) {
-          toast.error("Failed to add item to cart");
-          return;
-        }
-
-        const shouldReplace = window.confirm(
-          "Your cart has items from another pharmacy. Clear current cart and add this medicine instead?"
-        );
-
-        if (!shouldReplace) return;
-
-        try {
-          await clearCart();
-          await addToCart(medicine);
-          persistMedicineSnapshot(medicine);
-          toast.success("✅ Added to cart!");
-        } catch {
-          toast.error("Unable to replace cart items right now");
-        }
+      .catch(() => {
+        toast.error("Failed to add item to cart");
       });
   };
 
@@ -182,25 +163,25 @@ export default function MedicineSearch() {
     });
   };
 
-  // Get user's location on mount (with fallback to Kathmandu)
+  // Load the user's location on mount.
   useEffect(() => {
     getLocation();
   }, []);
 
-  // Handle geolocation errors with fallback
+  // Show a fallback message when geolocation fails.
   useEffect(() => {
     if (geoError) {
       setLocationError(geoError);
-      // Fallback location (Kathmandu, Nepal)
+      // Fallback location.
       console.warn("Using default location: Kathmandu");
     }
   }, [geoError]);
 
-  // Auto-search when user selects a new location from the location selector
+  // Re-run the search when the selected location changes.
   useEffect(() => {
     if (searchQuery.trim() && selectedLocation) {
       console.log("[MEDICINE SEARCH] Location changed to:", selectedLocation.name);
-      // Trigger search after a brief delay to ensure state updates
+      // Wait briefly so state updates settle before the next search.
       const timer = setTimeout(() => {
         const formEvent = new Event("submit", { bubbles: true });
         document.querySelector("form")?.dispatchEvent(formEvent);

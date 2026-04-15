@@ -51,7 +51,7 @@ L.Icon.Default.mergeOptions({
 export default function PharmacyStorefront() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { addToCart, clearCart, isPharmacyMismatchError } = useCart();
+  const { addToCart } = useCart();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -173,22 +173,7 @@ export default function PharmacyStorefront() {
     try {
       await addToCart(payload);
       toast.success("Added to cart");
-    } catch (err) {
-      if (isPharmacyMismatchError(err)) {
-        const shouldReplace = window.confirm(
-          "Your cart has items from another pharmacy. Clear cart and add this medicine instead?"
-        );
-        if (!shouldReplace) return;
-
-        try {
-          await clearCart();
-          await addToCart(payload);
-          toast.success("Added to cart");
-        } catch {
-          toast.error("Unable to replace cart items right now");
-        }
-        return;
-      }
+    } catch {
       toast.error("Failed to add item to cart");
     }
   };

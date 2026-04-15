@@ -143,6 +143,7 @@ export function Register() {
       slogan="Set up a secure account for faster access to healthcare tools, pharmacy services, and patient support."
       accentColor="#0097b2"
       cardClassName="max-w-[500px]"
+      showBrandBadge={false}
     >
       <form onSubmit={handleSubmit} className="space-y-3">
         {error && (

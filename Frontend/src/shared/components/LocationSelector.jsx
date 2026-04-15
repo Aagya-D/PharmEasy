@@ -14,14 +14,7 @@ import { nepalLocations, popularCities, nepaliProvinces, searchLocations } from 
 import { useLocation } from "../../context/LocationContext";
 
 /**
- * LocationSelector Modal
- * 
- * Searchable modal for selecting location across all 77 Nepal districts
- * Features:
- * - Real-time search by district/city/province
- * - GPS detection with fallback
- * - Popular cities quick selection
- * - Province grouping for organized browsing
+ * Compact location selector with search, GPS detection, and province filtering.
  */
 export default function LocationSelector({ isOpen, onClose }) {
   const { selectedLocation, updateLocation, detectLocation, isLoading } = useLocation();
@@ -31,18 +24,16 @@ export default function LocationSelector({ isOpen, onClose }) {
   const [detectingLocation, setDetectingLocation] = useState(false);
   const [showProvinceFilter, setShowProvinceFilter] = useState(false);
 
-  /**
-   * Handle search input
-   */
+  // Filter the list as the user types.
   useEffect(() => {
     let results = searchLocations(searchQuery);
 
-    // Filter by province if selected
+    // Keep only the selected province when one is active.
     if (selectedProvince) {
       results = results.filter((loc) => loc.province === selectedProvince);
     }
 
-    // Remove duplicates by name
+    // Remove duplicate names from the list.
     const seen = new Set();
     results = results.filter((loc) => {
       if (seen.has(loc.name)) return false;
@@ -53,9 +44,7 @@ export default function LocationSelector({ isOpen, onClose }) {
     setFilteredLocations(results.sort((a, b) => a.name.localeCompare(b.name)));
   }, [searchQuery, selectedProvince]);
 
-  /**
-   * Handle Detect My Location
-   */
+  // Detect the current location and apply it if available.
   const handleDetectLocation = async () => {
     setDetectingLocation(true);
     const detectedLocation = await detectLocation();
@@ -65,17 +54,13 @@ export default function LocationSelector({ isOpen, onClose }) {
     }
   };
 
-  /**
-   * Handle location selection
-   */
+  // Save the selected location and close the modal.
   const handleSelectLocation = (location) => {
     updateLocation(location);
     onClose();
   };
 
-  /**
-   * Clear filters
-   */
+  // Clear search and province filters.
   const clearFilters = () => {
     setSearchQuery("");
     setSelectedProvince(null);

@@ -1,11 +1,4 @@
-/**
- * Chat Routes
- * GET /api/chat/rooms - List all chat rooms for the user
- * GET /api/chat/rooms/:roomId/messages - Get messages for a room
- * GET /api/chat/unread-count - Get unread message count
- * POST /api/chat/rooms/:roomId/messages - Send a message
- * PUT /api/chat/rooms/:roomId/mark-read - Mark messages as read
- */
+// Chat routes for room listing, messages, unread counts, and read-state updates.
 
 import { Router } from "express";
 import {
@@ -20,24 +13,23 @@ import { authenticate } from "../../middlewares/auth.js";
 
 const router = Router();
 
-// GET /api/chat/rooms — list all chat rooms for the authenticated user
+// List chat rooms for authenticated user.
 router.get("/rooms", authenticate(), getChatRooms);
 
-// GET /api/chat/unread-count — get total unread message count
+// Get unread message count.
 router.get("/unread-count", authenticate(), getUnreadCount);
 
-// GET /api/chat/rooms/by-sos/:sosRequestId — resolve SOS ID to ChatRoom ID
-// Must be defined BEFORE /rooms/:roomId/messages so Express does not treat
-// the literal string "by-sos" as a roomId parameter.
+// Resolve SOS request ID to chat room ID.
+// Keep this route before /rooms/:roomId/messages to avoid route conflicts.
 router.get("/rooms/by-sos/:sosRequestId", authenticate(), getRoomBySosRequest);
 
-// GET /api/chat/rooms/:roomId/messages — retrieve messages for a room
+// Retrieve messages for one room.
 router.get("/rooms/:roomId/messages", authenticate(), getChatMessages);
 
-// POST /api/chat/rooms/:roomId/messages — send a new message
+// Send a new message to room.
 router.post("/rooms/:roomId/messages", authenticate(), sendMessage);
 
-// PUT /api/chat/rooms/:roomId/mark-read — mark all messages in room as read
+// Mark room messages as read for current user.
 router.put("/rooms/:roomId/mark-read", authenticate(), markMessagesAsRead);
 
 export default router;

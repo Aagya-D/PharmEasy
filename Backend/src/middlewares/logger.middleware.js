@@ -1,20 +1,8 @@
-/**
- * Request/Response Logging Middleware
- * Logs all incoming requests and outgoing responses
- * 
- * Features:
- * - Request logging with body/query/params
- * - Response logging with status and duration
- * - Feature/module detection from route
- * - Sensitive data filtering
- * - Performance timing
- */
+// Request/response logging middleware.
 
 import logger from '../utils/logger.js';
 
-/**
- * Extract feature/module from request path
- */
+// Derive feature/module name from request path.
 const getFeature = (path) => {
   const parts = path.split('/').filter(Boolean);
   if (parts.length === 0) return 'ROOT';
@@ -24,9 +12,7 @@ const getFeature = (path) => {
   return (parts[0] || 'UNKNOWN').toUpperCase();
 };
 
-/**
- * Filter sensitive data from request body
- */
+// Redact sensitive fields before logging payloads.
 const filterSensitiveData = (data) => {
   if (!data || typeof data !== 'object') return data;
   
@@ -42,19 +28,16 @@ const filterSensitiveData = (data) => {
   return filtered;
 };
 
-/**
- * Request Logger Middleware
- * Logs every incoming HTTP request
- */
+// Request logger middleware.
 export const requestLogger = (req, res, next) => {
-  // Store start time for duration calculation
+  // Store request start timestamp for duration metrics.
   req._startTime = Date.now();
   
   const feature = getFeature(req.path);
   const method = req.method;
   const url = req.originalUrl || req.url;
   
-  // Prepare request data
+  // Build structured request log payload.
   const requestData = {
     body: filterSensitiveData(req.body),
     query: Object.keys(req.query).length > 0 ? req.query : undefined,
@@ -63,28 +46,25 @@ export const requestLogger = (req, res, next) => {
     ip: req.ip || req.connection?.remoteAddress,
   };
   
-  // Log request
+  // Emit request log event.
   logger.request(feature, method, url, requestData);
   
   next();
 };
 
-/**
- * Response Logger Middleware
- * Intercepts response to log outgoing data
- */
+// Response logger middleware.
 export const responseLogger = (req, res, next) => {
-  // Store original send function
+  // Keep original response methods before wrapping.
   const originalSend = res.send;
   const originalJson = res.json;
   
-  // Override res.send
+  // Wrap res.send for response logging.
   res.send = function (data) {
     logResponse(req, res, data);
     return originalSend.call(this, data);
   };
   
-  // Override res.json
+  // Wrap res.json for response logging.
   res.json = function (data) {
     logResponse(req, res, data);
     return originalJson.call(this, data);
@@ -93,9 +73,7 @@ export const responseLogger = (req, res, next) => {
   next();
 };
 
-/**
- * Log response helper
- */
+// Response log helper used by send/json wrappers.
 const logResponse = (req, res, data) => {
   const feature = getFeature(req.path);
   const method = req.method;
@@ -103,12 +81,12 @@ const logResponse = (req, res, data) => {
   const statusCode = res.statusCode;
   const duration = req._startTime ? Date.now() - req._startTime : null;
   
-  // Parse response data
+  // Parse response body for log output.
   let responseData = null;
   try {
     responseData = typeof data === 'string' ? JSON.parse(data) : data;
     
-    // Only log summary for large responses
+    // Keep logs compact for large array responses.
     if (responseData && typeof responseData === 'object') {
       if (Array.isArray(responseData)) {
         responseData = { count: responseData.length, items: '[...]' };
@@ -129,9 +107,7 @@ const logResponse = (req, res, data) => {
   logger.response(feature, method, url, statusCode, responseData, duration);
 };
 
-/**
- * Combined logging middleware
- */
+// Combined middleware that logs both request and response.
 export const loggingMiddleware = (req, res, next) => {
   requestLogger(req, res, () => {
     responseLogger(req, res, next);

@@ -3,17 +3,17 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import LoadingSpinner from "../shared/components/ui/LoadingSpinner";
 
-// Landing
+// Landing page import.
 import Landing from "../features/landing/pages/Landing";
 
-// Auth Pages
+// Authentication page imports.
 import Login from "../features/auth/pages/Login";
 import { Register } from "../features/auth/pages/Register";
 import { VerifyOtp } from "../features/auth/pages/VerifyOtp";
 import ForgotPassword from "../features/auth/pages/ForgotPassword";
 import ResetPassword from "../features/auth/pages/ResetPassword";
 
-// Patient Pages
+// Patient page imports.
 import PatientPortal from "../features/patient/pages/PatientPortal";
 import SearchResults from "../features/patient/pages/SearchResults";
 import MedicineSearch from "../features/patient/pages/MedicineSearch";
@@ -35,7 +35,7 @@ import PatientChat from "../features/patient/pages/PatientChat";
 import OrderSuccess from "../features/patient/pages/OrderSuccess";
 import KhaltiPaymentCallback from "../features/patient/pages/KhaltiPaymentCallback";
 
-// Pharmacy Pages
+// Pharmacy page imports.
 import PharmacyDashboard from "../features/pharmacy/pages/PharmacyDashboard";
 import PharmacyOnboarding from "../features/pharmacy/pages/PharmacyOnboarding";
 import WaitingApproval from "../features/pharmacy/pages/WaitingApproval";
@@ -49,7 +49,7 @@ import PharmacyAnalytics from "../features/pharmacy/pages/PharmacyAnalytics";
 import PharmacyReports from "../features/pharmacy/pages/PharmacyReports";
 import PharmacySettings from "../features/pharmacy/pages/PharmacySettings";
 
-// Admin Pages
+// Admin page imports.
 import AdminDashboardHome from "../features/admin/pages/AdminDashboardHome";
 import AdminPharmacies from "../features/admin/pages/AdminPharmacies";
 import AdminPharmacyDetails from "../features/admin/pages/AdminPharmacyDetails";
@@ -60,24 +60,25 @@ import AdminMap from "../features/admin/pages/AdminMap";
 import AdminInventoryInsight from "../features/admin/pages/AdminInventoryInsight";
 import AdminCMS from "../features/admin/pages/AdminCMS";
 
-// Layouts & Components
+// Shared layouts and route-level wrappers.
 import ProtectedRoute from "./ProtectedRoute";
 import Layout from "../shared/layouts/Layout";
 import PatientLayout from "../shared/layouts/PatientLayout";
 import ProtectedPharmacyLayout from "../shared/layouts/ProtectedPharmacyLayout";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
 
-// Unauthorized page component
+// Unauthorized page shown when user lacks required permissions.
 function UnauthorizedPage() {
   const handleClearSession = () => {
-    console.log('🗑️ Clearing session data');
+    // Clear all persisted auth/session values.
+    console.log("Clearing session data");
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
     localStorage.removeItem("pendingUserId");
     localStorage.removeItem("pendingEmail");
     
-    // Redirect to login
+    // Redirect to login after clearing session.
     window.location.href = '/login';
   };
 
@@ -96,7 +97,7 @@ function UnauthorizedPage() {
           >
             Go to Dashboard
           </button>
-          {/* ✅ TASK 4: Clear stale session button for debugging */}
+          {/* Session reset helper for permission edge cases. */}
           <button
             onClick={handleClearSession}
             className="px-6 py-4 bg-red-600 text-white border-none rounded-lg cursor-pointer hover:opacity-80 transition"
@@ -110,7 +111,7 @@ function UnauthorizedPage() {
   );
 }
 
-// Not Found page component
+// Not-found page for unmatched routes.
 function NotFoundPage() {
   return (
     <Layout>
@@ -131,40 +132,40 @@ function NotFoundPage() {
   );
 }
 
-// Smart Dashboard Router - Routes users to their role-specific dashboard
+// Dashboard router that redirects users by role and pharmacy status.
 function Dashboard() {
   const { user } = useAuth();
 
-  // Route based on roleId
+  // Route by role ID.
   if (user?.roleId === 1) {
-    // System Admin -> Admin Dashboard
+    // System admin goes to admin dashboard.
     return <Navigate to="/admin/dashboard" replace />;
   } else if (user?.roleId === 2) {
-    // Pharmacy Admin -> Status-based routing
+    // Pharmacy admin follows status-based flow.
     const status = user?.status;
 
-    // Check user status first (new workflow)
+    // Route pharmacy user by onboarding/approval status.
     if (status === "ONBOARDING_REQUIRED") {
-      // New user needs to complete onboarding form
+      // User must complete onboarding form first.
       return <Navigate to="/pharmacy/onboarding" replace />;
     } else if (status === "PENDING") {
-      // Onboarding submitted, awaiting admin approval
+      // Waiting for admin approval.
       return <Navigate to="/pharmacy/waiting-approval" replace />;
     } else if (status === "REJECTED") {
-      // Admin rejected the application
+      // Application rejected by admin.
       return <Navigate to="/pharmacy/application-rejected" replace />;
     } else if (status === "APPROVED") {
-      // Approved -> Can access pharmacy dashboard
+      // Approved users can enter pharmacy dashboard.
       return <Navigate to="/pharmacy/dashboard" replace />;
     }
 
     return <Navigate to="/pharmacy/onboarding" replace />;
   } else if (user?.roleId === 3) {
-    // Patient -> Patient Portal
+    // Patient users go to patient portal.
     return <Navigate to="/patient" replace />;
   }
 
-  // Fallback - Generic dashboard
+  // Fallback dashboard for unknown role states.
   return (
     <Layout>
       <div
@@ -190,44 +191,39 @@ function Profile() {
   );
 }
 
-// Route guard for redirecting authenticated users away from auth pages
-// ✅ Route guard for redirecting authenticated users away from auth pages
-// Prevents authenticated users from accessing login/register pages
+// Route guard that blocks authenticated users from auth pages.
 function PublicRoute({ children }) {
   const { isAuthenticated, isInitializing } = useAuth();
 
-  // ✅ PHASE 1: Wait for initialization
-  // Don't redirect authenticated users until we know if they're actually logged in
+  // Wait until auth initialization completes.
   if (isInitializing) {
-    console.log('[PublicRoute] 🔄 INITIALIZING - showing loading spinner');
+    console.log("[PublicRoute] INITIALIZING - showing loading spinner");
     return <LoadingSpinner showText={false} />;
   }
 
-  // ✅ PHASE 2: Check if user is authenticated
-  // If already authenticated, redirect away from login/register pages
+  // Redirect authenticated users away from auth pages.
   if (isAuthenticated) {
-    console.log('[PublicRoute] ✅ AUTHENTICATED - redirecting to dashboard');
+    console.log("[PublicRoute] AUTHENTICATED - redirecting to dashboard");
     return <Navigate to="/dashboard" replace />;
   }
 
-  // ✅ Not authenticated, allow access to public pages (login, register, etc)
-  console.log('[PublicRoute] ✅ NOT AUTHENTICATED - allowing access to public page');
+  // Allow public route access for unauthenticated users.
+  console.log("[PublicRoute] NOT AUTHENTICATED - allowing access to public page");
   return children;
 }
 
-// Pharmacy status gatekeeper (routes enforced by user.status)
-// Routes users to correct pharmacy page based on their approval status
+// Pharmacy status gate that enforces onboarding/approval route flow.
 function PharmacyStatusGate() {
   const { user, isInitializing } = useAuth();
   const location = useLocation();
 
-  // ✅ Wait for initialization to complete
+  // Wait for auth initialization to complete first.
   if (isInitializing) {
-    console.log('[PharmacyStatusGate] 🔄 INITIALIZING');
+    console.log("[PharmacyStatusGate] INITIALIZING");
     return <Outlet />;
   }
 
-  // Only check status for pharmacy users
+  // Only enforce this gate for pharmacy users.
   if (!user || user?.roleId !== 2) {
     return <Outlet />;
   }
@@ -241,6 +237,7 @@ function PharmacyStatusGate() {
     currentPath,
   });
 
+  // Allowed route prefixes by pharmacy status.
   const statusRoutes = {
     ONBOARDING_REQUIRED: ["/pharmacy/onboarding"],
     PENDING: ["/pharmacy/waiting-approval"],
@@ -260,6 +257,7 @@ function PharmacyStatusGate() {
   const allowedPaths = statusRoutes[status] || [];
   const isAllowed = allowedPaths.some((path) => currentPath.startsWith(path));
 
+  // If current path is not allowed for current status, redirect.
   if (!status || !isAllowed) {
     if (status === "PENDING") {
       return <Navigate to="/pharmacy/waiting-approval" replace />;
@@ -281,7 +279,7 @@ function PharmacyStatusGate() {
  * Centralized routing rules with nested protected routes
  */
 export const routes = [
-  // --- PUBLIC ZONE ---
+  // Public routes.
   {
     path: "/",
     element: (
@@ -339,7 +337,7 @@ export const routes = [
     element: <KhaltiPaymentCallback />,
   },
 
-  // --- PATIENT CHAT (Standalone — no Navbar/Footer for immersive UX) ---
+  // Standalone patient chat route.
   {
     path: "/patient/chat",
     element: (
@@ -349,7 +347,7 @@ export const routes = [
     ),
   },
 
-  // --- PATIENT ZONE (Protected) ---
+  // Protected patient routes.
   {
     path: "/patient",
     element: (

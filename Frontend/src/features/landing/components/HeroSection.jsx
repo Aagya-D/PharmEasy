@@ -5,20 +5,7 @@ import heroCardImageOne from "../../../assets/c.jpg";
 import heroCardImageTwo from "../../../assets/do.jpg";
 
 /**
- * Hero Section - Primary Landing Page Entry Point
- * 
- * Architecture Rules:
- * 1. ALWAYS PUBLIC: This page shows the same for everyone
- *    - No login detection
- *    - No auth-specific UI
- *    - Clean, professional landing page
- * 
- * 2. PRIMARY ACTION: "Get Started" button
- *    - Redirects to /login
- *    - Login page handles auth logic and role-based routing
- * 
- * 3. SECONDARY ACTION: "Learn More" button
- *    - Scrolls to features section
+ * Public hero section for the landing page.
  */
 export function HeroSection() {
   const navigate = useNavigate();

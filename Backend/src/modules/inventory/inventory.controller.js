@@ -1,7 +1,4 @@
-/**
- * Inventory Controller - HTTP request handlers for inventory operations
- * Handles medicine CRUD endpoints for pharmacy inventory management
- */
+// Inventory controller for medicine CRUD and image upload workflows.
 
 import inventoryService from "./inventory.service.js";
 import logger from "../../utils/logger.js";
@@ -14,9 +11,12 @@ import { promises as fs } from "fs";
 import crypto from "crypto";
 import cloudinary from "../../config/cloudinary.js";
 
+// Allowed medicine image MIME types.
 const MEDICINE_IMAGE_ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+// Maximum upload size for medicine images.
 const MEDICINE_IMAGE_MAX_SIZE = 4 * 1024 * 1024;
 
+// Multer uploader for memory-buffered medicine image uploads.
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MEDICINE_IMAGE_MAX_SIZE },
@@ -29,8 +29,10 @@ const upload = multer({
   },
 });
 
+// Export upload middleware used by inventory routes.
 export const uploadMedicineImage = upload.single("image");
 
+// Parse boolean-like values from string/number inputs.
 const parseBoolean = (value) => {
   if (value === true || value === false) return value;
   if (typeof value === "string") {
@@ -40,14 +42,17 @@ const parseBoolean = (value) => {
   return false;
 };
 
+// Convert in-memory file buffer into data URI for Cloudinary upload.
 const toUploadDataUri = (file) => `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
 
+// Infer extension from image mime type.
 const toFileExtension = (mimetype) => {
   if (mimetype === "image/png") return "png";
   if (mimetype === "image/webp") return "webp";
   return "jpg";
 };
 
+// Fallback uploader: save image file to local uploads directory.
 const uploadToLocalStorage = async (req, file) => {
   const extension = toFileExtension(file.mimetype);
   const fileName = `medicine_${req.user?.pharmacyId || "unknown"}_${Date.now()}_${crypto.randomUUID()}.${extension}`;
@@ -57,12 +62,16 @@ const uploadToLocalStorage = async (req, file) => {
   const absolutePath = path.join(uploadDir, fileName);
   await fs.writeFile(absolutePath, file.buffer);
 
+  // Return public URL that maps to Express static uploads path.
   return `${req.protocol}://${req.get("host")}/uploads/medicine-images/${fileName}`;
 };
 
+// Resolve medicine image URL from Cloudinary or local fallback storage.
 const resolveMedicineImageUrl = async (req) => {
+  // Keep image URL unchanged when request has no file.
   if (!req.file) return undefined;
 
+  // Prefer Cloudinary when credentials are available, then fall back to local storage.
   const hasCloudinaryCreds =
     Boolean(process.env.CLOUDINARY_CLOUD_NAME) &&
     Boolean(process.env.CLOUDINARY_API_KEY) &&
@@ -81,6 +90,7 @@ const resolveMedicineImageUrl = async (req) => {
         return result.secure_url;
       }
     } catch (error) {
+      // Upload failures should not block the medicine from being saved.
       logger.warn("INVENTORY", "Cloudinary upload failed, falling back to local storage", {
         error: error?.message,
       });
@@ -100,8 +110,10 @@ export const addMedicine = async (req, res, next) => {
   try {
     const pharmacyId = req.user.pharmacyId;
     logger.operation('INVENTORY', 'addMedicine', 'START', { pharmacyId });
+    // The image URL comes from either Cloudinary or the local fallback.
     const imageUrl = await resolveMedicineImageUrl(req);
 
+    // Map and normalize incoming medicine payload.
     const medicineData = {
       name: req.body.name,
       genericName: req.body.genericName,
@@ -112,6 +124,7 @@ export const addMedicine = async (req, res, next) => {
       sideEffects: req.body.sideEffects,
       contraindications: req.body.contraindications,
       warnings: req.body.warnings,
+      // Accept boolean field from both JSON boolean and multipart string.
       isPrescriptionRequired:
         req.body.isPrescriptionRequired === true || req.body.isPrescriptionRequired === "true",
       dosageInstructions: req.body.dosageInstructions,
@@ -129,6 +142,7 @@ export const addMedicine = async (req, res, next) => {
       genericName: medicineData.genericName 
     });
 
+    // Persist medicine row for this pharmacy.
     const inventoryItem = await inventoryService.addMedicine(
       pharmacyId,
       medicineData
@@ -147,7 +161,7 @@ export const addMedicine = async (req, res, next) => {
       data: inventoryItem,
     });
 
-    // Fire-and-forget: check for low stock & expiry alerts
+    // Send alerts after the response so the upload feels fast.
     const ownerId = req.user.userId || req.user.id;
     try {
       if (inventoryItem.quantity > 0 && inventoryItem.quantity < 20) {
@@ -175,6 +189,7 @@ export const getMyInventory = async (req, res, next) => {
   const startTime = Date.now();
   try {
     const pharmacyId = req.user.pharmacyId;
+    // Parse pagination params with safe defaults.
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
 
@@ -184,6 +199,7 @@ export const getMyInventory = async (req, res, next) => {
       limit 
     });
 
+    // Fetch paginated inventory list from service layer.
     const result = await inventoryService.getPharmacyInventory(
       pharmacyId,
       page,
@@ -219,6 +235,7 @@ export const getMyInventory = async (req, res, next) => {
 export const getInventoryItem = async (req, res, next) => {
   const startTime = Date.now();
   try {
+    // Resolve route params and authenticated pharmacy scope.
     const inventoryId = req.params.id;
     const pharmacyId = req.user.pharmacyId;
 
@@ -227,6 +244,7 @@ export const getInventoryItem = async (req, res, next) => {
       pharmacyId,
     });
 
+    // Load one inventory item and enforce ownership at service layer.
     const item = await inventoryService.getInventoryItemById(inventoryId, pharmacyId);
 
     const duration = Date.now() - startTime;
@@ -252,6 +270,7 @@ export const getInventoryItem = async (req, res, next) => {
 export const updateInventoryItem = async (req, res, next) => {
   const startTime = Date.now();
   try {
+    // Resolve item ID and pharmacy scope for ownership checks.
     const inventoryId = req.params.id;
     const pharmacyId = req.user.pharmacyId;
 
@@ -260,7 +279,7 @@ export const updateInventoryItem = async (req, res, next) => {
       pharmacyId 
     });
 
-    // ── Capture BEFORE state for audit delta ──
+    // Save the current record so the audit log can show what changed.
     const beforeItem = await prisma.inventory.findUnique({
       where: { id: inventoryId },
       select: {
@@ -286,8 +305,10 @@ export const updateInventoryItem = async (req, res, next) => {
       },
     });
 
+    // Resolve uploaded replacement image when present.
     const uploadedImageUrl = await resolveMedicineImageUrl(req);
 
+    // Build partial update payload from request body.
     const updateData = {
       name: req.body.name,
       genericName: req.body.genericName,
@@ -309,6 +330,7 @@ export const updateInventoryItem = async (req, res, next) => {
       form: req.body.form,
       manufacturer: req.body.manufacturer,
       batchNumber: req.body.batchNumber,
+      // Keep existing image unless file upload or removeImage flag is provided.
       imageUrl:
         uploadedImageUrl !== undefined
           ? uploadedImageUrl
@@ -317,11 +339,12 @@ export const updateInventoryItem = async (req, res, next) => {
           : undefined,
     };
 
-    // Remove undefined values
+    // Remove fields the client did not send.
     Object.keys(updateData).forEach(key => 
       updateData[key] === undefined && delete updateData[key]
     );
 
+    // Apply inventory update through service with ownership validation.
     const updatedItem = await inventoryService.updateInventoryItem(
       inventoryId,
       pharmacyId,
@@ -335,8 +358,9 @@ export const updateInventoryItem = async (req, res, next) => {
       pharmacyId 
     });
 
-    // ── Audit: full delta + client metadata ──
+    // Store the diff so admins can review the exact change later.
     const actorId = req.user.userId || req.user.id;
+    // Build field-level delta text for audit log message.
     const changedFields = Object.keys(updateData);
     const deltaDesc = changedFields.map(f => {
       const oldVal = beforeItem?.[f];
@@ -383,7 +407,7 @@ export const updateInventoryItem = async (req, res, next) => {
       data: updatedItem,
     });
 
-    // Fire-and-forget: check for low stock & expiry alerts
+    // Alerting runs after the response so it never blocks the update.
     const ownerId = req.user.userId || req.user.id;
     try {
       if (updatedItem.quantity > 0 && updatedItem.quantity < 20) {
@@ -409,6 +433,7 @@ export const updateInventoryItem = async (req, res, next) => {
 export const deleteInventoryItem = async (req, res, next) => {
   const startTime = Date.now();
   try {
+    // Resolve inventory target and authenticated pharmacy.
     const inventoryId = req.params.id;
     const pharmacyId = req.user.pharmacyId;
 
@@ -417,6 +442,7 @@ export const deleteInventoryItem = async (req, res, next) => {
       pharmacyId 
     });
 
+    // Delete item via service with pharmacy ownership check.
     const deletedItem = await inventoryService.deleteInventoryItem(
       inventoryId,
       pharmacyId
@@ -441,6 +467,7 @@ export const deleteInventoryItem = async (req, res, next) => {
     const duration = Date.now() - startTime;
     logger.timing('INVENTORY', 'deleteInventoryItem', duration, 'ERROR');
     logger.operation('INVENTORY', 'deleteInventoryItem', 'ERROR', { error: error.message });
+    console.error('[DELETE ERROR]', error.code, error.message);
     next(error);
   }
 };

@@ -11,13 +11,15 @@ import { getDashboardPath } from "../../../utils/roleHelpers";
 export function VerifyOtp() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { verifyOTP } = useAuth(); // ✅ Use context function
+  // The auth context owns the verification flow and session persistence.
+  const { verifyOTP } = useAuth();
 
   const email =
     location.state?.email || localStorage.getItem("pendingEmail") || "";
   const userId =
     location.state?.userId || localStorage.getItem("pendingUserId") || "";
-  const isFromLogin = location.state?.isFromLogin || false; // Flag from login page
+  // Login and registration use the same screen but different next steps.
+  const isFromLogin = location.state?.isFromLogin || false;
   const stateMessage = location.state?.message || "";
 
   console.log("[VERIFY OTP PAGE] userId:", userId, "type:", typeof userId);
@@ -31,13 +33,15 @@ export function VerifyOtp() {
 
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(stateMessage ? "" : ""); // Clear if state message exists
-  const [timeLeft, setTimeLeft] = useState(300); // 5 minutes — matches OTP_EXPIRY_MINUTES on backend
-  const [resendCooldown, setResendCooldown] = useState(60); // 60-second lock before first resend
+  const [error, setError] = useState(stateMessage ? "" : "");
+  // This countdown matches the backend OTP lifetime.
+  const [timeLeft, setTimeLeft] = useState(300);
+  // Resend stays locked briefly so the page does not spam new OTPs.
+  const [resendCooldown, setResendCooldown] = useState(60);
   const [canResend, setCanResend] = useState(false);
-  const [successMessage, setSuccessMessage] = useState(stateMessage || ""); // Show state message
+  const [successMessage, setSuccessMessage] = useState(stateMessage || "");
 
-  // Check if email is available (userId only needed for new registrations, not from login)
+  // Missing email means the user lost the handoff state and must restart the flow.
   useEffect(() => {
     if (!email) {
       setError("Session expired. Please try again.");
@@ -45,7 +49,7 @@ export function VerifyOtp() {
     }
   }, [email, navigate, isFromLogin]);
 
-  // Main OTP expiry countdown — auto-clears fields when the code expires
+  // Clear the input once the code expires so the user starts with a fresh attempt.
   useEffect(() => {
     if (timeLeft <= 0) {
       setOtp(["", "", "", "", "", ""]);
@@ -57,7 +61,7 @@ export function VerifyOtp() {
     return () => clearInterval(timer);
   }, [timeLeft]);
 
-  // 60-second resend cooldown — independent of the main expiry timer
+  // Track resend cooldown separately from the OTP lifetime.
   useEffect(() => {
     if (resendCooldown <= 0) {
       setCanResend(true);
@@ -82,7 +86,7 @@ export function VerifyOtp() {
     newOtp[index] = value;
     setOtp(newOtp);
 
-    // Auto-focus next input
+    // Move to the next box after a digit is entered.
     if (value && index < 5) {
       const nextInput = document.getElementById(`otp-${index + 1}`);
       nextInput?.focus();
@@ -109,11 +113,11 @@ export function VerifyOtp() {
     setIsLoading(true);
 
     try {
-      // ✅ Use context function instead of API directly
+      // The context will persist the verified session and route the user.
       const result = await verifyOTP(email, otpString);
 
       if (result.success) {
-        // Use helper function for role-based navigation
+        // Route each role to the correct dashboard after verification.
         const user = result.user || { roleId: result.roleId, pharmacy: result.pharmacy };
         const dashboardPath = getDashboardPath(user);
         
@@ -145,8 +149,9 @@ export function VerifyOtp() {
 
     try {
       await authService.resendOTP({ email });
-      setTimeLeft(300);     // Reset 5-minute expiry
-      setResendCooldown(60); // Lock resend for another 60 seconds
+      // Reset both timers so the user gets a full fresh attempt.
+      setTimeLeft(300);
+      setResendCooldown(60);
       setCanResend(false);
       setOtp(["", "", "", "", "", ""]);
       const firstInput = document.getElementById("otp-0");

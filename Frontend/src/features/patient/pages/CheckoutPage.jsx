@@ -47,10 +47,12 @@ export default function CheckoutPage() {
   const { mode, medicineId, medicine, items: selectedItems } = location.state || {};
 
   const checkoutItems = useMemo(() => {
+    // Cart checkout keeps the already selected items.
     if (Array.isArray(selectedItems) && selectedItems.length > 0) {
       return selectedItems;
     }
 
+    // Buy-now flows pass a single medicine object, so we convert it into one line item.
     if (medicine) {
       return [
         {
@@ -66,6 +68,7 @@ export default function CheckoutPage() {
       ];
     }
 
+    // Fall back to the cached medicine snapshot if the route state is missing.
     if (!medicineId) return [];
 
     try {
@@ -112,6 +115,7 @@ export default function CheckoutPage() {
 
   const handleSaveAddress = async (addr) => {
     try {
+      // Save the address through auth so the user profile stays current everywhere.
       const result = await updateShippingAddress(addr);
       setSavedAddress(result?.user?.shippingAddress || addr);
       setShowAddressModal(false);
@@ -124,6 +128,7 @@ export default function CheckoutPage() {
   const handleConfirmOrder = async () => {
     if (!canConfirmOrder) return;
 
+    // Send only identifiers and quantities so the backend can validate the order itself.
     const selectedItemIds = checkoutItems
       .map((item) => item.id || item.cartItemId || item.medicineId)
       .filter(Boolean);
@@ -138,6 +143,7 @@ export default function CheckoutPage() {
 
     try {
       setPlacingOrder(true);
+      // Build the exact payload expected by the checkout endpoint.
       const response = await patientService.placeOrderFromCart({
         mode: mode || "cart",
         itemIds: selectedItemIds,
@@ -164,10 +170,16 @@ export default function CheckoutPage() {
         longitude: savedAddress._lng ?? null,
       });
 
-      const order = response?.data?.order || null;
+      const orders = Array.isArray(response?.data?.orders)
+        ? response.data.orders
+        : response?.data?.order
+        ? [response.data.order]
+        : [];
+      const order = orders[0] || null;
       const payment = response?.data?.payment || null;
 
       if (paymentMethod === "KHALTI") {
+        // Khalti redirects the browser, so stop once we receive the payment URL.
         const paymentUrl = payment?.paymentUrl;
         if (!paymentUrl) {
           throw new Error("Khalti payment link was not received from server");
@@ -179,10 +191,12 @@ export default function CheckoutPage() {
       }
 
       await refreshCart();
+      // Only move to the success page after the cart state has been refreshed.
       toast.success("Order placed successfully!");
       navigate("/patient/order-success", {
         state: {
           order,
+          orders,
           placedAt: new Date().toISOString(),
         },
       });
@@ -206,7 +220,7 @@ export default function CheckoutPage() {
       <div className="min-h-screen bg-slate-50 py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-          {/* Back */}
+          {/* Back button */}
           <button
             onClick={() => navigate(-1)}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors text-sm font-medium"
@@ -215,7 +229,7 @@ export default function CheckoutPage() {
             Back
           </button>
 
-          {/* Page Title */}
+          {/* Page title */}
           <div className="mt-5 mb-6">
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Checkout</h1>
             <p className="text-slate-500 mt-1 text-sm">
@@ -227,10 +241,10 @@ export default function CheckoutPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-            {/* ── Left Column ── */}
+            {/* Left column */}
             <div className="lg:col-span-2 space-y-5">
 
-              {/* 1. Shipping Address */}
+              {/* Shipping address */}
               <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -278,7 +292,7 @@ export default function CheckoutPage() {
                 )}
               </section>
 
-              {/* 2. Package Items */}
+              {/* Package items */}
               <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                 <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <Package size={17} className="text-blue-600" />
@@ -297,7 +311,7 @@ export default function CheckoutPage() {
                         key={item.id || `${item.medicineName}-${idx}`}
                         className="flex items-start gap-4 py-4 first:pt-0 last:pb-0"
                       >
-                        {/* Rx Icon */}
+                        {/* Item icon */}
                         <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
                           <span className="text-xs font-extrabold text-blue-600 tracking-tighter">Rx</span>
                         </div>
@@ -331,7 +345,7 @@ export default function CheckoutPage() {
                 )}
               </section>
 
-              {/* 3. Payment Method */}
+              {/* Payment method */}
               <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
                 <h2 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-4">
                   <Wallet size={17} className="text-blue-600" />
@@ -339,7 +353,7 @@ export default function CheckoutPage() {
                 </h2>
 
                 <div className="flex flex-col sm:flex-row gap-3">
-                  {/* Cash on Delivery */}
+                  {/* Cash on delivery */}
                   <button
                     type="button"
                     onClick={() => setPaymentMethod("CASH_ON_DELIVERY")}
@@ -399,7 +413,7 @@ export default function CheckoutPage() {
                     )}
                   </button>
 
-                  {/* eSewa — Coming Soon */}
+                  {/* eSewa is not available yet. */}
                   <button
                     type="button"
                     disabled
@@ -420,10 +434,10 @@ export default function CheckoutPage() {
               </section>
             </div>
 
-            {/* ── Right Sidebar ── */}
+            {/* Right sidebar */}
             <aside className="lg:sticky lg:top-24 space-y-4">
 
-              {/* Invoice Info */}
+              {/* Invoice info */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
                 <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-3">
                   Invoice Info
@@ -448,7 +462,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* Order Detail */}
+              {/* Order summary */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
                 <p className="text-base font-bold text-slate-900 mb-4">Order Detail</p>
 

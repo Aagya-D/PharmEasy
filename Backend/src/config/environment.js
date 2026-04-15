@@ -1,14 +1,13 @@
 /**
- * Environment Configuration
- * Centralized configuration management for all environment variables
+ * Central place for reading and validating environment settings.
  */
 
 import dotenv from "dotenv";
 
-// Load environment variables from .env file
+// Load variables from .env before reading any config values.
 dotenv.config();
 
-// Validation function to ensure required variables are set
+// Read an environment variable and warn when it is missing.
 const validateEnv = (variable, defaultValue = null) => {
   const value = process.env[variable];
   if (!value && !defaultValue) {
@@ -17,12 +16,9 @@ const validateEnv = (variable, defaultValue = null) => {
   return value || defaultValue;
 };
 
-/**
- * Environment Configuration Object
- * Access: import config from './config/environment.js'
- */
+// Shared application configuration.
 const config = {
-  // Application Configuration
+  // App settings
   app: {
     name: "PharmEasy",
     version: "1.0.0",
@@ -32,86 +28,82 @@ const config = {
     corsOrigin: validateEnv("CORS_ORIGIN", "http://localhost:5173"),
   },
 
-  // Database Configuration
+  // Database settings
   database: {
     url: validateEnv("DATABASE_URL"),
     poolMin: parseInt(validateEnv("DB_POOL_MIN", "2"), 10),
     poolMax: parseInt(validateEnv("DB_POOL_MAX", "10"), 10),
   },
 
-  // JWT Configuration
+  // Token settings
   jwt: {
-    // Access Token (short-lived, used for authenticated requests)
+    // Access tokens are short lived and used on authenticated requests.
     accessSecret: validateEnv(
       "JWT_ACCESS_SECRET",
       "your-secret-key-change-in-production"
     ),
-    accessExpiry: validateEnv("JWT_ACCESS_EXPIRY", "15m"), // 15 minutes
+    accessExpiry: validateEnv("JWT_ACCESS_EXPIRY", "15m"),
 
-    // Refresh Token (long-lived, used to get new access tokens)
+    // Refresh tokens live longer so the user does not log in too often.
     refreshSecret: validateEnv(
       "JWT_REFRESH_SECRET",
       "your-refresh-secret-key-change-in-production"
     ),
-    refreshExpiry: validateEnv("JWT_REFRESH_EXPIRY", "7d"), // 7 days
+    refreshExpiry: validateEnv("JWT_REFRESH_EXPIRY", "7d"),
 
-    // Reset Token (single-use, for password reset)
+    // Reset tokens are single use and only for password resets.
     resetSecret: validateEnv(
       "JWT_RESET_SECRET",
       "your-reset-secret-key-change-in-production"
     ),
-    resetExpiry: validateEnv("JWT_RESET_EXPIRY", "1h"), // 1 hour
+    resetExpiry: validateEnv("JWT_RESET_EXPIRY", "1h"),
   },
 
-  // SMTP Configuration (Email Service)
+  // Email settings
   smtp: {
     host: validateEnv("SMTP_HOST", "smtp.gmail.com"),
     port: parseInt(validateEnv("SMTP_PORT", "587"), 10),
-    secure: validateEnv("SMTP_SECURE", "false") === "true", // true for 465, false for other ports
+    secure: validateEnv("SMTP_SECURE", "false") === "true",
     user: validateEnv("SMTP_USER"),
     password: validateEnv("SMTP_PASSWORD"),
     fromEmail: validateEnv("SMTP_FROM_EMAIL", "noreply@pharmeasy.com"),
     fromName: validateEnv("SMTP_FROM_NAME", "PharmEasy"),
   },
 
-  // Frontend Configuration
+  // Frontend settings
   frontend: {
     url: validateEnv("FRONTEND_URL", "http://localhost:3000"),
-    passwordResetPath: "/auth/reset-password", // Append token: /auth/reset-password?token=xxx
+    passwordResetPath: "/auth/reset-password",
   },
 
-  // Rate Limiting Configuration
+  // Rate limits
   rateLimiting: {
-    // Prevent brute force attacks on registration
     register: {
       maxRequests: 5,
-      windowMs: 60 * 60 * 1000, // 1 hour
+      windowMs: 60 * 60 * 1000,
     },
-    // Prevent OTP spam
     otpResend: {
       maxRequests: 3,
-      windowMs: 10 * 60 * 1000, // 10 minutes
+      windowMs: 10 * 60 * 1000,
     },
-    // Prevent login brute force
     login: {
       maxRequests: 5,
-      windowMs: 15 * 60 * 1000, // 15 minutes
+      windowMs: 15 * 60 * 1000,
     },
-    // Prevent password reset spam
     passwordReset: {
       maxRequests: 3,
-      windowMs: 60 * 60 * 1000, // 1 hour
+      windowMs: 60 * 60 * 1000,
     },
   },
 
-  // OTP Configuration
+  // OTP settings
   otp: {
-    expiryMinutes: 10, // OTP valid for 10 minutes
-    maxResends: 5, // Maximum OTP resend attempts
-    maxVerifyAttempts: 3, // Maximum wrong OTP attempts before blocking
+    expiryMinutes: 10,
+    maxResends: 5,
+    maxVerifyAttempts: 3,
   },
 
-  // Features
+  // Feature flags
   features: {
     emailVerification:
       validateEnv("REQUIRE_EMAIL_VERIFICATION", "true") === "true",
@@ -120,7 +112,7 @@ const config = {
     auditLogging: validateEnv("ENABLE_AUDIT_LOGGING", "true") === "true",
   },
 
-  // Logging
+  // Logging settings
   logging: {
     level: validateEnv("LOG_LEVEL", "info"),
     enableConsole: validateEnv("LOG_CONSOLE", "true") === "true",
@@ -128,17 +120,14 @@ const config = {
     logFilePath: validateEnv("LOG_FILE_PATH", "./logs"),
   },
 
-  // Security
+  // Security settings
   security: {
-    // Bcrypt configuration for password hashing
     bcryptSaltRounds: parseInt(validateEnv("BCRYPT_SALT_ROUNDS", "12"), 10),
-    // Content Security Policy headers
     enableCSP: validateEnv("ENABLE_CSP", "true") === "true",
-    // HSTS headers
     enableHSTS: validateEnv("ENABLE_HSTS", "true") === "true",
   },
 
-  // API Keys (if needed for third-party services)
+  // Third-party API keys
   apiKeys: {
     googleMapsKey: validateEnv("GOOGLE_MAPS_API_KEY"),
     twilioSid: validateEnv("TWILIO_ACCOUNT_SID"),
@@ -147,24 +136,16 @@ const config = {
   },
 };
 
-/**
- * Helper function to check if running in development
- */
+// Check whether the app is running in development.
 config.isDevelopment = () => config.app.environment === "development";
 
-/**
- * Helper function to check if running in production
- */
+// Check whether the app is running in production.
 config.isProduction = () => config.app.environment === "production";
 
-/**
- * Helper function to check if running in test
- */
+// Check whether the app is running in test.
 config.isTest = () => config.app.environment === "test";
 
-/**
- * Validate critical configuration on startup
- */
+// Fail fast when required production variables are missing.
 const validateCriticalConfig = () => {
   const criticalVars = [
     "DATABASE_URL",
@@ -184,7 +165,7 @@ const validateCriticalConfig = () => {
   }
 };
 
-// Run validation
+// Validate the environment before the app starts.
 validateCriticalConfig();
 
 export default config;

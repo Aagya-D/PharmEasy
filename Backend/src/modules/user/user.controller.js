@@ -3,16 +3,20 @@ import { CloudinaryStorage } from "multer-storage-cloudinary";
 import cloudinary from "../../config/cloudinary.js";
 import { prisma } from "../../database/prisma.js";
 
+// Cloudinary-backed storage for profile avatar uploads.
 const avatarStorage = new CloudinaryStorage({
   cloudinary,
   params: async (req, file) => {
+    // Derive output extension from uploaded MIME type.
     const extension = file.mimetype?.split("/")?.[1] || "jpg";
 
     return {
+      // Store avatars in dedicated folder with user-scoped public ID.
       folder: "users/avatars",
       public_id: `avatar_${req.user?.userId || "unknown"}_${Date.now()}`,
       format: extension,
       resource_type: "image",
+      // Apply face-centered square crop for consistent avatar display.
       transformation: [
         { width: 400, height: 400, crop: "fill", gravity: "face" },
         { quality: "auto:good" },
@@ -22,6 +26,7 @@ const avatarStorage = new CloudinaryStorage({
   },
 });
 
+// File filter that allows only image MIME types.
 const fileFilter = (req, file, cb) => {
   const allowedMimeTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
   if (!allowedMimeTypes.includes(file.mimetype)) {
@@ -32,6 +37,7 @@ const fileFilter = (req, file, cb) => {
   cb(null, true);
 };
 
+// Multer uploader for single avatar field.
 const upload = multer({
   storage: avatarStorage,
   fileFilter,
@@ -42,8 +48,10 @@ const upload = multer({
 
 export const uploadAvatar = upload.single("avatar");
 
+// Update authenticated user's avatar URL.
 export const updateAvatar = async (req, res, next) => {
   try {
+    // Resolve authenticated user ID.
     const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({
@@ -52,6 +60,7 @@ export const updateAvatar = async (req, res, next) => {
       });
     }
 
+    // Uploaded avatar file is required.
     if (!req.file?.path) {
       return res.status(400).json({
         success: false,
@@ -59,6 +68,7 @@ export const updateAvatar = async (req, res, next) => {
       });
     }
 
+    // Persist avatar URL on user profile.
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: { avatarUrl: req.file.path },

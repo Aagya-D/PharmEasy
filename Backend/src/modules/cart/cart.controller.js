@@ -26,6 +26,7 @@ const cartInclude = {
 };
 
 const getOrCreateCart = async (userId) => {
+  // Every user gets one cart, and this creates it on demand.
   return prisma.cart.upsert({
     where: { userId },
     update: {},
@@ -40,6 +41,7 @@ export const getCart = async (req, res) => {
   }
 
   try {
+    // Return the full cart so the frontend can render it in one request.
     const cart = await prisma.cart.upsert({
       where: { userId },
       update: {},
@@ -93,30 +95,8 @@ export const addToCart = async (req, res) => {
   }
 
   try {
+    // Start from the current user's cart so items never leak across accounts.
     const cart = await getOrCreateCart(userId);
-
-    const existingItem = await prisma.cartItem.findFirst({
-      where: { cartId: cart.id },
-      orderBy: { createdAt: "asc" },
-      select: {
-        pharmacyId: true,
-        pharmacyName: true,
-      },
-    });
-
-    if (existingItem && existingItem.pharmacyId !== String(pharmacyId)) {
-      return res.status(409).json({
-        success: false,
-        errorCode: "PHARMACY_MISMATCH",
-        message: "Your cart contains items from a different pharmacy.",
-        data: {
-          existingPharmacyId: existingItem.pharmacyId,
-          existingPharmacyName: existingItem.pharmacyName,
-          incomingPharmacyId: String(pharmacyId),
-          incomingPharmacyName: pharmacyName || null,
-        },
-      });
-    }
 
     await prisma.cartItem.upsert({
       where: {
@@ -180,6 +160,7 @@ export const updateQuantity = async (req, res) => {
   }
 
   try {
+    // Reload the cart after the change so totals stay current in the UI.
     const cart = await getOrCreateCart(userId);
 
     const existing = await prisma.cartItem.findFirst({
@@ -242,6 +223,7 @@ export const removeItem = async (req, res) => {
   }
 
   try {
+    // Remove only the item that belongs to this user's cart.
     const cart = await getOrCreateCart(userId);
     const deleted = await prisma.cartItem.deleteMany({
       where: {

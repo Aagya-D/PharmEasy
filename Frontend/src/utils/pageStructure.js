@@ -1,16 +1,13 @@
 /**
- * Page Organization Index
- * Reference for organized folder structure
+ * Page paths grouped by area of the app.
  */
 
 export const PAGE_STRUCTURE = {
-  // Public Pages
   public: {
     Landing: "/pages/Landing.jsx",
     NotificationCenter: "/pages/NotificationCenter.jsx",
   },
 
-  // Authentication Pages
   auth: {
     Login: "/pages/auth/Login.jsx",
     Register: "/pages/auth/Register.jsx",
@@ -19,14 +16,12 @@ export const PAGE_STRUCTURE = {
     ResetPassword: "/pages/auth/ResetPassword.jsx",
   },
 
-  // Patient Pages (roleId = 3)
   patient: {
     PatientPortal: "/pages/patient/PatientPortal.jsx",
     SearchResults: "/pages/patient/SearchResults.jsx",
     EmergencySOS: "/pages/patient/EmergencySOS.jsx",
   },
 
-  // Pharmacy Pages (roleId = 2)
   pharmacy: {
     PharmacyDashboard: "/pages/pharmacy/PharmacyDashboard.jsx",
     PharmacyOnboarding: "/pages/pharmacy/PharmacyOnboarding.jsx",
@@ -34,16 +29,15 @@ export const PAGE_STRUCTURE = {
     ApplicationRejected: "/pages/pharmacy/ApplicationRejected.jsx",
   },
 
-  // Admin Pages (roleId = 1)
   admin: {
     AdminDashboard: "/pages/admin/AdminDashboard.jsx",
   },
 };
 
 export const ROLE_PAGES = {
-  1: "admin", // System Admin
-  2: "pharmacy", // Pharmacy Admin
-  3: "patient", // Patient
+  1: "admin",
+  2: "pharmacy",
+  3: "patient",
 };
 
 export const ACCESS_RULES = {

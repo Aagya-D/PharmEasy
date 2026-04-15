@@ -1,7 +1,5 @@
 /**
- * Frontend Logger & State Audit System
- * Tracks user actions, API calls, state changes, and errors
- * Production-ready with environment-based logging levels
+ * Frontend logger for app events, API calls, state changes, and errors.
  */
 
 const LOG_LEVELS = {
@@ -17,13 +15,11 @@ class Logger {
     this.currentLevel = this.getLogLevel();
     this.sessionId = this.generateSessionId();
     this.logs = [];
-    this.maxLogs = 100; // Keep last 100 logs in memory
+    this.maxLogs = 100;
     this.initialized = false;
   }
 
-  /**
-   * Get log level from environment or default to INFO
-   */
+  // Read the log level from the current environment.
   getLogLevel() {
     const env = import.meta.env.MODE || "development";
     if (env === "production") return LOG_LEVELS.WARN;
@@ -31,16 +27,12 @@ class Logger {
     return LOG_LEVELS.DEBUG;
   }
 
-  /**
-   * Generate unique session ID for tracking
-   */
+  // Generate a session ID for the current browser tab.
   generateSessionId() {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  /**
-   * Initialize logger with user context
-   */
+  // Store the current user context.
   init(userId = null, userRole = null) {
     this.userId = userId;
     this.userRole = userRole;
@@ -48,9 +40,7 @@ class Logger {
     this.info("Logger initialized", { userId, userRole, sessionId: this.sessionId });
   }
 
-  /**
-   * Format log entry
-   */
+  // Build a log record.
   formatLog(level, message, data = {}) {
     return {
       timestamp: new Date().toISOString(),
@@ -65,9 +55,7 @@ class Logger {
     };
   }
 
-  /**
-   * Store log in memory (circular buffer)
-   */
+  // Keep a small in-memory log history.
   storeLog(logEntry) {
     this.logs.push(logEntry);
     if (this.logs.length > this.maxLogs) {
@@ -75,16 +63,13 @@ class Logger {
     }
   }
 
-  /**
-   * Core logging method
-   */
+  // Shared logger entry point.
   log(level, levelName, message, data = {}) {
     if (level > this.currentLevel) return;
 
     const logEntry = this.formatLog(levelName, message, data);
     this.storeLog(logEntry);
 
-    // Console output with colors
     const styles = {
       ERROR: "color: #ff4444; font-weight: bold",
       WARN: "color: #ff9800; font-weight: bold",
@@ -99,36 +84,28 @@ class Logger {
       data
     );
 
-    // Send to backend in production (optional)
     if (level === LOG_LEVELS.ERROR && import.meta.env.MODE === "production") {
       this.sendToBackend(logEntry);
     }
   }
 
-  /**
-   * ERROR: Critical errors that need immediate attention
-   * IMPORTANT: Always pass Error objects, never strings
-   */
+  // Log an error.
   error(message, error = null) {
-    // Safely extract error information
     let errorData = {};
     
     if (error) {
       if (typeof error === 'string') {
-        // ✅ Handle string errors safely (don't spread)
         errorData = {
           message: error,
           stack: undefined,
         };
       } else if (error instanceof Error) {
-        // ✅ Handle Error objects properly
         errorData = {
           name: error.name,
           message: error.message,
           stack: error.stack,
         };
       } else if (typeof error === 'object' && error !== null) {
-        // ✅ Handle plain objects (Axios errors, etc)
         errorData = {
           message: error.message || JSON.stringify(error),
           ...(error.code && { code: error.code }),
@@ -141,44 +118,32 @@ class Logger {
     this.log(LOG_LEVELS.ERROR, "ERROR", message, errorData);
   }
 
-  /**
-   * SUCCESS: Successful operations (alias for INFO with success context)
-   */
+  // Log a successful action.
   success(message, data = {}) {
     this.log(LOG_LEVELS.INFO, "SUCCESS", message, data);
   }
 
-  /**
-   * WARN: Warning messages for potential issues
-   */
+  // Log a warning.
   warn(message, data = {}) {
     this.log(LOG_LEVELS.WARN, "WARN", message, data);
   }
 
-  /**
-   * INFO: General information about application flow
-   */
+  // Log a general message.
   info(message, data = {}) {
     this.log(LOG_LEVELS.INFO, "INFO", message, data);
   }
 
-  /**
-   * DEBUG: Detailed debugging information
-   */
+  // Log debug details.
   debug(message, data = {}) {
     this.log(LOG_LEVELS.DEBUG, "DEBUG", message, data);
   }
 
-  /**
-   * TRACE: Very detailed tracing information
-   */
+  // Log trace details.
   trace(message, data = {}) {
     this.log(LOG_LEVELS.TRACE, "TRACE", message, data);
   }
 
-  /**
-   * Log user authentication events
-   */
+  // Log auth events.
   authEvent(event, data = {}) {
     this.info(`AUTH: ${event}`, {
       event,
@@ -187,11 +152,8 @@ class Logger {
     });
   }
 
-  /**
-   * Log API calls with enhanced formatting
-   */
+  // Log an API call.
   apiCall(method, url, statusOrData = null, responseTime = null, additionalData = {}) {
-    // Handle both old and new call signatures
     let status = null;
     let data = additionalData;
     
@@ -202,11 +164,10 @@ class Logger {
     }
 
     const feature = data.feature || 'API';
-    const direction = status ? '←' : '→';
     const statusText = status ? `[${status}]` : '';
     const timeText = responseTime ? `(${responseTime}ms)` : '';
     
-    this.debug(`${direction} ${feature} ${statusText} ${method} ${url} ${timeText}`.trim(), {
+    this.debug(`${feature} ${statusText} ${method} ${url} ${timeText}`.trim(), {
       method,
       url,
       ...(status && { status }),
@@ -215,15 +176,13 @@ class Logger {
     });
   }
 
-  /**
-   * Log API errors with enhanced formatting
-   */
+  // Log an API error.
   apiError(method, url, errorData) {
     const feature = errorData.feature || 'API';
     const status = errorData.status || 'ERR';
     const timeText = errorData.duration ? `(${errorData.duration}ms)` : '';
     
-    this.error(`✖ ${feature} [${status}] ${method} ${url} ${timeText}`.trim(), {
+    this.error(`${feature} [${status}] ${method} ${url} ${timeText}`.trim(), {
       method,
       url,
       status: errorData.status,
@@ -232,9 +191,7 @@ class Logger {
     });
   }
 
-  /**
-   * Log navigation events
-   */
+  // Log navigation changes.
   navigation(from, to, params = {}) {
     this.info(`NAVIGATION: ${from} → ${to}`, {
       from,
@@ -243,9 +200,7 @@ class Logger {
     });
   }
 
-  /**
-   * Log state changes
-   */
+  // Log state changes.
   stateChange(stateName, previousValue, newValue) {
     this.debug(`STATE: ${stateName} changed`, {
       stateName,
@@ -254,9 +209,7 @@ class Logger {
     });
   }
 
-  /**
-   * Log user actions
-   */
+  // Log user actions.
   userAction(action, details = {}) {
     this.info(`USER_ACTION: ${action}`, {
       action,
@@ -264,9 +217,7 @@ class Logger {
     });
   }
 
-  /**
-   * Log form submissions
-   */
+  // Log form submits.
   formSubmit(formName, success, errors = null) {
     if (success) {
       this.info(`FORM: ${formName} submitted successfully`);
@@ -275,16 +226,12 @@ class Logger {
     }
   }
 
-  /**
-   * Log pharmacy-specific events
-   */
+  // Log pharmacy events.
   pharmacyEvent(event, data = {}) {
     this.info(`PHARMACY: ${event}`, data);
   }
 
-  /**
-   * Log admin actions
-   */
+  // Log admin actions.
   adminAction(action, targetId, data = {}) {
     this.info(`ADMIN: ${action}`, {
       action,
@@ -293,24 +240,18 @@ class Logger {
     });
   }
 
-  /**
-   * Get all logs (for debugging)
-   */
+  // Return the stored logs.
   getLogs() {
     return this.logs;
   }
 
-  /**
-   * Clear logs
-   */
+  // Clear the stored logs.
   clearLogs() {
     this.logs = [];
     this.info("Logs cleared");
   }
 
-  /**
-   * Export logs as JSON (for debugging)
-   */
+  // Export logs as JSON.
   exportLogs() {
     const logsJson = JSON.stringify(this.logs, null, 2);
     const blob = new Blob([logsJson], { type: "application/json" });

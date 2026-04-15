@@ -1,31 +1,26 @@
-/**
- * Error Handling Middleware
- * Centralized error handling for all routes
- */
+// Centralized error handling for the backend.
 
 import logger from '../utils/logger.js';
 
 export class AppError extends Error {
   constructor(message, statusCode) {
+    // Store custom status code for controlled API errors.
     super(message);
     this.statusCode = statusCode;
     Error.captureStackTrace(this, this.constructor);
   }
 }
 
-/**
- * Global error handler middleware
- * Catches and formats all errors
- */
+// Format all errors into a consistent API response.
 export const errorHandler = (err, req, res, next) => {
-  // Default error status
+  // Start with the default error status.
   let statusCode = err.statusCode || 500;
   let message = err.message || "Internal server error";
 
-  // Determine feature from request path
+  // Use the request path to label the affected feature.
   const feature = req.path.split('/').filter(Boolean)[1]?.toUpperCase() || 'API';
 
-  // Log error with full context
+  // Log the error with request context.
   logger.error(feature, `${req.method} ${req.path} - ${message}`, {
     statusCode,
     message,
@@ -38,7 +33,7 @@ export const errorHandler = (err, req, res, next) => {
     query: process.env.NODE_ENV === 'development' ? req.query : undefined,
   });
 
-  // Handle custom error classes (from utils/errors.js)
+  // Map custom error classes to HTTP status codes.
   if (err.name === "BadRequestError" || err.name === "ValidationError") {
     statusCode = 400;
   }
@@ -59,7 +54,7 @@ export const errorHandler = (err, req, res, next) => {
     statusCode = 409;
   }
 
-  // Handle JWT errors
+  // Handle JWT errors.
   if (err.name === "JsonWebTokenError") {
     statusCode = 401;
     message = "Invalid token";
@@ -70,23 +65,23 @@ export const errorHandler = (err, req, res, next) => {
     message = "Token has expired";
   }
 
-  // Handle Prisma errors
   if (err.code === "P2002") {
+    // Prisma unique-constraint violation.
     statusCode = 409;
     message = "This email is already registered";
   }
 
   if (err.code === "P2025") {
+    // Prisma record-not-found operation.
     statusCode = 404;
     message = "Resource not found";
   }
 
-  // CRITICAL: Ensure headers haven't been sent
   if (res.headersSent) {
+    // Delegate to default Express handler when response is already sent.
     return next(err);
   }
 
-  // Send error response
   res.status(statusCode).json({
     success: false,
     error: {
@@ -97,18 +92,16 @@ export const errorHandler = (err, req, res, next) => {
   });
 };
 
-/**
- * Async route wrapper (catches async errors)
- */
+// Wrap async routes so errors reach the handler.
 export const asyncHandler = (fn) => (req, res, next) => {
+  // Convert rejected async handlers into Express next(err) calls.
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
-/**
- * Request validation middleware
- */
+// Validate incoming requests against a schema.
 export const validateRequest = (schema) => {
   return (req, res, next) => {
+    // Validate request body using provided schema.
     const { error, value } = schema.validate(req.body);
 
     if (error) {
@@ -122,6 +115,7 @@ export const validateRequest = (schema) => {
       });
     }
 
+    // Replace request body with validated/sanitized value.
     req.body = value;
     next();
   };

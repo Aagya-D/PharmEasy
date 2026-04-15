@@ -3,16 +3,13 @@ import { useAuth } from "../../context/AuthContext";
 import Sidebar from "../components/Sidebar";
 
 /**
- * Dashboard Layout Wrapper
- * - Includes Sidebar for authenticated dashboard routes
- * - Only for role-specific protected pages (pharmacy, admin, patient)
- * - Separate from public Layout to ensure clean separation
+ * Dashboard layout for authenticated sections that can use the shared sidebar shell.
  */
 export function DashboardLayout({ children }) {
   const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Only show sidebar for pharmacy admins
+  // Only pharmacy users use this dashboard sidebar.
   const showSidebar = user?.roleId === 2;
 
   return (
@@ -27,7 +24,7 @@ export function DashboardLayout({ children }) {
                 onClick={() => setSidebarOpen(true)}
                 className="inline-flex items-center gap-2 text-sm font-medium text-slate-700"
               >
-                ☰ Menu
+                Menu
               </button>
             </div>
             <main className="flex-1 w-full">{children}</main>

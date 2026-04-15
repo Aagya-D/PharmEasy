@@ -7,6 +7,11 @@ export default function OrderSuccess() {
   const location = useLocation();
 
   const order = location.state?.order || null;
+  const orders = Array.isArray(location.state?.orders)
+    ? location.state.orders
+    : order
+    ? [order]
+    : [];
   const orderId = order?.id || "Pending ID";
 
   return (
@@ -25,6 +30,24 @@ export default function OrderSuccess() {
           <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-5">
             <p className="text-xs uppercase tracking-widest text-slate-500 font-semibold">Order ID</p>
             <p className="mt-2 text-2xl font-bold text-slate-900 break-all">#{orderId}</p>
+            {orders.length > 1 && (
+              <div className="mt-3 border-t border-slate-200 pt-3 text-left">
+                <p className="text-xs uppercase tracking-widest text-slate-500 font-semibold">Split Orders</p>
+                <p className="mt-1 text-sm text-slate-700">
+                  Your checkout was split into {orders.length} pharmacy orders:
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {orders.map((entry) => (
+                    <span
+                      key={entry.id}
+                      className="rounded-full bg-white border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700"
+                    >
+                      #{entry.id}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3">

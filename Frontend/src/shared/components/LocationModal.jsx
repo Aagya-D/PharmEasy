@@ -41,9 +41,7 @@ const userIcon = new L.Icon({
   shadowSize: [41, 41],
 });
 
-/**
- * DraggableMarker - Allows user to drag pin to correct their location
- */
+/** Allows the user to drag the map pin to adjust the selected location. */
 function DraggableMarker({ position, onPositionChange }) {
   const markerRef = useRef(null);
 
@@ -71,9 +69,7 @@ function DraggableMarker({ position, onPositionChange }) {
   );
 }
 
-/**
- * RecenterMap - Fly map to new center when position changes
- */
+/** Recenter the map when the selected position changes. */
 function RecenterMap({ center, zoom }) {
   const map = useMap();
   useEffect(() => {
@@ -85,21 +81,7 @@ function RecenterMap({ center, zoom }) {
 }
 
 /**
- * LocationModal Component
- * 
- * Professional, searchable modal for selecting location across all 77 Nepal districts
- * Features:
- * - Real-time search by district/city/province
- * - GPS detection with geolocation API
- * - Mini-map preview with draggable pin for visual confirmation
- * - Popular cities quick selection
- * - Province-based filtering for organized browsing
- * - Scrollable districts list with province/district information
- * - Smooth animations and transitions
- * 
- * @param {Object} props
- * @param {boolean} props.isOpen - Controls modal visibility
- * @param {Function} props.onClose - Called when modal should close
+ * Modal for selecting a location across Nepal with search, GPS detection, and map confirmation.
  */
 export default function LocationModal({ isOpen, onClose }) {
   const { selectedLocation, updateLocation, confirmExactLocation, detectLocation, isLoading } = useLocation();
@@ -116,18 +98,16 @@ export default function LocationModal({ isOpen, onClose }) {
   const [detectedLocationInfo, setDetectedLocationInfo] = useState(null);
   const [nearestCityName, setNearestCityName] = useState("");
 
-  /**
-   * Handle search input - filter locations in real-time
-   */
+  // Filter locations as the user types.
   useEffect(() => {
     let results = searchLocations(searchQuery);
 
-    // Filter by province if selected
+    // Keep only the selected province when a province filter is active.
     if (selectedProvince) {
       results = results.filter((loc) => loc.province === selectedProvince);
     }
 
-    // Remove duplicates by name
+    // Remove duplicate names from the list.
     const seen = new Set();
     results = results.filter((loc) => {
       if (seen.has(loc.name)) return false;
@@ -138,9 +118,7 @@ export default function LocationModal({ isOpen, onClose }) {
     setFilteredLocations(results.sort((a, b) => a.name.localeCompare(b.name)));
   }, [searchQuery, selectedProvince]);
 
-  /**
-   * Update nearest city name when pin is dragged
-   */
+  // Update the nearest city when the pin moves.
   const handlePinDrag = (lat, lng) => {
     setPinPosition([lat, lng]);
     const nearest = findLocationByCoordinates(lat, lng);
@@ -150,10 +128,7 @@ export default function LocationModal({ isOpen, onClose }) {
     }
   };
 
-  /**
-   * Handle Detect My Location using Geolocation API
-   * Shows mini-map for visual confirmation
-   */
+  // Detect the current location and open the map preview for confirmation.
   const handleDetectLocation = async () => {
     setDetectingLocation(true);
     const detectedLocation = await detectLocation();
@@ -163,7 +138,7 @@ export default function LocationModal({ isOpen, onClose }) {
       const rawLat = detectedLocation._rawLat || detectedLocation.lat;
       const rawLng = detectedLocation._rawLng || detectedLocation.lng;
 
-      // Show map preview with pin at raw GPS location
+      // Show the map preview at the raw GPS coordinates.
       setPinPosition([rawLat, rawLng]);
       setMapCenter([rawLat, rawLng]);
       setDetectedLocationInfo(detectedLocation);
@@ -172,9 +147,7 @@ export default function LocationModal({ isOpen, onClose }) {
     }
   };
 
-  /**
-   * Confirm the exact location from the map pin
-   */
+  // Confirm the selected map position.
   const handleConfirmExactLocation = () => {
     if (pinPosition) {
       confirmExactLocation(pinPosition[0], pinPosition[1], detectedLocationInfo);
@@ -183,9 +156,7 @@ export default function LocationModal({ isOpen, onClose }) {
     }
   };
 
-  /**
-   * Reset map preview and go back to list
-   */
+  // Return from the map preview to the location list.
   const handleResetMapPreview = () => {
     setShowMapPreview(false);
     setPinPosition(null);
@@ -194,17 +165,13 @@ export default function LocationModal({ isOpen, onClose }) {
     setNearestCityName("");
   };
 
-  /**
-   * Handle location selection and close modal
-   */
+  // Save the chosen location and close the modal.
   const handleSelectLocation = (location) => {
     updateLocation(location);
     onClose();
   };
 
-  /**
-   * Clear all active filters
-   */
+  // Clear the search and province filters.
   const clearFilters = () => {
     setSearchQuery("");
     setSelectedProvince(null);

@@ -32,11 +32,11 @@ const PasswordStrengthMeter = ({ password }) => {
     if (!pwd) return { score: 0, label: "", color: "" };
 
     let score = 0;
-    
+
     // Length check
     if (pwd.length >= 8) score++;
     if (pwd.length >= 12) score++;
-    
+
     // Character variety checks
     if (/[a-z]/.test(pwd)) score++;
     if (/[A-Z]/.test(pwd)) score++;
@@ -185,6 +185,7 @@ const AdminSettings = () => {
   // Update form when user changes
   useEffect(() => {
     if (user) {
+      // Keep the form fields aligned with the latest authenticated user data.
       resetProfile({
         name: user.name || "",
         email: user.email || "",
@@ -197,6 +198,7 @@ const AdminSettings = () => {
 
   const fetch2FAStatus = async () => {
     try {
+      // Read the current server-side 2FA state before showing any setup UI.
       const response = await fetch('http://localhost:5000/api/admin/2fa/status', {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -213,6 +215,7 @@ const AdminSettings = () => {
 
   const enable2FA = async () => {
     try {
+      // Start 2FA enrollment and collect the QR code plus backup data.
       const response = await fetch('http://localhost:5000/api/admin/2fa/enable', {
         method: 'POST',
         headers: {
@@ -234,6 +237,7 @@ const AdminSettings = () => {
 
   const verify2FA = async () => {
     try {
+      // Confirm the OTP from the authenticator app before we mark 2FA as active.
       const response = await fetch('http://localhost:5000/api/admin/2fa/verify', {
         method: 'POST',
         headers: {
@@ -258,12 +262,14 @@ const AdminSettings = () => {
   };
 
   const disable2FA = async () => {
+    // Ask for confirmation before disabling a security feature.
     setConfirmDisable2FA(true);
   };
 
   const handleDisable2FAConfirm = async () => {
     setConfirmDisable2FA(false);
     try {
+      // Send the disable request only after the user confirms.
       const response = await fetch('http://localhost:5000/api/admin/2fa/disable', {
         method: 'POST',
         headers: {
@@ -282,6 +288,7 @@ const AdminSettings = () => {
   };
 
   const copyToClipboard = (text) => {
+    // Copy backup codes or secrets without exposing them in the UI.
     navigator.clipboard.writeText(text);
     setToast({ type: 'success', message: 'Copied to clipboard!' });
   };
@@ -289,6 +296,7 @@ const AdminSettings = () => {
   // Handle profile update
   const onProfileSubmit = async (data) => {
     try {
+      // Persist the profile changes through the admin service.
       const response = await adminService.updateProfile(data);
 
       if (response.success) {
@@ -297,6 +305,7 @@ const AdminSettings = () => {
           ...user,
           ...response.data.user,
         };
+        // Keep the UI and auth state in sync with the server response.
         updateUser(updatedUser);
 
         setToast({
@@ -315,6 +324,7 @@ const AdminSettings = () => {
   // Handle password change
   const onPasswordSubmit = async (data) => {
     try {
+      // Send only the password fields that matter to the backend.
       const response = await adminService.changePassword({
         currentPassword: data.currentPassword,
         newPassword: data.newPassword,
@@ -371,7 +381,7 @@ const AdminSettings = () => {
         </div>
 
         <div className="space-y-6">
-          {/* General Profile Section */}
+          {/* General profile section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -390,7 +400,7 @@ const AdminSettings = () => {
             </div>
 
             <form onSubmit={handleSubmitProfile(onProfileSubmit)} className="p-6 space-y-6">
-              {/* Name Field */}
+              {/* Name field */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Full Name
@@ -422,7 +432,7 @@ const AdminSettings = () => {
                 )}
               </div>
 
-              {/* Email Field */}
+              {/* Email field */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address
@@ -454,7 +464,7 @@ const AdminSettings = () => {
                 )}
               </div>
 
-              {/* Phone Field */}
+              {/* Phone field */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Phone Number
@@ -485,7 +495,7 @@ const AdminSettings = () => {
                 )}
               </div>
 
-              {/* Submit Button */}
+              {/* Submit button */}
               <button
                 type="submit"
                 disabled={isProfileSubmitting}
@@ -506,7 +516,7 @@ const AdminSettings = () => {
             </form>
           </motion.div>
 
-          {/* Security Settings Section */}
+          {/* Security settings section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -526,7 +536,7 @@ const AdminSettings = () => {
             </div>
 
             <form onSubmit={handleSubmitPassword(onPasswordSubmit)} className="p-6 space-y-6">
-              {/* Current Password */}
+              {/* Current password */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Current Password
@@ -563,7 +573,7 @@ const AdminSettings = () => {
                 )}
               </div>
 
-              {/* New Password */}
+              {/* New password */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   New Password
@@ -606,7 +616,7 @@ const AdminSettings = () => {
                 )}
               </div>
 
-              {/* Confirm New Password */}
+              {/* Confirm new password */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Confirm New Password
@@ -645,7 +655,7 @@ const AdminSettings = () => {
                 )}
               </div>
 
-              {/* Security Tips */}
+              {/* Security tips */}
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                 <p className="text-sm font-medium text-purple-900 mb-2">
                   Password Security Tips:
@@ -658,7 +668,7 @@ const AdminSettings = () => {
                 </ul>
               </div>
 
-              {/* Submit Button */}
+              {/* Submit button */}
               <button
                 type="submit"
                 disabled={isPasswordSubmitting}
@@ -679,7 +689,7 @@ const AdminSettings = () => {
             </form>
           </motion.div>
 
-          {/* Two-Factor Authentication Section */}
+          {/* Two-factor authentication section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -699,7 +709,7 @@ const AdminSettings = () => {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* 2FA Status */}
+              {/* 2FA status */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center ${

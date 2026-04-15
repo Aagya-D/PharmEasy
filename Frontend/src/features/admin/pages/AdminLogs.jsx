@@ -44,11 +44,12 @@ const AdminLogs = () => {
     }
   }, [user, navigate]);
 
+
   useEffect(() => {
     fetchLogs();
   }, [categoryFilter]);
 
-  // Auto-refresh every 30 seconds
+  // Refresh the audit log every 30 seconds so the admin view stays current.
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchLogs();
@@ -61,6 +62,7 @@ const AdminLogs = () => {
     setIsLoading(true);
     setError(null);
     try {
+      // Only send the category filter when the admin has narrowed the list.
       const filters = {};
       
       if (categoryFilter !== "ALL") {
@@ -79,6 +81,7 @@ const AdminLogs = () => {
   };
 
   const handleRefresh = async () => {
+    // Manual refresh reuses the same fetch path so the list stays consistent.
     setIsRefreshing(true);
     await fetchLogs();
     setTimeout(() => setIsRefreshing(false), 500);
@@ -214,9 +217,14 @@ const AdminLogs = () => {
       <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <p style={{ fontSize: "14px", color: "#6B7280" }}>
+          {/* Audit detail modal */}
+
+
             Complete audit trail of all system activities and user actions
+          {/* Modal header */}
           </p>
         </div>
+          {/* Modal body */}
         <button
           onClick={handleRefresh}
           disabled={isRefreshing}
@@ -242,10 +250,10 @@ const AdminLogs = () => {
         </button>
       </div>
 
-      {/* Filters */}
+      {/* Filter controls */}
       <div style={{ marginBottom: "24px" }}>
         <div style={{ display: "flex", gap: "16px", marginBottom: "16px", flexWrap: "wrap" }}>
-          {/* Category Filters */}
+          {/* Category filters */}
           <div style={{ flex: "1", minWidth: "300px" }}>
             <label style={{ display: "block", fontSize: "12px", fontWeight: "600", color: "#6B7280", marginBottom: "8px" }}>
               CATEGORY

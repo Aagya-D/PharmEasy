@@ -64,6 +64,7 @@ export function Login() {
       subtitle="Sign in to your account"
       slogan="Access your trusted pharmacy workspace with a secure, fast, and easy sign-in experience."
       accentColor="#0097b2"
+      showBrandBadge={false}
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {error && (

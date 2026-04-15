@@ -4,7 +4,9 @@ import { updateAvatar, uploadAvatar } from "./user.controller.js";
 
 const router = express.Router();
 
+// Update authenticated user's avatar image.
 router.patch("/avatar", authenticate(), (req, res, next) => {
+  // Run multer uploader and convert upload errors into JSON responses.
   uploadAvatar(req, res, (err) => {
     if (err) {
       return res.status(400).json({

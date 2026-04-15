@@ -1,33 +1,10 @@
 import prisma from "../database/prisma.js";
 
 /**
- * ============================================================
- *  Enterprise Audit-Log Utility
- * ============================================================
- *
- * Two APIs coexist:
- *
- * 1. Legacy  – createLog / logActivity
- *    Kept for backward-compat with every call-site that already exists.
- *    Internally now delegates to createAuditLog so ALL writes gain the
- *    new columns (they'll just be null when callers don't supply them).
- *
- * 2. New     – createAuditLog
- *    Full-fidelity audit entry with: data-delta (oldValue/newValue),
- *    client metadata (IP + User-Agent), and resource targeting
- *    (resourceType + resourceId).
- *
- * RULE: Logging must NEVER crash the main request.
- *       Every public function wraps its body in try/catch.
- * ============================================================
+ * Audit log helpers used across the app.
  */
 
-// ─── Helpers ─────────────────────────────────────────────────
-
-/**
- * Safely serialise any value to plain JSON (strips Prisma objects,
- * Dates, Buffers, etc.).  Returns null for falsy input.
- */
+// Convert Prisma and request values into plain JSON before saving them.
 const safeJson = (value) => {
   if (value === undefined || value === null) return null;
   try {
@@ -37,45 +14,24 @@ const safeJson = (value) => {
   }
 };
 
-/**
- * Extract the real client IP from a request, respecting proxies.
- */
+// Read the client IP, including the forwarded address when present.
 const extractIp = (req) => {
   if (!req) return null;
   const forwarded = req.headers?.["x-forwarded-for"];
   if (forwarded) {
-    // "x-forwarded-for" can be a comma-separated list; take the first
+    // x-forwarded-for can list multiple addresses; use the first one.
     return String(forwarded).split(",")[0].trim();
   }
   return req.ip || req.socket?.remoteAddress || null;
 };
 
-/**
- * Extract the User-Agent string from a request.
- */
+// Read the User-Agent header when it exists.
 const extractUserAgent = (req) => {
   if (!req) return null;
   return req.headers?.["user-agent"] || null;
 };
 
-// ─── Core writer ─────────────────────────────────────────────
-
-/**
- * Create a full-fidelity audit log entry.
- *
- * @param {Object}  opts
- * @param {string}  opts.actorId       – userId of whoever triggered the action (null = system)
- * @param {string}  opts.action        – action constant e.g. "PHARMACY_APPROVED"
- * @param {string}  opts.message       – human-readable description
- * @param {string}  opts.category      – LogCategory enum value
- * @param {string}  [opts.resourceType]– entity type  e.g. "Pharmacy"
- * @param {string}  [opts.resourceId]  – entity primary key
- * @param {Object}  [opts.oldValue]    – snapshot BEFORE mutation
- * @param {Object}  [opts.newValue]    – snapshot AFTER mutation
- * @param {Object}  [opts.metadata]    – any extra context
- * @param {import('express').Request} [opts.req] – Express request (extracts IP + UA)
- * @returns {Promise<Object|null>}     – the created Log row, or null on failure
- */
+// Create a full audit entry with before and after values.
 export const createAuditLog = async ({
   actorId = null,
   action,
@@ -112,18 +68,13 @@ export const createAuditLog = async ({
     );
     return log;
   } catch (error) {
-    // NEVER let logging break the app
+    // Logging should never block the request path.
     console.error("[AUDIT] Failed to write audit log:", error.message);
     return null;
   }
 };
 
-// ─── Legacy API (backward-compatible) ────────────────────────
-
-/**
- * Create a new activity log entry (legacy signature).
- * Delegates to createAuditLog internally.
- */
+// Keep the older logging signature working for existing call sites.
 export const createLog = async (userId, action, message, category, metadata = null) => {
   return createAuditLog({
     actorId: userId,
@@ -134,9 +85,7 @@ export const createLog = async (userId, action, message, category, metadata = nu
   });
 };
 
-/**
- * Create activity log using object parameters (legacy signature).
- */
+// Keep the object-based legacy API working too.
 export const logActivity = async ({ userId, action, message, category, metadata = null }) => {
   return createAuditLog({
     actorId: userId,
@@ -147,16 +96,7 @@ export const logActivity = async ({ userId, action, message, category, metadata 
   });
 };
 
-/**
- * Retrieve logs with pagination and filtering
- * @param {object} filters - Filter options
- * @param {string} filters.category - Filter by category
- * @param {string} filters.userId - Filter by user ID
- * @param {string} filters.action - Filter by action
- * @param {number} filters.skip - Pagination skip
- * @param {number} filters.take - Pagination take
- * @returns {Promise<object>} Logs and count
- */
+// Return logs with optional filters and pagination.
 export const getLogs = async (filters = {}) => {
   try {
     const {
@@ -192,7 +132,7 @@ export const getLogs = async (filters = {}) => {
     };
   } catch (error) {
     console.error("Failed to retrieve logs:", error);
-    // Return empty result instead of throwing
+    // Return an empty result instead of breaking the request.
     return {
       logs: [],
       totalCount: 0,
@@ -203,42 +143,40 @@ export const getLogs = async (filters = {}) => {
   }
 };
 
-/**
- * Common log actions for consistency
- */
+// Shared action names used by the audit trail.
 export const LOG_ACTIONS = {
-  // Auth
+  // Auth events
   USER_REGISTERED: "USER_REGISTERED",
   USER_LOGIN: "USER_LOGIN",
   USER_LOGOUT: "USER_LOGOUT",
   PASSWORD_RESET: "PASSWORD_RESET",
   EMAIL_VERIFIED: "EMAIL_VERIFIED",
   
-  // Pharmacy
+  // Pharmacy events
   PHARMACY_ONBOARDED: "PHARMACY_ONBOARDED",
   PHARMACY_APPROVED: "PHARMACY_APPROVED",
   PHARMACY_REJECTED: "PHARMACY_REJECTED",
   
-  // System
+  // System events
   PROFILE_UPDATED: "PROFILE_UPDATED",
   PASSWORD_CHANGED: "PASSWORD_CHANGED",
   
-  // User Management
+  // User management events
   USER_CREATED: "USER_CREATED",
   USER_UPDATED: "USER_UPDATED",
   USER_DELETED: "USER_DELETED",
   
-  // Inventory
+  // Inventory events
   INVENTORY_ADDED: "INVENTORY_ADDED",
   INVENTORY_UPDATED: "INVENTORY_UPDATED",
   INVENTORY_DELETED: "INVENTORY_DELETED",
   
-  // Orders
+  // Order events
   ORDER_CREATED: "ORDER_CREATED",
   ORDER_UPDATED: "ORDER_UPDATED",
   ORDER_CANCELLED: "ORDER_CANCELLED",
   
-  // Content Management
+  // Content management events
   CONTENT_CREATED: "CONTENT_CREATED",
   CONTENT_UPDATED: "CONTENT_UPDATED",
   CONTENT_DELETED: "CONTENT_DELETED",

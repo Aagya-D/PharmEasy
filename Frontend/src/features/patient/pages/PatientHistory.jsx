@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import patientService from "../services/patient.service";
 
-// ─── Status Badge Component ──────────────────────────
+// Status badge for SOS history rows.
 function StatusBadge({ status }) {
   const normalizedStatus = String(status || "").toLowerCase();
 
@@ -83,7 +83,7 @@ function StatusBadge({ status }) {
   );
 }
 
-// ─── Relative Time Formatter ──────────────────────────
+// Format timestamps in a short relative style.
 function timeAgo(dateStr) {
   const now = new Date();
   const d = new Date(dateStr);
@@ -98,14 +98,14 @@ function timeAgo(dateStr) {
 export default function PatientHistory() {
   const navigate = useNavigate();
 
-  // SOS History state
+  // SOS history state.
   const [sosHistory, setSOSHistory] = useState([]);
   const [sosLoading, setSOSLoading] = useState(true);
   const [sosError, setSOSError] = useState(null);
   const [sosFilter, setSOSFilter] = useState("all"); // "all" | "7days"
   const [visibleSOSCount, setVisibleSOSCount] = useState(5);
 
-  // Favorites state
+  // Favorite medicines state.
   const [favorites, setFavorites] = useState([]);
   const [favLoading, setFavLoading] = useState(true);
   const [favError, setFavError] = useState(null);
@@ -113,7 +113,7 @@ export default function PatientHistory() {
 
 
 
-  // ─── Data Fetch ────────────────────────────────────
+  // Data loading.
   const loadSOSHistory = useCallback(async () => {
     setSOSLoading(true);
     setSOSError(null);
@@ -145,7 +145,7 @@ export default function PatientHistory() {
   }, [loadSOSHistory]);
 
   useEffect(() => {
-    // Reset pagination window when history scope changes
+    // Reset the visible window when the history scope changes.
     setVisibleSOSCount(5);
   }, [sosFilter]);
 
@@ -191,7 +191,7 @@ export default function PatientHistory() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
+        {/* Page header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <Sparkles className="text-blue-500" size={28} />
@@ -202,7 +202,7 @@ export default function PatientHistory() {
           </p>
         </div>
 
-        {/* ══════════ SECTION 1: SOS HISTORY ══════════ */}
+        {/* SOS history section */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-8">
           <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3">

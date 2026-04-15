@@ -37,7 +37,7 @@ function isArchivedStatus(status) {
   return value === "COMPLETED" || value === "EXPIRED" || value === "REJECTED" || value === "DECLINED";
 }
 
-/** Soft two-tone chime using Web Audio API — no audio file required */
+/** Soft two-tone chime using Web Audio API. */
 function playChime() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -66,10 +66,11 @@ export default function PharmacyChatDrawer({ isOpen, onClose, currentUser }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeChatRoom, setActiveChatRoom] = useState(null);
 
-  // ── Fetch rooms from the correct /chat/rooms endpoint ──────────────
+  // Load the chat rooms for the drawer.
   const fetchConversations = useCallback(async () => {
     setLoading(true);
     try {
+      // Pull active and completed rooms together so the drawer can switch tabs instantly.
       const [activeRes, archiveRes] = await Promise.all([
         httpClient.get("/chat/rooms", { params: { status: "active" } }),
         httpClient.get("/chat/rooms", { params: { status: "completed" } }),
@@ -94,13 +95,13 @@ export default function PharmacyChatDrawer({ isOpen, onClose, currentUser }) {
     if (isOpen && !activeChatSOS) fetchConversations();
   }, [isOpen, activeChatSOS, fetchConversations]);
 
-  // ── Socket: live new-message sidebar updates + new-chat alert ──────
+  // Keep the drawer updated with live socket events.
   useEffect(() => {
     if (!isOpen) return;
 
     const socket = connectSocket();
 
-    /** When any message is sent, update the matching room's snippet + sort it to top */
+    /** Update the matching room snippet and move it to the top. */
     const handleNewMessage = (data) => {
       setConversations((prev) => {
         const idx = prev.findIndex((c) => c.id === data.roomId);
@@ -113,7 +114,7 @@ export default function PharmacyChatDrawer({ isOpen, onClose, currentUser }) {
             senderName: data.senderName,
             createdAt: data.createdAt,
           },
-          // Only bump unreadCount when the active chat is a different room
+          // Only increase the unread count for rooms that are not open.
           unreadCount:
             activeChatSOS !== updated[idx].sosRequestId
               ? (updated[idx].unreadCount || 0) + 1
@@ -123,17 +124,18 @@ export default function PharmacyChatDrawer({ isOpen, onClose, currentUser }) {
         return [room, ...updated];
       });
 
-      // Chime only when the pharmacy is NOT already watching that room
+      // Play the alert only when the room is not active.
       const inActiveChat =
         activeChatSOS != null &&
         conversations.find((c) => c.id === data.roomId)?.sosRequestId === activeChatSOS;
       if (!inActiveChat) playChime();
     };
 
-    /** When SOS is accepted, a new ChatRoom is created — add it to the sidebar instantly */
+    /** Add a newly created chat room to the drawer immediately. */
     const handleNewChat = (data) => {
       if (data.pharmacyId !== currentUser?.id) return;
       setConversations((prev) => {
+        // Ignore duplicates when the room already exists in state.
         if (prev.some((c) => c.sosRequestId === data.room.sosRequestId)) return prev;
         return [data.room, ...prev];
       });
@@ -179,10 +181,11 @@ export default function PharmacyChatDrawer({ isOpen, onClose, currentUser }) {
   }, [isOpen, currentUser?.id, activeChatSOS, conversations]);
 
   const handleBack = () => {
+    // Leaving the room resets the drawer state and refreshes unread counts.
     setActiveChatSOS(null);
     setActiveChatPatient("");
     setActiveChatRoom(null);
-    // Re-fetch so unread counts are cleared after reading
+    // Refresh so unread counts are cleared after the room is read.
     fetchConversations();
   };
 

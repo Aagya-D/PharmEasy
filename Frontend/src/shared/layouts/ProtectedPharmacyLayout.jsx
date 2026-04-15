@@ -10,7 +10,7 @@ import { connectSocket } from "../../core/services/socket";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 
 /**
- * Inner component to initialize SOS count
+ * Inner pharmacy layout that keeps SOS and chat state ready for approved pharmacies.
  */
 function ProtectedPharmacyLayoutInner({ children, isApprovedPharmacy }) {
   const { user } = useAuth();
@@ -19,19 +19,19 @@ function ProtectedPharmacyLayoutInner({ children, isApprovedPharmacy }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatBadge, setChatBadge] = useState(0);
 
-  // Get currentUser for chat drawer
+  // Build the user object used by the chat drawer.
   const currentUser = user
     ? { id: user.id, name: user.name || user.email, roleId: user.roleId }
     : null;
 
-  // Initialize SOS count on mount for approved pharmacies
+  // Load SOS requests once the approved pharmacy shell is ready.
   useEffect(() => {
     if (isApprovedPharmacy) {
       fetchSOSRequests(httpClient);
     }
   }, [isApprovedPharmacy, fetchSOSRequests]);
 
-  // Socket.IO: listen for NEW_CHAT_MESSAGE to bump the badge
+  // Keep the chat badge in sync with socket events.
   useEffect(() => {
     if (!isApprovedPharmacy) return;
     const socket = connectSocket();
@@ -94,10 +94,8 @@ function ProtectedPharmacyLayoutInner({ children, isApprovedPharmacy }) {
 }
 
 /**
- * Protected Pharmacy Layout
- * - Renders Sidebar only for approved pharmacy users
- * - Wraps all pharmacy routes with SOSProvider for dynamic badge
- * - Ensures onboarding/pending/rejected pages stay full-width
+ * Pharmacy layout for approved pharmacy users.
+ * Pending or onboarding pages stay full width, while approved users get the dashboard shell.
  */
 export function ProtectedPharmacyLayout({ children }) {
   const { user } = useAuth();

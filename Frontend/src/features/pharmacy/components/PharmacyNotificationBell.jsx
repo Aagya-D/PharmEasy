@@ -24,7 +24,7 @@ import { useNotification } from "../../../context/NotificationContext";
 const MotionSpan = motion.span;
 const MotionDiv = motion.div;
 
-// ── Type visual config
+// Visual styles for each notification type.
 const TYPE_CONFIG = {
   SOS_ALERT: {
     icon: Siren,
@@ -104,7 +104,7 @@ function timeAgo(dateStr) {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-/** Extract a navigable link from notification metadata */
+/** Extract the destination link from notification metadata. */
 function getActionLink(n) {
   try {
     const meta = typeof n.metadata === "string" ? JSON.parse(n.metadata) : n.metadata;
@@ -117,7 +117,7 @@ function getActionLink(n) {
 export default function PharmacyNotificationBell() {
   const navigate = useNavigate();
 
-  // ── Auth safety check ────────────────────────────────
+  // Read the current auth state before showing notifications.
   const token = typeof window !== "undefined"
     ? localStorage.getItem("accessToken") || sessionStorage.getItem("accessToken")
     : null;
@@ -128,7 +128,7 @@ export default function PharmacyNotificationBell() {
     } catch { return null; }
   })();
 
-  // ── Global notification state from context ───────────
+  // Use the shared notification state so the badge stays in sync.
   const {
     unreadNotifications: unreadCount,
     hasHighPriority,
@@ -147,7 +147,7 @@ export default function PharmacyNotificationBell() {
   const panelRef = useRef(null);
   const bellRef = useRef(null);
 
-  // ── Fetch notifications list (for dropdown display) ──
+  // Load the notification list for the dropdown panel.
   const fetchNotifications = useCallback(async () => {
     if (!isAuthReady) {
       setNotifications([]);
@@ -160,7 +160,7 @@ export default function PharmacyNotificationBell() {
       const list = Array.isArray(data) ? data : [];
       setNotifications(list);
 
-      // Sync badge count from the authoritative DB list
+      // Recompute unread and high-priority counts from the fetched list.
       const realUnread = list.filter((n) => !n.isRead).length;
       setUnreadNotifications(realUnread);
       setHasHighPriority(
@@ -175,14 +175,12 @@ export default function PharmacyNotificationBell() {
     }
   }, [isAuthReady, setUnreadNotifications, setHasHighPriority]);
 
-  // ── Refresh notifications when dropdown opens ────────
+  // Refresh the list when the dropdown opens.
   useEffect(() => {
     if (isOpen && isAuthReady) fetchNotifications();
   }, [isOpen, isAuthReady, fetchNotifications]);
 
-  // ── Also refresh list on SOS alert (keep list fresh) ─
-  // NotificationContext already handles sound + badge increment.
-  // We just need to refresh the list so the new SOS row appears.
+  // Refresh the list when a new SOS alert arrives.
   useEffect(() => {
     if (!isAuthReady) return;
     const socket = connectSocket();
@@ -191,7 +189,7 @@ export default function PharmacyNotificationBell() {
     return () => { socket.off("NEW_SOS_ALERT", onSOS); };
   }, [isOpen, isAuthReady, fetchNotifications]);
 
-  // ── Click-outside to close popover ───────────────────
+  // Close the popover when the user clicks outside it.
   useEffect(() => {
     function handleClick(e) {
       if (
@@ -207,7 +205,7 @@ export default function PharmacyNotificationBell() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [isOpen]);
 
-  // ── Actions ──────────────────────────────────────────
+  // Notification actions.
   const handleMarkRead = async (id) => {
     try {
       await notificationService.markNotificationAsRead(id);
@@ -216,7 +214,7 @@ export default function PharmacyNotificationBell() {
       );
       decrementNotifications(1);
     } catch {
-      /* silent */
+      /* ignore network errors */
     }
   };
 
@@ -226,7 +224,7 @@ export default function PharmacyNotificationBell() {
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       clearNotifications();
     } catch {
-      /* silent */
+      /* ignore network errors */
     }
   };
 
@@ -236,15 +234,16 @@ export default function PharmacyNotificationBell() {
       setNotifications((prev) => prev.filter((n) => n.id !== id));
       if (wasUnread) decrementNotifications(1);
     } catch {
-      /* silent */
+      /* ignore network errors */
     }
   };
 
-  /** Navigate to the notification's action link and auto-mark as read */
+  /** Open the notification link and mark it as read. */
   const handleNotificationClick = async (n) => {
     const link = getActionLink(n);
     if (!n.isRead) {
-      handleMarkRead(n.id); // fire-and-forget
+      // Mark the item first so unread counts stay accurate when the user opens it.
+      handleMarkRead(n.id);
     }
     if (link) {
       setIsOpen(false);
@@ -255,11 +254,11 @@ export default function PharmacyNotificationBell() {
   const isHighPriority = (n) =>
     n.priority === "high" || n.type === "SOS_UPDATE" || n.type === "SOS_ALERT";
 
-  // Sort: SOS_ALERT first, then SOS_UPDATE, then unread, then by date
+  // Sort by urgency first, then unread items, then newest first.
   const sortedNotifications = [...notifications].sort((a, b) => {
     const aSOS = (a.type === "SOS_ALERT" || a.type === "SOS_UPDATE") && !a.isRead;
     const bSOS = (b.type === "SOS_ALERT" || b.type === "SOS_UPDATE") && !b.isRead;
-    // Emergency SOS_ALERT always tops
+    // Emergency SOS items stay ahead of everything else.
     if (a.type === "SOS_ALERT" && !a.isRead && b.type !== "SOS_ALERT") return -1;
     if (b.type === "SOS_ALERT" && !b.isRead && a.type !== "SOS_ALERT") return 1;
     if (aSOS && !bSOS) return -1;

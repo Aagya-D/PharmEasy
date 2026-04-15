@@ -4,18 +4,7 @@ import { Star, X, Loader, CheckCircle } from "lucide-react";
 import reviewService from "../services/review.service";
 
 /**
- * RatePharmacyModal
- *
- * Renders a modal overlay that lets the patient rate a pharmacy 1–5 stars
- * with an optional text comment.  On successful submission the parent
- * callback `onSuccess` is invoked so it can update local state.
- *
- * Props:
- *   - isOpen        : boolean
- *   - onClose       : () => void
- *   - pharmacyId    : string
- *   - pharmacyName  : string  (for display purposes)
- *   - onSuccess     : (data) => void  (optional callback after successful review)
+ * Modal for submitting a pharmacy review with a star rating and optional comment.
  */
 export default function RatePharmacyModal({
   isOpen,
@@ -51,12 +40,12 @@ export default function RatePharmacyModal({
 
       setSuccess(true);
 
-      // Notify parent
+      // Let the parent update its local state.
       if (onSuccess) {
         onSuccess(result.data);
       }
 
-      // Auto-close after showing success animation
+      // Close after the success state has been visible for a moment.
       setTimeout(() => {
         onClose();
       }, 1500);

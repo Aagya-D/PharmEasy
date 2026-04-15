@@ -21,14 +21,36 @@ export default function Cart() {
   const isCartEmpty = !isLoadingCart && cartItems.length === 0;
 
   const groupedItems = useMemo(() => {
-    return cartItems.reduce((acc, item) => {
-      const key = item.pharmacyName || "Other Pharmacy";
-      if (!acc[key]) {
-        acc[key] = [];
-      }
-      acc[key].push(item);
-      return acc;
-    }, {});
+    const groups = new Map();
+
+    for (const item of cartItems) {
+      const pharmacyId = String(item.pharmacyId || "unknown-pharmacy");
+      const existing = groups.get(pharmacyId) || {
+        pharmacyId,
+        pharmacyName: item.pharmacyName || "Other Pharmacy",
+        pharmacyAddress: item.pharmacyAddress || "Address unavailable",
+        items: [],
+      };
+
+      existing.items.push(item);
+      groups.set(pharmacyId, existing);
+    }
+
+    return [...groups.values()].map((group) => {
+      const subtotal = group.items.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+        0
+      );
+      const selectedSubtotal = group.items
+        .filter((item) => item.selected)
+        .reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
+
+      return {
+        ...group,
+        subtotal,
+        selectedSubtotal,
+      };
+    });
   }, [cartItems]);
 
   const { subtotal, shipping, total, selectedItems } = useMemo(() => {
@@ -115,15 +137,24 @@ export default function Cart() {
               )}
 
               {!isLoadingCart &&
-                Object.entries(groupedItems).map(([pharmacyName, items]) => (
-                  <article key={pharmacyName} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                groupedItems.map((group) => (
+                  <article key={group.pharmacyId} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                     <header className="px-5 py-4 border-b border-slate-200 bg-slate-50">
-                      <h2 className="text-sm font-semibold tracking-wide text-slate-700 uppercase">{pharmacyName}</h2>
-                      <p className="text-xs text-slate-500 mt-1">{items[0]?.pharmacyAddress || "Address unavailable"}</p>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h2 className="text-sm font-semibold tracking-wide text-slate-700 uppercase">{group.pharmacyName}</h2>
+                          <p className="text-xs text-slate-500 mt-1">{group.pharmacyAddress}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Pharmacy Subtotal</p>
+                          <p className="text-sm font-bold text-slate-700">{formatCurrency(group.subtotal)}</p>
+                          <p className="text-[11px] text-emerald-600 mt-0.5">Selected: {formatCurrency(group.selectedSubtotal)}</p>
+                        </div>
+                      </div>
                     </header>
 
                     <div className="divide-y divide-slate-100">
-                      {items.map((item) => (
+                      {group.items.map((item) => (
                         <div key={item.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
                           <div className="flex items-start gap-3 flex-1 min-w-0">
                             <input

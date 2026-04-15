@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import LoadingSpinner from "../shared/components/ui/LoadingSpinner";
 
-// Role ID to role name mapping
+// Role ID to role name mapping.
 const ROLE_MAP = {
   1: 'ADMIN',
   2: 'PHARMACY',
@@ -11,38 +11,32 @@ const ROLE_MAP = {
 };
 
 /**
- * Route guard component
- * Protects routes that require authentication and optional role validation
- * @param {string[]} allowedRoles - Array of allowed role names (e.g., ['ADMIN', 'PHARMACY'])
+ * Route guard for authenticated and role-based pages.
+ * allowedRoles is optional. When it is set, the user must match one of the listed roles.
  */
 export function ProtectedRoute({ allowedRoles, children }) {
   const { isAuthenticated, isInitializing, user } = useAuth();
 
-  // ✅ PHASE 1: INITIALIZATION PHASE
-  // While the app is reading from localStorage and verifying token, show nothing
+  // Wait until auth hydration and token checks finish.
   if (isInitializing) {
     console.log('[ProtectedRoute] 🔄 INITIALIZING - showing loading spinner');
     return <LoadingSpinner />;
   }
 
-  // ✅ PHASE 2: AUTHENTICATION CHECK
-  // After initialization, verify user is logged in
+  // Block access if the user is not signed in.
   if (!user || !isAuthenticated) {
-    console.log('[ProtectedRoute] ❌ NOT AUTHENTICATED - redirecting to /login', {
+    console.log('[ProtectedRoute]  NOT AUTHENTICATED - redirecting to /login', {
       user: user ? `${user.id}` : null,
       isAuthenticated,
     });
     return <Navigate to="/login" replace />;
   }
 
-  // ✅ PHASE 3: AUTHORIZATION CHECK (Role-Based Access)
-  // User is authenticated, now check if they have permission for this route
+  // Check role-based access when the route requires it.
   if (allowedRoles && allowedRoles.length > 0) {
-    // Convert to number for type-safe comparison
     const userRoleId = Number(user.roleId);
     const userRole = ROLE_MAP[userRoleId];
-    
-    // Get master key status
+
     const isSysAdmin = userRoleId === 1;
     const isPharmacyRoute = allowedRoles.includes('PHARMACY');
 
@@ -54,10 +48,7 @@ export function ProtectedRoute({ allowedRoles, children }) {
       isPharmacyRoute,
     });
 
-    // ✅ Role validation logic:
-    // 1. If user role matches any allowed role → ALLOW
-    // 2. If user is SYSTEM_ADMIN (1) AND this is NOT a pharmacy route → ALLOW
-    // 3. Otherwise → DENY
+    // System admin can access non-pharmacy routes even when a role list is provided.
     const hasRole = userRole && allowedRoles.includes(userRole);
     const hasMasterKey = isSysAdmin && !isPharmacyRoute;
     const isAuthorized = hasRole || hasMasterKey;

@@ -40,24 +40,26 @@ import { playNotificationSound } from "../utils/notificationSound";
 import notificationService from "../core/services/notification.service";
 import chatService from "../features/chat/services/chat.service";
 
-// ─── Context ─────────────────────────────────────────────────────────────────
-
+// Notification context object.
 const NotificationContext = createContext(null);
 
-// ─── Provider ────────────────────────────────────────────────────────────────
-
+// Notification provider component.
 export function NotificationProvider({ children }) {
+  // Read auth state so listeners only run for authenticated users.
   const { isAuthenticated, user } = useAuth();
 
+  // Unread bell-notification count.
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  // Unread chat-message count.
   const [unreadMessages, setUnreadMessages] = useState(0);
+  // High-priority notification flag.
   const [hasHighPriority, setHasHighPriority] = useState(false);
 
-  // Track previous counts so we only chime on NEW events during polling
+  // Keep previous counts for polling-based sound control.
   const prevNotifCountRef = useRef(0);
   const prevMsgCountRef   = useRef(0);
 
-  // ── Fetch notification unread count from backend ──────────────────────────
+  // Fetch unread notification count from backend.
   const refreshNotifications = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
@@ -73,11 +75,11 @@ export function NotificationProvider({ children }) {
       setUnreadNotifications(count);
       setHasHighPriority(high);
     } catch {
-      // silent — badge stays at last known value
+      // Keep previous badge value on fetch failure.
     }
   }, [isAuthenticated]);
 
-  // ── Fetch chat unread count from backend ──────────────────────────────────
+  // Fetch unread chat message count from backend.
   const refreshMessages = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
@@ -85,13 +87,14 @@ export function NotificationProvider({ children }) {
       const count = res?.data?.unreadCount ?? 0;
       setUnreadMessages(count);
     } catch {
-      // silent
+      // Keep previous message count on fetch failure.
     }
   }, [isAuthenticated]);
 
-  // ── Initial fetch + fallback polling (60s) ───────────────────────────────
+  // Initial unread fetch with 60-second polling fallback.
   useEffect(() => {
     if (!isAuthenticated) {
+      // Reset all counters when user is logged out.
       setUnreadNotifications(0);
       setUnreadMessages(0);
       setHasHighPriority(false);
@@ -111,29 +114,29 @@ export function NotificationProvider({ children }) {
     return () => clearInterval(interval);
   }, [isAuthenticated, refreshNotifications, refreshMessages]);
 
-  // ── Socket.IO real-time listeners ─────────────────────────────────────────
+  // Register real-time socket listeners for incoming alerts.
   useEffect(() => {
     if (!isAuthenticated) return;
 
     const socket = connectSocket();
 
-    // NEW_SOS_ALERT — emitted by patient.controller when SOS is filed
+    // Handle SOS alert events.
     const onSOS = () => {
       setUnreadNotifications((c) => c + 1);
       setHasHighPriority(true);
       playNotificationSound("urgent");
     };
 
-    // NEW_MESSAGE — our new canonical event for chat messages
+    // Handle chat message events (canonical event name).
     const onNewMessage = (payload) => {
-      // Only increment for the intended recipient
+      // Only increment for intended recipient.
       const myId = user?.id;
       if (payload?.recipientId && myId && payload.recipientId !== myId) return;
       setUnreadMessages((c) => c + 1);
       playNotificationSound("urgent");
     };
 
-    // new_message_notification — legacy lowercase alias emitted by chat controller
+    // Handle legacy chat message event alias.
     const onNewMessageLegacy = (payload) => {
       const myId = user?.id;
       if (payload?.recipientId && myId && payload.recipientId !== myId) return;
@@ -141,13 +144,13 @@ export function NotificationProvider({ children }) {
       playNotificationSound("urgent");
     };
 
-    // ADMIN_BROADCAST — emitted by admin.controller when announcement is published
+    // Handle admin announcement broadcasts.
     const onAdminBroadcast = () => {
       setUnreadNotifications((c) => c + 1);
       playNotificationSound("standard");
     };
 
-    // NEW_ORDER — emitted when patient places a checkout order
+    // Handle new order events.
     const onNewOrder = (payload) => {
       const myId = user?.id;
       if (payload?.recipientId && myId && payload.recipientId !== myId) return;
@@ -155,6 +158,7 @@ export function NotificationProvider({ children }) {
       playNotificationSound("standard");
     };
 
+    // Handle system alert events for admin role.
     const onSystemAlert = () => {
       if (user?.roleId !== 1) return;
       setUnreadNotifications((c) => c + 1);
@@ -179,22 +183,25 @@ export function NotificationProvider({ children }) {
     };
   }, [isAuthenticated, user?.id, user?.roleId]);
 
-  // ── Imperative badge-clearing helpers ─────────────────────────────────────
+  // Imperative badge-clearing helpers.
 
   const decrementNotifications = useCallback((n = 1) => {
+    // Decrease notification count without going below zero.
     setUnreadNotifications((c) => Math.max(0, c - n));
   }, []);
 
   const clearNotifications = useCallback(() => {
+    // Clear bell count and reset priority flag.
     setUnreadNotifications(0);
     setHasHighPriority(false);
   }, []);
 
   const clearMessages = useCallback(() => {
+    // Clear chat unread counter.
     setUnreadMessages(0);
   }, []);
 
-  // ── Context value ─────────────────────────────────────────────────────────
+  // Context value exposed to consumers.
 
   const value = {
     unreadNotifications,
@@ -215,8 +222,6 @@ export function NotificationProvider({ children }) {
     </NotificationContext.Provider>
   );
 }
-
-// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 /**
  * useNotification()

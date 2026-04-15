@@ -1,25 +1,19 @@
-/**
- * Admin Authorization Middleware
- * Identifies System Admin by roleId=1
- * NO database schema changes - uses existing User.roleId field
- */
+// System-admin authorization middleware based on user.roleId.
 
 import { prisma } from "../database/prisma.js";
 import { AppError } from "./errorHandler.js";
 
-/**
- * Require System Admin (roleId=1)
- * Blocks all users except those with roleId=1
- */
+// Require roleId=1 system admin access.
 export const requireSystemAdmin = async (req, res, next) => {
   try {
+    // Read authenticated user ID from prior auth middleware.
     const userId = req.user?.userId;
     
     if (!userId) {
       return next(new AppError("Authentication required", 401));
     }
 
-    // Fetch user to check roleId
+    // Load role and active state from database.
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { roleId: true, isActive: true },
@@ -33,7 +27,7 @@ export const requireSystemAdmin = async (req, res, next) => {
       return next(new AppError("Account is disabled", 403));
     }
 
-    // System Admin must have roleId=1
+    // Permit only system admin users.
     if (user.roleId !== 1) {
       return next(new AppError("Access denied. System Administrator access required.", 403));
     }

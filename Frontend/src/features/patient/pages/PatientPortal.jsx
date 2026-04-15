@@ -22,8 +22,7 @@ import {
 import Layout from "../../../shared/layouts/Layout";
 
 /**
- * Global Landing Page - Patient Portal
- * Hero section with global search bar, Emergency SOS button, and How it Works section
+ * Public landing page for the patient portal.
  */
 export default function PatientPortal() {
   const navigate = useNavigate();
@@ -31,7 +30,7 @@ export default function PatientPortal() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [showSOSPopup, setShowSOSPopup] = useState(false);
 
-  // Mock suggestions for autocomplete
+  // Sample suggestions for the search box.
   const suggestions = [
     { name: "Paracetamol 500mg", type: "brand", category: "Pain Relief" },
     { name: "Acetaminophen", type: "generic", category: "Pain Relief" },
@@ -98,9 +97,9 @@ export default function PatientPortal() {
     <Layout>
       <div className="min-h-screen bg-white">
 
-      {/* Hero Section */}
+      {/* Hero section */}
       <section className="relative bg-gradient-to-br from-blue-50 via-white to-cyan-50 overflow-hidden">
-        {/* Background Pattern */}
+        {/* Background shapes */}
         <div className="absolute inset-0 opacity-30">
           <div
             className="absolute top-20 left-10 w-72 h-72 bg-blue-200 rounded-full blur-3xl"
@@ -114,7 +113,7 @@ export default function PatientPortal() {
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-32">
           <div className="text-center max-w-4xl mx-auto">
-            {/* Badge */}
+            {/* Intro badge */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -125,7 +124,7 @@ export default function PatientPortal() {
               <span>Trusted by 50,000+ patients across India</span>
             </motion.div>
 
-            {/* Main Heading */}
+            {/* Main heading */}
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -149,7 +148,7 @@ export default function PatientPortal() {
               availability at verified pharmacies in your area.
             </motion.p>
 
-            {/* Global Search Bar */}
+            {/* Global search bar */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -187,7 +186,7 @@ export default function PatientPortal() {
                 </div>
               </form>
 
-              {/* Autocomplete Suggestions */}
+              {/* Search suggestions */}
               <AnimatePresence>
                 {searchFocused && filteredSuggestions.length > 0 && (
                   <motion.div

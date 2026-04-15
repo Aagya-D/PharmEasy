@@ -1,8 +1,4 @@
-/**
- * Admin Controller - System Admin pharmacy verification operations
- * Uses existing Pharmacy table fields (verificationStatus, verifiedBy, verifiedAt)
- * NO schema changes required
- */
+// Admin controller for pharmacy review, user management, content, and audit tools.
 
 import bcrypt from "bcrypt";
 import { prisma } from "../database/prisma.js";
@@ -10,10 +6,7 @@ import { AppError } from "../middlewares/errorHandler.js";
 import { createLog, getLogs as getActivityLogs, LOG_ACTIONS } from "../utils/activityLogger.js";
 import notificationService from "../modules/notifications/notification.service.js";
 
-/**
- * GET /api/admin/pharmacies/pending
- * Get all pharmacies awaiting verification (with license document URLs)
- */
+// Return the pharmacies that still need review.
 export const getPendingPharmacies = async (req, res, next) => {
   try {
     const pharmacies = await prisma.pharmacy.findMany({
@@ -36,10 +29,10 @@ export const getPendingPharmacies = async (req, res, next) => {
       },
     });
 
-    // Map pharmacies to include license document URL for admin review
+    // Keep the document URL under a clearer field name for the admin UI.
     const pharmaciesWithDocuments = pharmacies.map((pharmacy) => ({
       ...pharmacy,
-      licenseDocumentUrl: pharmacy.licenseDocument, // Cloudinary URL for viewing/download
+      licenseDocumentUrl: pharmacy.licenseDocument,
     }));
 
     res.status(200).json({
@@ -52,10 +45,7 @@ export const getPendingPharmacies = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/admin/pharmacies
- * Get all pharmacies (with optional status filter)
- */
+// Return all pharmacies, optionally filtered by verification status.
 export const getAllPharmacies = async (req, res, next) => {
   try {
     const { status } = req.query;
@@ -83,10 +73,10 @@ export const getAllPharmacies = async (req, res, next) => {
       },
     });
 
-    // Include license document URLs for admin review
+    // Keep the document URL in the admin response for review screens.
     const pharmaciesWithDocuments = pharmacies.map((pharmacy) => ({
       ...pharmacy,
-      licenseDocumentUrl: pharmacy.licenseDocument, // Cloudinary URL
+      licenseDocumentUrl: pharmacy.licenseDocument,
     }));
 
     res.status(200).json({
@@ -99,10 +89,7 @@ export const getAllPharmacies = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/admin/pharmacy/:id
- * Get specific pharmacy details
- */
+// Return one pharmacy with the user details attached.
 export const getPharmacyById = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -128,12 +115,11 @@ export const getPharmacyById = async (req, res, next) => {
       throw new AppError("Pharmacy not found", 404);
     }
 
-    // Return pharmacy with license document URL
+    // Keep both field names so older frontend code still works.
     res.status(200).json({
       success: true,
       data: {
         ...pharmacy,
-        // Ensure both fields are available for backward compatibility
         licenseDocumentUrl: pharmacy.licenseDocument,
       },
     });
@@ -142,10 +128,7 @@ export const getPharmacyById = async (req, res, next) => {
   }
 };
 
-/**
- * PATCH /api/admin/pharmacy/:id/approve
- * Approve pharmacy - updates existing verificationStatus field
- */
+// Approve a pharmacy and activate the related user account.
 export const approvePharmacy = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -160,8 +143,7 @@ export const approvePharmacy = async (req, res, next) => {
       throw new AppError("Pharmacy not found", 404);
     }
 
-    // Security: System Admin (roleId=1) should NEVER have a pharmacy
-    // This prevents admin from creating pharmacy accounts and self-approving
+    // System admin accounts should not own pharmacy records.
     if (pharmacy.user.roleId === 1) {
       throw new AppError(
         "System Admin accounts cannot register pharmacies",
@@ -169,7 +151,7 @@ export const approvePharmacy = async (req, res, next) => {
       );
     }
 
-    // Prevent admin from approving their own pharmacy
+    // The reviewer cannot approve their own pharmacy.
     if (pharmacy.userId === adminUserId) {
       throw new AppError("Cannot approve your own pharmacy", 403);
     }
@@ -178,8 +160,7 @@ export const approvePharmacy = async (req, res, next) => {
       throw new AppError("Pharmacy is already verified", 400);
     }
 
-    // Prevent re-upload after admin decision
-    // Once admin reviews, the license document is locked
+    // Rejected applications stay locked until an admin resets them.
     if (pharmacy.verificationStatus === "REJECTED") {
       throw new AppError(
         "Cannot approve a rejected pharmacy. Contact system administrator for reset.",
@@ -187,7 +168,7 @@ export const approvePharmacy = async (req, res, next) => {
       );
     }
 
-    // Atomically update pharmacy verification status AND user account status
+    // Update the pharmacy and user account together so they stay in sync.
     const [updatedPharmacy] = await prisma.$transaction([
       prisma.pharmacy.update({
         where: { id },
@@ -218,7 +199,7 @@ export const approvePharmacy = async (req, res, next) => {
       `[ADMIN] Pharmacy ${id} approved by admin ${adminUserId} - User ${pharmacy.userId} status set to APPROVED`
     );
 
-    // Log activity
+    // Record the approval in the audit trail.
     await createLog(
       adminUserId,
       LOG_ACTIONS.PHARMACY_APPROVED,
@@ -242,10 +223,7 @@ export const approvePharmacy = async (req, res, next) => {
   }
 };
 
-/**
- * PATCH /api/admin/pharmacy/:id/reject
- * Reject pharmacy - updates existing verificationStatus field
- */
+// Reject a pharmacy and store the reason for the decision.
 export const rejectPharmacy = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -265,7 +243,7 @@ export const rejectPharmacy = async (req, res, next) => {
       throw new AppError("Pharmacy not found", 404);
     }
 
-    // Security: System Admin (roleId=1) should NEVER have a pharmacy
+    // System admin accounts should not have pharmacy records.
     if (pharmacy.user.roleId === 1) {
       throw new AppError(
         "System Admin accounts cannot register pharmacies",
@@ -273,7 +251,7 @@ export const rejectPharmacy = async (req, res, next) => {
       );
     }
 
-    // Prevent admin from rejecting their own pharmacy
+    // Prevent admins from rejecting their own pharmacy.
     if (pharmacy.userId === adminUserId) {
       throw new AppError("Cannot reject your own pharmacy", 403);
     }
@@ -282,7 +260,7 @@ export const rejectPharmacy = async (req, res, next) => {
       throw new AppError("Pharmacy is already rejected", 400);
     }
 
-    // Atomically update pharmacy verification status AND user account status
+    // Update the pharmacy and user account together in one transaction.
     const [updatedPharmacy] = await prisma.$transaction([
       prisma.pharmacy.update({
         where: { id },
@@ -313,7 +291,7 @@ export const rejectPharmacy = async (req, res, next) => {
       `[ADMIN] Pharmacy ${id} rejected by admin ${adminUserId}: ${reason} - User ${pharmacy.userId} status set to REJECTED`
     );
 
-    // Log activity
+    // Record the rejection in the audit trail.
     await createLog(
       adminUserId,
       LOG_ACTIONS.PHARMACY_REJECTED,
@@ -338,22 +316,18 @@ export const rejectPharmacy = async (req, res, next) => {
   }
 };
 
-/**
- * PATCH /api/admin/profile
- * Update admin profile (name, email, phone)
- * Security: Only the logged-in admin can update their own profile
- */
+// Update the logged-in admin profile.
 export const updateProfile = async (req, res, next) => {
   try {
-    const userId = req.user.userId; // From JWT token
+    const userId = req.user.userId;
     const { name, email, phone } = req.body;
 
-    // Validate at least one field is provided
+    // Require at least one field.
     if (!name && !email && !phone) {
       throw new AppError("At least one field (name, email, or phone) must be provided", 400);
     }
 
-    // If email is being changed, check if it's already taken by another user
+    // Check that the new email is not already in use.
     if (email) {
       const existingUser = await prisma.user.findUnique({
         where: { email },
@@ -364,13 +338,13 @@ export const updateProfile = async (req, res, next) => {
       }
     }
 
-    // Build update data object
+    // Build the update payload.
     const updateData = {};
     if (name) updateData.name = name.trim();
     if (email) updateData.email = email.trim().toLowerCase();
     if (phone) updateData.phone = phone.trim();
 
-    // Update user profile
+    // Save the profile changes.
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: updateData,
@@ -392,7 +366,7 @@ export const updateProfile = async (req, res, next) => {
 
     console.log(`[ADMIN] Profile updated for user ${userId}`);
 
-    // Log activity
+    // Record the profile update in the audit trail.
     await createLog(
       userId,
       LOG_ACTIONS.PROFILE_UPDATED,
@@ -423,30 +397,23 @@ export const updateProfile = async (req, res, next) => {
   }
 };
 
-/**
- * PATCH /api/admin/change-password
- * Change password with current password verification
- * Security:
- * - Requires current password verification
- * - Hashes new password before saving
- * - Updates updatedAt timestamp for audit trail
- */
+// Change the admin password after verifying the current one.
 export const changePassword = async (req, res, next) => {
   try {
-    const userId = req.user.userId; // From JWT token
+    const userId = req.user.userId;
     const { currentPassword, newPassword } = req.body;
 
-    // Validate required fields
+    // Require both passwords.
     if (!currentPassword || !newPassword) {
       throw new AppError("Current password and new password are required", 400);
     }
 
-    // Validate new password strength
+    // Keep the new password at a reasonable length.
     if (newPassword.length < 8) {
       throw new AppError("New password must be at least 8 characters long", 400);
     }
 
-    // Get user with password
+    // Load the stored password hash.
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -460,23 +427,23 @@ export const changePassword = async (req, res, next) => {
       throw new AppError("User not found", 404);
     }
 
-    // Verify current password using bcrypt
+    // Verify the current password before changing anything.
     const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
 
     if (!isPasswordValid) {
       throw new AppError("The current password you entered is incorrect.", 400);
     }
 
-    // Check that new password is different from current
+    // Prevent reusing the current password.
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
     if (isSamePassword) {
       throw new AppError("New password must be different from current password", 400);
     }
 
-    // Hash new password with salt rounds = 12
+    // Hash the new password before saving it.
     const hashedPassword = await bcrypt.hash(newPassword, 12);
 
-    // Update password in database
+    // Save the new password hash.
     await prisma.user.update({
       where: { id: userId },
       data: {
@@ -487,7 +454,7 @@ export const changePassword = async (req, res, next) => {
 
     console.log(`[ADMIN] Password changed for user ${userId} (${user.email})`);
 
-    // Log activity
+    // Record the password change in the audit trail.
     await createLog(
       userId,
       LOG_ACTIONS.PASSWORD_CHANGED,
@@ -508,33 +475,25 @@ export const changePassword = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/admin/users
- * Get all users with filtering options
- * Query params:
- * - role: Filter by roleId (1=Admin, 2=Pharmacy, 3=Patient)
- * - search: Search by name or email
- * - status: Filter by user status (APPROVED, PENDING, REJECTED, etc.)
- * Requires: JWT + roleId=1
- */
+// Return users with optional filters.
 export const getAllUsers = async (req, res, next) => {
   try {
     const { role, search, status } = req.query;
 
-    // Build where clause for filtering
+    // Build the filter query.
     const where = {};
 
-    // Filter by role
+    // Filter by role.
     if (role && !isNaN(parseInt(role))) {
       where.roleId = parseInt(role);
     }
 
-    // Filter by status
+    // Filter by status.
     if (status) {
       where.status = status;
     }
 
-    // Search by name or email
+    // Search by name or email.
     if (search && search.trim()) {
       where.OR = [
         { name: { contains: search.trim(), mode: 'insensitive' } },
@@ -542,7 +501,7 @@ export const getAllUsers = async (req, res, next) => {
       ];
     }
 
-    // Fetch users with role information, excluding password
+    // Fetch users without the password field.
     const users = await prisma.user.findMany({
       where,
       select: {
@@ -581,17 +540,7 @@ export const getAllUsers = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/admin/logs
- * Get activity logs with filtering and pagination
- * Query params:
- * - category: Filter by log category (AUTH, PHARMACY, SYSTEM, USER, INVENTORY, ORDER)
- * - userId: Filter by user ID
- * - action: Filter by action type
- * - skip: Pagination skip (default: 0)
- * - take: Pagination take (default: 50)
- * Requires: JWT + roleId=1
- */
+// Return activity logs with filters and pagination.
 export const getLogs = async (req, res, next) => {
   try {
     const { category, userId, action, skip = 0, take = 50 } = req.query;
@@ -608,14 +557,14 @@ export const getLogs = async (req, res, next) => {
 
     console.log(`[ADMIN] Fetched ${result.logs.length} logs (page ${result.page}/${result.totalPages})`);
 
-    // Always return 200 with the result, even if logs array is empty
+    // Return a normal response even when there are no logs.
     res.status(200).json({
       success: true,
       ...result,
     });
   } catch (error) {
     console.error("[ADMIN] Error fetching logs:", error);
-    // Return empty result on error instead of crashing
+    // Return an empty result on error instead of crashing.
     res.status(200).json({
       success: true,
       logs: [],
@@ -627,13 +576,10 @@ export const getLogs = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/admin/sos-locations
- * Get all SOS emergency locations from patients
- */
+// Return the latest SOS locations for the admin map.
 export const getSOSLocations = async (req, res, next) => {
   try {
-    // Fetch SOS requests with patient information
+    // Load SOS requests with patient details.
     const sosRequests = await prisma.sOSRequest.findMany({
       include: {
         patient: {
@@ -648,10 +594,10 @@ export const getSOSLocations = async (req, res, next) => {
       orderBy: {
         createdAt: "desc",
       },
-      take: 100, // Limit to recent 100 requests
+      take: 100,
     });
 
-    // Format data for map display
+    // Shape the data for the map view.
     const locations = sosRequests.map((sos) => ({
       id: sos.id,
       latitude: sos.latitude,
@@ -688,15 +634,11 @@ export const getSOSLocations = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/admin/inventory/insights
- * Get inventory insights across all pharmacies
- */
+// Return inventory insights across all pharmacies.
 export const getInventoryInsights = async (req, res, next) => {
   const startTime = Date.now();
   try {
-    // Fetch all inventory items with pharmacy information
-    // Correct model: prisma.inventory (schema.prisma: model Inventory)
+    // Load inventory items with pharmacy details.
     const inventoryItems = await prisma.inventory.findMany({
       include: {
         pharmacy: {
@@ -709,7 +651,7 @@ export const getInventoryInsights = async (req, res, next) => {
       },
     });
 
-    // Low stock threshold — Inventory model has no reorderLevel field
+    // Use a fixed low-stock threshold because the model has no reorder level.
     const LOW_STOCK_THRESHOLD = 10;
 
     const lowStockItems = inventoryItems.filter(
@@ -720,7 +662,7 @@ export const getInventoryInsights = async (req, res, next) => {
       (item) => item.quantity === 0
     );
 
-    // Group by generic name for shortage analysis (covers both low-stock and out-of-stock)
+    // Group by generic name for shortage analysis.
     const medicineMap = new Map();
     [...lowStockItems, ...outOfStockItems].forEach((item) => {
       const key = item.genericName;
@@ -745,7 +687,7 @@ export const getInventoryInsights = async (req, res, next) => {
     });
 
     const shortages = Array.from(medicineMap.values()).map((medicine) => {
-      // Safe aggregation — handles empty pharmacy list
+      // Safe aggregation for empty pharmacy lists.
       const total = medicine.pharmaciesAffected.length > 0
         ? medicine.totalStock / medicine.pharmaciesAffected.length
         : 0;
@@ -773,10 +715,7 @@ export const getInventoryInsights = async (req, res, next) => {
   }
 };
 
-/**
- * POST /api/admin/inventory/restock-alert
- * Send restock alert to pharmacies
- */
+// Send a restock alert to pharmacies.
 export const sendRestockAlert = async (req, res, next) => {
   try {
     const { genericName, message } = req.body;
@@ -785,7 +724,7 @@ export const sendRestockAlert = async (req, res, next) => {
       throw new AppError("Generic name and message are required", 400);
     }
 
-    // Find affected pharmacies (low stock on this medicine)
+    // Find pharmacies affected by low stock.
     const lowStockItems = await prisma.inventoryItem.findMany({
       where: {
         medicineName: {
@@ -808,7 +747,7 @@ export const sendRestockAlert = async (req, res, next) => {
       },
     });
 
-    // Log the alert
+    // Record the alert in the audit trail.
     await createLog(
       req.user.userId,
       "INVENTORY_ALERT_SENT",
@@ -835,10 +774,7 @@ export const sendRestockAlert = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/admin/health-tips
- * Get all health tips
- */
+// Return all health tips.
 export const getHealthTips = async (req, res, next) => {
   try {
     const healthTips = await prisma.healthTip.findMany({
@@ -858,13 +794,10 @@ export const getHealthTips = async (req, res, next) => {
   }
 };
 
-/**
- * POST /api/admin/health-tips
- * Create a new health tip
- */
+// Create a new health tip.
 export const createHealthTip = async (req, res, next) => {
   try {
-    // Validate admin authentication
+    // Require admin authentication.
     if (!req.user || !req.user.userId) {
       throw new AppError("Unauthorized: Admin authentication required", 401);
     }
@@ -886,7 +819,7 @@ export const createHealthTip = async (req, res, next) => {
       },
     });
 
-    // Log activity
+    // Record the creation in the audit trail.
     await createLog(
       req.user.userId,
       LOG_ACTIONS.CONTENT_CREATED,
@@ -906,10 +839,7 @@ export const createHealthTip = async (req, res, next) => {
   }
 };
 
-/**
- * PATCH /api/admin/health-tips/:id
- * Update a health tip
- */
+// Update a health tip.
 export const updateHealthTip = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -926,7 +856,7 @@ export const updateHealthTip = async (req, res, next) => {
       },
     });
 
-    // Log activity
+    // Record the update in the audit trail.
     await createLog(
       req.user.userId,
       LOG_ACTIONS.CONTENT_UPDATED,
@@ -946,10 +876,7 @@ export const updateHealthTip = async (req, res, next) => {
   }
 };
 
-/**
- * DELETE /api/admin/health-tips/:id
- * Delete a health tip
- */
+// Delete a health tip.
 export const deleteHealthTip = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -958,7 +885,7 @@ export const deleteHealthTip = async (req, res, next) => {
       where: { id },
     });
 
-    // Log activity
+    // Record the deletion in the audit trail.
     await createLog(
       req.user.userId,
       LOG_ACTIONS.CONTENT_DELETED,
@@ -977,10 +904,7 @@ export const deleteHealthTip = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/admin/announcements
- * Get all announcements
- */
+// Return all announcements.
 export const getAnnouncements = async (req, res, next) => {
   try {
     const announcements = await prisma.announcement.findMany({
@@ -1000,13 +924,10 @@ export const getAnnouncements = async (req, res, next) => {
   }
 };
 
-/**
- * POST /api/admin/announcements
- * Create a new announcement
- */
+// Create a new announcement.
 export const createAnnouncement = async (req, res, next) => {
   try {
-    // Validate admin authentication
+    // Require admin authentication.
     if (!req.user || !req.user.userId) {
       throw new AppError("Unauthorized: Admin authentication required", 401);
     }
@@ -1040,7 +961,7 @@ export const createAnnouncement = async (req, res, next) => {
       },
     });
 
-    // Log activity
+    // Record the creation in the audit trail.
     await createLog(
       req.user.userId,
       LOG_ACTIONS.CONTENT_CREATED,
@@ -1049,7 +970,7 @@ export const createAnnouncement = async (req, res, next) => {
       `Created announcement: ${title}`
     );
 
-    // Trigger notification broadcast to target users
+    // Send the notification, but do not block creation if it fails.
     try {
       const notificationCount = await notificationService.notifyAnnouncement(announcement);
       console.log(`[ADMIN] Announcement broadcast to ${notificationCount} users`);
@@ -1058,7 +979,7 @@ export const createAnnouncement = async (req, res, next) => {
       // Continue despite notification failure - don't block announcement creation
     }
 
-    // Real-time Socket.IO push — ADMIN_BROADCAST to all connected clients
+    // Push the announcement to connected clients.
     try {
       const io = req.app.get("io");
       if (io) {
@@ -1088,10 +1009,7 @@ export const createAnnouncement = async (req, res, next) => {
   }
 };
 
-/**
- * PATCH /api/admin/announcements/:id
- * Update an announcement
- */
+// Update an announcement.
 export const updateAnnouncement = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -1122,7 +1040,7 @@ export const updateAnnouncement = async (req, res, next) => {
       },
     });
 
-    // Log activity
+    // Record the update in the audit trail.
     await createLog(
       req.user.userId,
       LOG_ACTIONS.CONTENT_UPDATED,
@@ -1142,10 +1060,7 @@ export const updateAnnouncement = async (req, res, next) => {
   }
 };
 
-/**
- * DELETE /api/admin/announcements/:id
- * Delete an announcement
- */
+// Delete an announcement.
 export const deleteAnnouncement = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -1154,7 +1069,7 @@ export const deleteAnnouncement = async (req, res, next) => {
       where: { id },
     });
 
-    // Log activity
+    // Record the deletion in the audit trail.
     await createLog(
       req.user.userId,
       LOG_ACTIONS.CONTENT_DELETED,

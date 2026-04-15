@@ -1,34 +1,16 @@
 /**
- * notificationSound.js
- * 
- * Centralized audio chime utility for the PharmEasy notification system.
- * 
- * Types:
- *   'standard'  — gentle two-tone sine-wave ping (new notifications, CMS announcements)
- *   'cms'       — alias for 'standard'
- *   'urgent'    — 3-pulse descending square-wave emergency beep (SOS alerts, new chat messages)
- *   'sos'       — alias for 'urgent'
- *   'message'   — alias for 'urgent'
- *   'admin'     — 2-step soft triad chime for system-admin global alerts
- * 
- * Browser Audio Unlock:
- *   Browsers require a user gesture before AudioContext can play sound.
- *   This module tracks whether the user has interacted and queues a silent
- *   resume call so the first real chime is never silently blocked.
+ * Audio chimes used by the notification system.
  */
 
 let _audioCtxRef = null;
 let _userHasInteracted = false;
 
-// Track the first user interaction to unblock AudioContext
 if (typeof window !== "undefined") {
   const _unlock = () => {
     _userHasInteracted = true;
-    // Resume any suspended context
     if (_audioCtxRef && _audioCtxRef.state === "suspended") {
       _audioCtxRef.resume().catch(() => {});
     }
-    // Remove listeners after first interaction
     window.removeEventListener("click", _unlock, true);
     window.removeEventListener("keydown", _unlock, true);
     window.removeEventListener("touchstart", _unlock, true);
@@ -54,10 +36,7 @@ function getAudioContext() {
   }
 }
 
-/**
- * Play a standard two-tone ping.
- * Sine wave: 880 Hz → 440 Hz over 0.4s, gentle volume.
- */
+// Play the standard notification ping.
 function playStandardPing() {
   const ctx = getAudioContext();
   if (!ctx) return;
@@ -78,11 +57,7 @@ function playStandardPing() {
   }
 }
 
-/**
- * Play a 3-pulse descending square-wave emergency chime.
- * 900 Hz → 800 Hz → 700 Hz, each 150ms, spaced 180ms apart.
- * Used for SOS alerts and urgent new-message notifications.
- */
+// Play the urgent notification chime.
 function playUrgentChime() {
   const ctx = getAudioContext();
   if (!ctx) return;
@@ -111,7 +86,7 @@ function playAdminChime() {
   if (!ctx) return;
 
   try {
-    const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+    const notes = [523.25, 659.25, 783.99];
     notes.forEach((freq, index) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();

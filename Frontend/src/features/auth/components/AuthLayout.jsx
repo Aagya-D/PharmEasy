@@ -16,6 +16,7 @@ export function AuthLayout({
   slogan,
   accentColor = "#0097b2",
   cardClassName = "max-w-[460px]",
+  showBrandBadge = true,
 }) {
   const location = useLocation();
 
@@ -99,10 +100,12 @@ export function AuthLayout({
                   </div>
                 </div>
               </div>
-              <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600 sm:inline-flex">
-                <Sparkles size={14} className="text-teal-600" />
-                PharmEasy
-              </div>
+              {showBrandBadge ? (
+                <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600 sm:inline-flex">
+                  <Sparkles size={14} className="text-teal-600" />
+                  PharmEasy
+                </div>
+              ) : null}
             </div>
 
             <AnimatePresence mode="wait" initial={false}>

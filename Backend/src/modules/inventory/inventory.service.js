@@ -334,6 +334,35 @@ export const deleteInventoryItem = async (inventoryId, pharmacyId) => {
     throw new AppError("You do not have permission to delete this inventory item", 403);
   }
 
+  const linkedOrderItems = await prisma.orderItem.count({
+    where: { inventoryId },
+  });
+
+  if (linkedOrderItems > 0) {
+    throw new AppError(
+      "Cannot delete this medicine because it is linked to existing orders. Try marking it as out of stock instead.",
+      400
+    );
+  }
+
+  const sosLinkFilters = [{ medicineName: inventoryItem.name }];
+  if (inventoryItem.genericName) {
+    sosLinkFilters.push({ genericName: inventoryItem.genericName });
+  }
+
+  const linkedSosRequests = await prisma.sOSRequest.count({
+    where: {
+      OR: sosLinkFilters,
+    },
+  });
+
+  if (linkedSosRequests > 0) {
+    throw new AppError(
+      "Cannot delete this medicine because it is linked to SOS requests. Try marking it as out of stock instead.",
+      400
+    );
+  }
+
   // Delete the inventory item
   const deletedItem = await prisma.inventory.delete({
     where: { id: inventoryId },

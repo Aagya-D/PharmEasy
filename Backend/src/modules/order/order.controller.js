@@ -5,6 +5,7 @@ import logger from "../../utils/logger.js";
 import { decryptText } from "../../utils/encryption.js";
 import config from "../../config/environment.js";
 
+// Allowed order statuses used across pharmacy workflow.
 const ORDER_STATUS_ENUM_VALUES = [
   "PENDING",
   "ACCEPTED",
@@ -14,6 +15,7 @@ const ORDER_STATUS_ENUM_VALUES = [
   "CANCELLED",
 ];
 
+// Valid state transitions for order lifecycle updates.
 const STATUS_TRANSITIONS = {
   PENDING: ["ACCEPTED", "CANCELLED"],
   ACCEPTED: ["PREPARING", "READY", "CANCELLED"],
@@ -23,15 +25,21 @@ const STATUS_TRANSITIONS = {
   CANCELLED: [],
 };
 
+// Normalize status input from client/API callbacks.
 const normalizeStatus = (status) => String(status || "").trim().toUpperCase();
+// Supported checkout payment methods.
 const ALLOWED_PAYMENT_METHODS = ["CASH_ON_DELIVERY", "ESEWA", "KHALTI"];
+// Flat delivery fee currently applied at checkout.
 const STANDARD_DELIVERY_FEE = 40;
+// Khalti status constants used for mapping.
 const KHALTI_SUCCESS_STATUS = "COMPLETED";
 const KHALTI_HOLD_STATUSES = ["PENDING", "INITIATED"];
 const KHALTI_FAILED_STATUSES = ["EXPIRED", "USER CANCELED", "FAILED", "REFUNDED"];
 
+// Keep phone numbers in normalized digits-only format.
 const normalizePhoneNumber = (value) => String(value || "").replace(/\D/g, "").trim();
 
+// Build a printable delivery address from structured shipping fields.
 const formatShippingAddress = (shippingAddress) => {
   if (!shippingAddress || typeof shippingAddress !== "object") {
     return "";
@@ -65,11 +73,13 @@ const formatShippingAddress = (shippingAddress) => {
   return `${prefix || addressLine}${suffix}`.trim();
 };
 
+// Deduplicate and normalize explicit item IDs.
 const resolveRequestedItemIds = (itemIds) => {
   const explicitIds = Array.isArray(itemIds) ? itemIds : [];
   return [...new Set(explicitIds.filter(Boolean).map(String))];
 };
 
+// Normalize checkout item payload from multiple frontend shapes.
 const normalizePayloadItems = (items) => {
   if (!Array.isArray(items)) {
     return [];
@@ -87,11 +97,25 @@ const normalizePayloadItems = (items) => {
     .filter((item) => item.medicineId);
 };
 
+// Create consistent HTTP errors with optional metadata.
 const createHttpError = (statusCode, message, extra = {}) =>
   Object.assign(new Error(message), { statusCode, ...extra });
 
+const parseOrderNotes = (value) => {
+  if (!value) return {};
+  if (typeof value === "object") return value;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {};
+  }
+};
+
+// Normalize Khalti status values from remote API.
 const normalizeKhaltiStatus = (status) => String(status || "").trim().toUpperCase();
 
+// Resolve Khalti API base URL based on environment config.
 const getKhaltiBaseUrl = () => {
   const raw = String(
     process.env.KHALTI_API_BASE_URL ||
@@ -103,8 +127,10 @@ const getKhaltiBaseUrl = () => {
   return raw.replace(/\/+$/, "");
 };
 
+// Build auth header for Khalti API requests.
 const buildKhaltiAuthHeader = (secretKey) => `Key ${String(secretKey || "").trim()}`;
 
+// Resolve frontend URLs used in Khalti initiate payload.
 const resolveKhaltiUrls = () => {
   const frontendUrl = String(process.env.FRONTEND_URL || config.frontend.url || "").trim();
 
@@ -119,6 +145,7 @@ const resolveKhaltiUrls = () => {
   };
 };
 
+// Parse API error body safely without crashing on invalid JSON.
 const parseKhaltiErrorBody = async (response) => {
   try {
     return await response.json();
@@ -127,6 +154,7 @@ const parseKhaltiErrorBody = async (response) => {
   }
 };
 
+// Map Khalti API error payload to user-facing error messages.
 const resolveKhaltiApiError = (body, fallbackMessage) => {
   const detail = String(body?.detail || "").trim();
 
@@ -155,6 +183,7 @@ const resolveKhaltiApiError = (body, fallbackMessage) => {
   return createHttpError(400, detail || body?.error_key || fallbackMessage, { data: body });
 };
 
+// Call Khalti initiate endpoint and throw normalized API errors.
 const callKhaltiInitiate = async (payload, secretKey) => {
   const response = await fetch(`${getKhaltiBaseUrl()}/epayment/initiate/`, {
     method: "POST",
@@ -176,6 +205,7 @@ const callKhaltiInitiate = async (payload, secretKey) => {
   return body;
 };
 
+// Call Khalti lookup endpoint and return lookup body.
 const callKhaltiLookup = async (pidx, secretKey) => {
   const response = await fetch(`${getKhaltiBaseUrl()}/epayment/lookup/`, {
     method: "POST",
@@ -197,6 +227,7 @@ const callKhaltiLookup = async (pidx, secretKey) => {
   return body;
 };
 
+// Fetch and decrypt pharmacy-specific Khalti secret key.
 const getPharmacyKhaltiSecret = async (pharmacyId) => {
   const configEntry = await prisma.pharmacyPaymentConfig.findUnique({
     where: { pharmacyId },
@@ -217,6 +248,7 @@ const getPharmacyKhaltiSecret = async (pharmacyId) => {
   };
 };
 
+// Convert Khalti status to local paymentStatus enum.
 const mapKhaltiStatusToPaymentStatus = (status) => {
   const normalized = normalizeKhaltiStatus(status);
 
@@ -235,6 +267,7 @@ const mapKhaltiStatusToPaymentStatus = (status) => {
   return "HOLD";
 };
 
+// Patient-facing message copy for each order status.
 const ORDER_STATUS_PATIENT_MESSAGES = {
   PENDING: "Your order is pending confirmation.",
   ACCEPTED: "Your order has been accepted by the pharmacy.",
@@ -244,9 +277,11 @@ const ORDER_STATUS_PATIENT_MESSAGES = {
   CANCELLED: "Your order has been cancelled.",
 };
 
+// Deduct inventory when order reaches active processing states.
 const shouldAttemptInventoryDeduction = (nextStatus) =>
   nextStatus === "ACCEPTED" || nextStatus === "COMPLETED";
 
+// Suggest next statuses for pharmacy dashboard actions.
 const NEXT_STATUS_HINTS = {
   PENDING: ["ACCEPTED", "CANCELLED"],
   ACCEPTED: ["PREPARING", "READY", "CANCELLED"],
@@ -256,6 +291,7 @@ const NEXT_STATUS_HINTS = {
   CANCELLED: [],
 };
 
+// Deduct inventory for each order line item inside DB transaction.
 const deductOrderInventory = async (tx, order, pharmacyId) => {
   const items = Array.isArray(order.items) ? order.items : [];
 
@@ -287,6 +323,7 @@ const deductOrderInventory = async (tx, order, pharmacyId) => {
 export const placeOrderFromCart = async (req, res) => {
   const startTime = Date.now();
   const userId = req.user?.userId || req.user?.id;
+  // Normalize checkout-level request fields.
   const {
     mode,
     itemIds,
@@ -300,8 +337,7 @@ export const placeOrderFromCart = async (req, res) => {
     longitude,
   } = req.body || {};
 
-  // Direct purchase: "buy-now" mode means items come directly from the medicine page,
-  // not from the Cart table. The frontend always sends `mode` explicitly.
+  // Buy-now mode skips the cart and checks out the selected items directly.
   const isDirectPurchase = mode === "buy-now";
 
   if (!userId) {
@@ -321,6 +357,7 @@ export const placeOrderFromCart = async (req, res) => {
   const clientDeliveryFee = summary?.deliveryFee === undefined ? null : Number(summary.deliveryFee);
   const clientTotal = summary?.total === undefined ? null : Number(summary.total);
 
+  // Checkout requires a persisted delivery address string.
   if (!normalizedDeliveryAddress) {
     return res.status(400).json({
       success: false,
@@ -328,6 +365,7 @@ export const placeOrderFromCart = async (req, res) => {
     });
   }
 
+  // Payment method must match the allow-list.
   if (!ALLOWED_PAYMENT_METHODS.includes(normalizedPaymentMethod)) {
     return res.status(400).json({
       success: false,
@@ -335,6 +373,7 @@ export const placeOrderFromCart = async (req, res) => {
     });
   }
 
+  // Parse optional delivery GPS coordinates.
   const parsedLatitude = latitude === null || latitude === undefined || latitude === ""
     ? null
     : Number(latitude);
@@ -342,6 +381,7 @@ export const placeOrderFromCart = async (req, res) => {
     ? null
     : Number(longitude);
 
+  // Validate GPS pair integrity.
   if ((parsedLatitude === null) !== (parsedLongitude === null)) {
     return res.status(400).json({
       success: false,
@@ -349,6 +389,7 @@ export const placeOrderFromCart = async (req, res) => {
     });
   }
 
+  // Validate numeric GPS formatting.
   if (
     (parsedLatitude !== null && Number.isNaN(parsedLatitude)) ||
     (parsedLongitude !== null && Number.isNaN(parsedLongitude))
@@ -359,6 +400,7 @@ export const placeOrderFromCart = async (req, res) => {
     });
   }
 
+  // Validate summary fields when provided by client.
   if (
     (clientItemsTotal !== null && Number.isNaN(clientItemsTotal)) ||
     (clientDeliveryFee !== null && Number.isNaN(clientDeliveryFee)) ||
@@ -370,6 +412,7 @@ export const placeOrderFromCart = async (req, res) => {
     });
   }
 
+  // Require either payload items or item ID list.
   if (payloadItems.length === 0 && requestedItemIds.length === 0) {
     return res.status(400).json({
       success: false,
@@ -378,6 +421,7 @@ export const placeOrderFromCart = async (req, res) => {
   }
 
   try {
+    // Read patient profile to fill contact fallback.
     const patient = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -385,6 +429,7 @@ export const placeOrderFromCart = async (req, res) => {
       },
     });
 
+    // Validate final contact number used for delivery.
     const finalContactNumber = normalizedContactNumber || normalizePhoneNumber(patient?.phone);
     if (!isValidNepaliPhone(finalContactNumber)) {
       return res.status(400).json({
@@ -393,11 +438,13 @@ export const placeOrderFromCart = async (req, res) => {
       });
     }
 
+    // Resolve eligible checkout items from direct payload or cart selection.
     let cart = null;
     let eligibleItems = isDirectPurchase || requestedItemIds.length === 0 ? payloadItems : [];
 
     if (eligibleItems.length === 0) {
-      // Fallback for legacy cart-driven checkout when payload items are not sent.
+      // Fall back to the saved cart when the client does not send item details.
+      // Load cart with stable ordering for deterministic checkout.
       cart = await prisma.cart.findUnique({
         where: { userId },
         include: {
@@ -411,6 +458,7 @@ export const placeOrderFromCart = async (req, res) => {
         return res.status(400).json({ success: false, message: "Cart is empty" });
       }
 
+      // If the request specifies item IDs, only those items are checked out.
       eligibleItems = requestedItemIds.length > 0
         ? cart.items.filter(
             (item) =>
@@ -424,6 +472,7 @@ export const placeOrderFromCart = async (req, res) => {
       }
     }
 
+    // Validate each item has pharmacy, medicine, and positive quantity.
     const invalidPayloadItems = eligibleItems.filter(
       (item) => !item.pharmacyId || !Number.isInteger(item.quantity) || item.quantity <= 0
     );
@@ -434,25 +483,29 @@ export const placeOrderFromCart = async (req, res) => {
       });
     }
 
-    const pharmacyIds = [...new Set(eligibleItems.map((item) => item.pharmacyId))];
-    if (pharmacyIds.length > 1) {
-      return res.status(409).json({
-        success: false,
-        errorCode: "PHARMACY_MISMATCH",
-        message: "Selected items must be from a single pharmacy",
-      });
+    const groupedItemsByPharmacy = new Map();
+    for (const item of eligibleItems) {
+      const pharmacyKey = String(item.pharmacyId);
+      if (!groupedItemsByPharmacy.has(pharmacyKey)) {
+        groupedItemsByPharmacy.set(pharmacyKey, []);
+      }
+      groupedItemsByPharmacy.get(pharmacyKey).push(item);
     }
 
-    const pharmacyId = pharmacyIds[0];
-    const createdOrder = await prisma.$transaction(async (tx) => {
-      const inventoryIds = eligibleItems.map((item) => item.medicineId);
+    const groupedPharmacyIds = [...groupedItemsByPharmacy.keys()];
+    const isKhaltiPayment = normalizedPaymentMethod === "KHALTI";
+
+    // Split checkout into one order per pharmacy inside a single transaction.
+    const createdOrders = await prisma.$transaction(async (tx) => {
+      const inventoryIds = [...new Set(eligibleItems.map((item) => item.medicineId))];
       const inventoryList = await tx.inventory.findMany({
         where: {
           id: { in: inventoryIds },
-          pharmacyId,
+          pharmacyId: { in: groupedPharmacyIds },
         },
         select: {
           id: true,
+          pharmacyId: true,
           name: true,
           genericName: true,
           quantity: true,
@@ -461,14 +514,19 @@ export const placeOrderFromCart = async (req, res) => {
         },
       });
 
-      const inventoryById = new Map(inventoryList.map((entry) => [entry.id, entry]));
+      const inventoryByCompositeKey = new Map(
+        inventoryList.map((entry) => [`${entry.pharmacyId}::${entry.id}`, entry])
+      );
+
       const insufficientItems = eligibleItems
         .map((item) => {
-          const inv = inventoryById.get(item.medicineId);
+          const key = `${item.pharmacyId}::${item.medicineId}`;
+          const inv = inventoryByCompositeKey.get(key);
           if (!inv) {
             return {
               itemId: item.id,
               medicineId: item.medicineId,
+              pharmacyId: item.pharmacyId,
               reason: "NOT_FOUND",
             };
           }
@@ -477,6 +535,7 @@ export const placeOrderFromCart = async (req, res) => {
             return {
               itemId: item.id,
               medicineId: item.medicineId,
+              pharmacyId: item.pharmacyId,
               requestedQuantity: item.quantity,
               availableQuantity: inv.quantity,
               reason: "INSUFFICIENT_STOCK",
@@ -494,14 +553,18 @@ export const placeOrderFromCart = async (req, res) => {
         });
       }
 
-      const itemsSubtotal = eligibleItems.reduce((sum, item) => {
-        const inv = inventoryById.get(item.medicineId);
-        const unitPrice = Number(inv?.price || 0);
-        return sum + unitPrice * Number(item.quantity || 0);
-      }, 0);
+      const pharmacySubtotals = new Map();
+      for (const [pharmacyId, itemsForPharmacy] of groupedItemsByPharmacy.entries()) {
+        const subtotal = itemsForPharmacy.reduce((sum, item) => {
+          const inv = inventoryByCompositeKey.get(`${pharmacyId}::${item.medicineId}`);
+          return sum + Number(inv?.price || 0) * Number(item.quantity || 0);
+        }, 0);
+        pharmacySubtotals.set(pharmacyId, subtotal);
+      }
+
+      const itemsSubtotal = [...pharmacySubtotals.values()].reduce((sum, value) => sum + value, 0);
       const deliveryFee = eligibleItems.length > 0 ? STANDARD_DELIVERY_FEE : 0;
       const grandTotal = itemsSubtotal + deliveryFee;
-      const persistedTotal = clientTotal !== null ? clientTotal : grandTotal;
 
       if (
         (clientItemsTotal !== null && Math.abs(clientItemsTotal - itemsSubtotal) > 0.01) ||
@@ -511,91 +574,128 @@ export const placeOrderFromCart = async (req, res) => {
         throw createHttpError(409, "Order total changed. Please review your cart and try again.");
       }
 
-      const isKhaltiPayment = normalizedPaymentMethod === "KHALTI";
-      const order = await tx.order.create({
-        data: {
-          patientId: userId,
-          pharmacyId,
-          status: "PENDING",
-          inventoryDeducted: !isKhaltiPayment,
-          paymentStatus: isKhaltiPayment ? "INITIATED" : "NOT_REQUIRED",
-          totalAmount: persistedTotal,
-          deliveryAddress: normalizedDeliveryAddress,
-          paymentMethod: normalizedPaymentMethod,
-          contactNumber: finalContactNumber,
-          ...(parsedLatitude !== null ? { latitude: parsedLatitude } : {}),
-          ...(parsedLongitude !== null ? { longitude: parsedLongitude } : {}),
-        },
-      });
+      const orderIds = [];
+      const groupedEntries = [...groupedItemsByPharmacy.entries()];
 
-      await tx.orderItem.createMany({
-        data: eligibleItems.map((item) => {
-          const inv = inventoryById.get(item.medicineId);
-          const unitPrice = Number(inv?.price || 0);
-          const quantity = Number(item.quantity || 0);
+      for (let index = 0; index < groupedEntries.length; index += 1) {
+        const [pharmacyId, itemsForPharmacy] = groupedEntries[index];
+        const pharmacyItemsSubtotal = pharmacySubtotals.get(pharmacyId) || 0;
+        const pharmacyDeliveryFee = index === 0 ? deliveryFee : 0;
+        const orderTotalAmount = pharmacyItemsSubtotal + pharmacyDeliveryFee;
 
-          return {
-            orderId: order.id,
-            inventoryId: item.medicineId,
-            medicineName: inv?.name || item.medicineName,
-            genericName: inv?.genericName || item.genericName || null,
-            unitPrice,
-            quantity,
-            lineTotal: unitPrice * quantity,
-          };
-        }),
-      });
-
-      if (!isKhaltiPayment) {
-        for (const item of eligibleItems) {
-          const updated = await tx.inventory.updateMany({
-            where: {
-              id: item.medicineId,
-              pharmacyId,
-              quantity: { gte: item.quantity },
-            },
-            data: { quantity: { decrement: item.quantity } },
-          });
-
-          if (updated.count !== 1) {
-            throw createHttpError(409, "Inventory changed during checkout. Please try again.");
-          }
-        }
-      }
-
-      if (!isDirectPurchase && cart && !isKhaltiPayment) {
-        await tx.cartItem.deleteMany({
-          where: {
-            cartId: cart.id,
-            id: { in: eligibleItems.map((item) => item.id) },
+        const order = await tx.order.create({
+          data: {
+            patientId: userId,
+            pharmacyId,
+            status: "PENDING",
+            inventoryDeducted: !isKhaltiPayment,
+            paymentStatus: isKhaltiPayment ? "INITIATED" : "NOT_REQUIRED",
+            totalAmount: orderTotalAmount,
+            deliveryAddress: normalizedDeliveryAddress,
+            paymentMethod: normalizedPaymentMethod,
+            contactNumber: finalContactNumber,
+            ...(parsedLatitude !== null ? { latitude: parsedLatitude } : {}),
+            ...(parsedLongitude !== null ? { longitude: parsedLongitude } : {}),
           },
         });
+
+        await tx.orderItem.createMany({
+          data: itemsForPharmacy.map((item) => {
+            const inv = inventoryByCompositeKey.get(`${pharmacyId}::${item.medicineId}`);
+            const unitPrice = Number(inv?.price || 0);
+            const quantity = Number(item.quantity || 0);
+
+            return {
+              orderId: order.id,
+              inventoryId: item.medicineId,
+              medicineName: inv?.name || item.medicineName,
+              genericName: inv?.genericName || item.genericName || null,
+              unitPrice,
+              quantity,
+              lineTotal: unitPrice * quantity,
+            };
+          }),
+        });
+
+        if (!isKhaltiPayment) {
+          for (const item of itemsForPharmacy) {
+            const updated = await tx.inventory.updateMany({
+              where: {
+                id: item.medicineId,
+                pharmacyId,
+                quantity: { gte: item.quantity },
+              },
+              data: { quantity: { decrement: item.quantity } },
+            });
+
+            if (updated.count !== 1) {
+              throw createHttpError(409, "Inventory changed during checkout. Please try again.");
+            }
+          }
+        }
+
+        if (!isDirectPurchase && cart && !isKhaltiPayment) {
+          const selectedCartItemIds = itemsForPharmacy
+            .map((item) => item.id)
+            .filter(Boolean)
+            .map((value) => String(value));
+
+          if (selectedCartItemIds.length > 0) {
+            await tx.cartItem.deleteMany({
+              where: {
+                cartId: cart.id,
+                id: { in: selectedCartItemIds },
+              },
+            });
+          }
+        }
+
+        orderIds.push(order.id);
       }
 
-      return tx.order.findUnique({
-        where: { id: order.id },
+      return tx.order.findMany({
+        where: { id: { in: orderIds } },
         include: { items: true },
       });
     });
 
+    const orderedCheckoutOrders = createdOrders.sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
+    const primaryOrder = orderedCheckoutOrders[0] || null;
+    const checkoutGroupId = `checkout_${Date.now()}_${String(userId).slice(-6)}`;
+
     let checkoutResponse = {
-      order: createdOrder,
+      order: primaryOrder,
+      orders: orderedCheckoutOrders,
       payment: null,
+      summary: {
+        orderCount: orderedCheckoutOrders.length,
+        totalAmount: orderedCheckoutOrders.reduce(
+          (sum, order) => sum + Number(order.totalAmount || 0),
+          0
+        ),
+      },
     };
 
     if (normalizedPaymentMethod === "KHALTI") {
       try {
+        if (!primaryOrder) {
+          throw createHttpError(500, "No orders were created for Khalti checkout");
+        }
+
         const { websiteUrl, returnUrl } = resolveKhaltiUrls();
-        const { secretKey } = await getPharmacyKhaltiSecret(createdOrder.pharmacyId);
-        const amountInPaisa = Math.round(Number(createdOrder.totalAmount || 0) * 100);
-        const purchaseOrderId = `order-${createdOrder.id}`;
+        const { secretKey } = await getPharmacyKhaltiSecret(primaryOrder.pharmacyId);
+        const totalAmount = checkoutResponse.summary.totalAmount;
+        const amountInPaisa = Math.round(Number(totalAmount || 0) * 100);
+        const purchaseOrderId = `order-${primaryOrder.id}`;
 
         const khaltiInitPayload = {
           return_url: returnUrl,
           website_url: websiteUrl,
           amount: amountInPaisa,
           purchase_order_id: purchaseOrderId,
-          purchase_order_name: `PharmEasy Order ${createdOrder.id.slice(0, 8)}`,
+          purchase_order_name: `PharmEasy Checkout ${checkoutGroupId}`,
           customer_info: {
             name: String(req.user?.name || "PharmEasy Customer").slice(0, 100),
             email: String(req.user?.email || "customer@pharmeasy.app").slice(0, 120),
@@ -604,7 +704,7 @@ export const placeOrderFromCart = async (req, res) => {
           amount_breakdown: [
             {
               label: "Medicine Total",
-              amount: Math.round((Number(createdOrder.totalAmount || 0) - STANDARD_DELIVERY_FEE) * 100),
+              amount: Math.round((Number(totalAmount || 0) - STANDARD_DELIVERY_FEE) * 100),
             },
             {
               label: "Delivery Fee",
@@ -614,25 +714,61 @@ export const placeOrderFromCart = async (req, res) => {
         };
 
         const khaltiResponse = await callKhaltiInitiate(khaltiInitPayload, secretKey);
+        const allOrderIds = orderedCheckoutOrders.map((order) => order.id);
+        const secondaryOrderIds = allOrderIds.filter((id) => id !== primaryOrder.id);
 
-        const updatedOrder = await prisma.order.update({
-          where: { id: createdOrder.id },
-          data: {
-            khaltiPidx: khaltiResponse.pidx,
-            paymentStatus: "PENDING",
-            notes: JSON.stringify({
-              ...(createdOrder.notes ? { previousNotes: createdOrder.notes } : {}),
-              purchaseOrderId,
-              paymentExpiresAt: khaltiResponse.expires_at,
-            }),
-          },
+        await prisma.$transaction(async (tx) => {
+          await tx.order.update({
+            where: { id: primaryOrder.id },
+            data: {
+              khaltiPidx: khaltiResponse.pidx,
+              paymentStatus: "PENDING",
+              notes: JSON.stringify({
+                checkoutGroupId,
+                paymentScope: "MULTI_VENDOR",
+                groupOrderIds: allOrderIds,
+                primaryOrderId: primaryOrder.id,
+                purchaseOrderId,
+                paymentExpiresAt: khaltiResponse.expires_at,
+              }),
+            },
+          });
+
+          if (secondaryOrderIds.length > 0) {
+            await tx.order.updateMany({
+              where: { id: { in: secondaryOrderIds } },
+              data: {
+                paymentStatus: "PENDING",
+                notes: JSON.stringify({
+                  checkoutGroupId,
+                  paymentScope: "MULTI_VENDOR",
+                  primaryOrderId: primaryOrder.id,
+                  linkedKhaltiPidx: khaltiResponse.pidx,
+                  purchaseOrderId,
+                }),
+              },
+            });
+          }
+        });
+
+        const refreshedOrders = await prisma.order.findMany({
+          where: { id: { in: allOrderIds } },
           include: { items: true },
         });
 
+        const refreshedById = new Map(refreshedOrders.map((order) => [order.id, order]));
+        const orderedRefreshedOrders = allOrderIds
+          .map((orderId) => refreshedById.get(orderId))
+          .filter(Boolean);
+
         checkoutResponse = {
-          order: updatedOrder,
+          ...checkoutResponse,
+          order: orderedRefreshedOrders[0] || null,
+          orders: orderedRefreshedOrders,
           payment: {
             provider: "KHALTI",
+            checkoutGroupId,
+            orderIds: allOrderIds,
             pidx: khaltiResponse.pidx,
             paymentUrl: khaltiResponse.payment_url,
             expiresAt: khaltiResponse.expires_at,
@@ -641,11 +777,12 @@ export const placeOrderFromCart = async (req, res) => {
           },
         };
       } catch (khaltiError) {
-        await prisma.order.update({
-          where: { id: createdOrder.id },
+        await prisma.order.updateMany({
+          where: { id: { in: orderedCheckoutOrders.map((order) => order.id) } },
           data: {
             paymentStatus: "FAILED",
             notes: JSON.stringify({
+              checkoutGroupId,
               initError: khaltiError?.message || "Khalti initiate failed",
               failedAt: new Date().toISOString(),
             }),
@@ -661,37 +798,49 @@ export const placeOrderFromCart = async (req, res) => {
     }
 
     try {
-      const pharmacy = await prisma.pharmacy.findUnique({
-        where: { id: pharmacyId },
-        select: {
-          userId: true,
-          pharmacyName: true,
-        },
-      });
-
-      if (pharmacy?.userId && normalizedPaymentMethod !== "KHALTI") {
-        await notificationService.createNotification(
-          pharmacy.userId,
-          "New Order Received",
-          `A new patient order has been placed at ${pharmacy.pharmacyName || "your pharmacy"}.`,
-          "NEW_ORDER",
-          {
-            orderId: createdOrder.id,
-            link: "/pharmacy/orders",
-            sound: "standard",
+      if (normalizedPaymentMethod !== "KHALTI") {
+        const pharmacies = await prisma.pharmacy.findMany({
+          where: {
+            id: { in: [...new Set(orderedCheckoutOrders.map((order) => order.pharmacyId))] },
           },
-          "PHARMACY",
-          "high"
-        );
+          select: {
+            id: true,
+            userId: true,
+            pharmacyName: true,
+          },
+        });
 
+        const pharmacyById = new Map(pharmacies.map((pharmacy) => [pharmacy.id, pharmacy]));
         const io = req.app.get("io");
-        if (io) {
-          io.emit("NEW_ORDER", {
-            orderId: createdOrder.id,
-            recipientId: pharmacy.userId,
-            pharmacyId,
-            patientId: userId,
-          });
+
+        for (const order of orderedCheckoutOrders) {
+          const pharmacy = pharmacyById.get(order.pharmacyId);
+          if (!pharmacy?.userId) continue;
+
+          await notificationService.createNotification(
+            pharmacy.userId,
+            "New Order Received",
+            `A new patient order has been placed at ${pharmacy.pharmacyName || "your pharmacy"}.`,
+            "NEW_ORDER",
+            {
+              orderId: order.id,
+              checkoutGroupId,
+              link: "/pharmacy/orders",
+              sound: "standard",
+            },
+            "PHARMACY",
+            "high"
+          );
+
+          if (io) {
+            io.emit("NEW_ORDER", {
+              orderId: order.id,
+              checkoutGroupId,
+              recipientId: pharmacy.userId,
+              pharmacyId: order.pharmacyId,
+              patientId: userId,
+            });
+          }
         }
       }
     } catch (notificationError) {
@@ -701,9 +850,10 @@ export const placeOrderFromCart = async (req, res) => {
 
     logger.info("ORDER", "Checkout completed", {
       userId,
-      orderId: createdOrder.id,
-      pharmacyId,
-      itemCount: createdOrder.items?.length || 0,
+      checkoutGroupId,
+      orderIds: orderedCheckoutOrders.map((order) => order.id),
+      pharmacyCount: [...new Set(orderedCheckoutOrders.map((order) => order.pharmacyId))].length,
+      itemCount: orderedCheckoutOrders.reduce((sum, order) => sum + (order.items?.length || 0), 0),
       duration: `${Date.now() - startTime}ms`,
     });
 
@@ -712,8 +862,8 @@ export const placeOrderFromCart = async (req, res) => {
       data: checkoutResponse,
       message:
         normalizedPaymentMethod === "KHALTI"
-          ? "Order created. Complete payment in Khalti to confirm."
-          : "Order placed successfully",
+          ? "Orders created. Complete payment in Khalti to confirm."
+          : "Orders placed successfully",
     });
   } catch (error) {
     console.error("[CHECKOUT CRASH]", error.message, error.stack);
@@ -729,6 +879,7 @@ export const placeOrderFromCart = async (req, res) => {
 };
 
 export const verifyKhaltiPayment = async (req, res) => {
+  // Resolve authenticated user and payment identifier.
   const userId = req.user?.userId || req.user?.id;
   const pidx = String(req.body?.pidx || req.query?.pidx || "").trim();
 
@@ -740,6 +891,7 @@ export const verifyKhaltiPayment = async (req, res) => {
     return res.status(400).json({ success: false, message: "pidx is required" });
   }
 
+  // Verify payment with user scoping to prevent cross-account access.
   try {
     const result = await verifyKhaltiPaymentInternal({
       pidx,
@@ -759,6 +911,7 @@ export const verifyKhaltiPayment = async (req, res) => {
 };
 
 const resolveOrderIdFromPurchaseOrderId = (purchaseOrderId) => {
+  // Convert purchase_order_id format (order-<id>) into order ID.
   const value = String(purchaseOrderId || "").trim();
   if (!value) return null;
   const prefix = "order-";
@@ -776,8 +929,34 @@ const verifyKhaltiPaymentInternal = async ({ pidx, userId = null, purchaseOrderI
     ...(orderIdFromPurchase ? { id: orderIdFromPurchase } : {}),
   };
 
-  const order = await prisma.order.findFirst({
+  const primaryOrder = await prisma.order.findFirst({
     where: whereClause,
+    select: {
+      id: true,
+      patientId: true,
+      pharmacyId: true,
+      notes: true,
+    },
+  });
+
+  if (!primaryOrder) {
+    throw createHttpError(404, "Order not found for callback verification");
+  }
+
+  const primaryNotes = parseOrderNotes(primaryOrder.notes);
+  const requestedGroupOrderIds = Array.isArray(primaryNotes.groupOrderIds)
+    ? primaryNotes.groupOrderIds.filter(Boolean).map(String)
+    : [];
+
+  const orderIds = requestedGroupOrderIds.length > 0
+    ? requestedGroupOrderIds
+    : [String(primaryOrder.id)];
+
+  const groupedOrders = await prisma.order.findMany({
+    where: {
+      id: { in: orderIds },
+      ...(userId ? { patientId: userId } : {}),
+    },
     include: {
       items: {
         select: {
@@ -789,14 +968,23 @@ const verifyKhaltiPaymentInternal = async ({ pidx, userId = null, purchaseOrderI
     },
   });
 
-  if (!order) {
-    throw createHttpError(404, "Order not found for callback verification");
+  if (groupedOrders.length === 0) {
+    throw createHttpError(404, "No orders found for this payment session");
   }
 
-  const { secretKey } = await getPharmacyKhaltiSecret(order.pharmacyId);
+  const orderById = new Map(groupedOrders.map((order) => [String(order.id), order]));
+  const orderedGroup = orderIds
+    .map((id) => orderById.get(String(id)))
+    .filter(Boolean);
+
+  const verificationSourceOrder = orderedGroup[0] || groupedOrders[0];
+  const { secretKey } = await getPharmacyKhaltiSecret(verificationSourceOrder.pharmacyId);
   const lookup = await callKhaltiLookup(pidx, secretKey);
   const normalizedKhaltiStatus = normalizeKhaltiStatus(lookup?.status);
-  const expectedTotalPaisa = Math.round(Number(order.totalAmount || 0) * 100);
+
+  const expectedTotalPaisa = Math.round(
+    orderedGroup.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0) * 100
+  );
   const khaltiTotalPaisa = Number(lookup?.total_amount || 0);
 
   if (!Number.isFinite(khaltiTotalPaisa) || khaltiTotalPaisa <= 0) {
@@ -804,99 +992,124 @@ const verifyKhaltiPaymentInternal = async ({ pidx, userId = null, purchaseOrderI
   }
 
   if (khaltiTotalPaisa !== expectedTotalPaisa) {
-    await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        paymentStatus: "HOLD",
-      },
+    await prisma.order.updateMany({
+      where: { id: { in: orderedGroup.map((order) => order.id) } },
+      data: { paymentStatus: "HOLD" },
     });
 
-    throw createHttpError(409, "Payment amount mismatch detected. Order moved to hold state.", {
+    throw createHttpError(409, "Payment amount mismatch detected. Orders moved to hold state.", {
       data: {
         expectedTotalPaisa,
         khaltiTotalPaisa,
         pidx,
+        orderIds: orderedGroup.map((order) => order.id),
       },
     });
   }
 
   const internalPaymentStatus = mapKhaltiStatusToPaymentStatus(normalizedKhaltiStatus);
   const isSuccess = normalizedKhaltiStatus === KHALTI_SUCCESS_STATUS;
+  const paymentJustCompletedOrderIds = [];
 
-  let paymentJustCompleted = false;
+  const updatedOrders = await prisma.$transaction(async (tx) => {
+    const nextOrders = [];
+    const allInventoryIdsForCartCleanup = new Set();
 
-  const updatedOrder = await prisma.$transaction(async (tx) => {
-    const currentOrder = await tx.order.findUnique({
-      where: { id: order.id },
-      select: {
-        id: true,
-        patientId: true,
-        pharmacyId: true,
-        paymentStatus: true,
-        inventoryDeducted: true,
-        items: {
-          select: {
-            inventoryId: true,
-            medicineName: true,
-            quantity: true,
+    for (const baseOrder of orderedGroup) {
+      const currentOrder = await tx.order.findUnique({
+        where: { id: baseOrder.id },
+        select: {
+          id: true,
+          status: true,
+          patientId: true,
+          pharmacyId: true,
+          paymentStatus: true,
+          inventoryDeducted: true,
+          items: {
+            select: {
+              inventoryId: true,
+              medicineName: true,
+              quantity: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    if (!currentOrder) {
-      throw createHttpError(404, "Order not found");
+      if (!currentOrder) {
+        throw createHttpError(404, "Order not found");
+      }
+
+      if (isSuccess && !currentOrder.inventoryDeducted) {
+        await deductOrderInventory(tx, currentOrder, currentOrder.pharmacyId);
+      }
+
+      if (isSuccess && currentOrder.paymentStatus !== "COMPLETED") {
+        paymentJustCompletedOrderIds.push(currentOrder.id);
+      }
+
+      const nextOrder = await tx.order.update({
+        where: { id: currentOrder.id },
+        data: {
+          ...(isSuccess && currentOrder.status === "PENDING" ? { status: "ACCEPTED" } : {}),
+          paymentStatus: internalPaymentStatus,
+          paymentTransactionId: lookup?.transaction_id || lookup?.tidx || null,
+          paymentVerifiedAt: isSuccess ? new Date() : null,
+          ...(isSuccess && !currentOrder.inventoryDeducted ? { inventoryDeducted: true } : {}),
+        },
+        include: { items: true },
+      });
+
+      currentOrder.items.forEach((item) => allInventoryIdsForCartCleanup.add(item.inventoryId));
+      nextOrders.push(nextOrder);
     }
-
-    if (isSuccess && !currentOrder.inventoryDeducted) {
-      await deductOrderInventory(tx, currentOrder, currentOrder.pharmacyId);
-    }
-
-    paymentJustCompleted = isSuccess && currentOrder.paymentStatus !== "COMPLETED";
-
-    const nextOrder = await tx.order.update({
-      where: { id: order.id },
-      data: {
-        ...(isSuccess && currentOrder.status === "PENDING" ? { status: "ACCEPTED" } : {}),
-        paymentStatus: internalPaymentStatus,
-        paymentTransactionId: lookup?.transaction_id || lookup?.tidx || null,
-        paymentVerifiedAt: isSuccess ? new Date() : null,
-        ...(isSuccess && !currentOrder.inventoryDeducted ? { inventoryDeducted: true } : {}),
-      },
-      include: { items: true },
-    });
 
     if (isSuccess) {
       await tx.cartItem.deleteMany({
         where: {
           cart: {
-            userId: currentOrder.patientId,
+            userId: verificationSourceOrder.patientId,
           },
           medicineId: {
-            in: currentOrder.items.map((item) => item.inventoryId),
+            in: [...allInventoryIdsForCartCleanup],
           },
         },
       });
     }
 
-    return nextOrder;
+    return nextOrders;
   });
 
-  if (paymentJustCompleted) {
+  if (paymentJustCompletedOrderIds.length > 0) {
     try {
-      const pharmacy = await prisma.pharmacy.findUnique({
-        where: { id: updatedOrder.pharmacyId },
-        select: { userId: true, pharmacyName: true },
+      const completedOrders = updatedOrders.filter((order) =>
+        paymentJustCompletedOrderIds.includes(order.id)
+      );
+
+      const pharmacies = await prisma.pharmacy.findMany({
+        where: {
+          id: { in: [...new Set(completedOrders.map((order) => order.pharmacyId))] },
+        },
+        select: {
+          id: true,
+          userId: true,
+          pharmacyName: true,
+        },
       });
 
-      if (pharmacy?.userId) {
+      const pharmacyById = new Map(pharmacies.map((pharmacy) => [pharmacy.id, pharmacy]));
+      const io = app?.get?.("io");
+
+      for (const completedOrder of completedOrders) {
+        const pharmacy = pharmacyById.get(completedOrder.pharmacyId);
+        if (!pharmacy?.userId) continue;
+
         await notificationService.createNotification(
           pharmacy.userId,
           "New Paid Order Received",
           `A Khalti-paid order is ready for processing at ${pharmacy.pharmacyName || "your pharmacy"}.`,
           "NEW_ORDER",
           {
-            orderId: updatedOrder.id,
+            orderId: completedOrder.id,
             link: "/pharmacy/orders",
             sound: "standard",
           },
@@ -904,31 +1117,33 @@ const verifyKhaltiPaymentInternal = async ({ pidx, userId = null, purchaseOrderI
           "high"
         );
 
-        const io = app?.get?.("io");
         if (io) {
           io.emit("NEW_ORDER", {
-            orderId: updatedOrder.id,
+            orderId: completedOrder.id,
             recipientId: pharmacy.userId,
-            pharmacyId: updatedOrder.pharmacyId,
-            patientId: updatedOrder.patientId,
+            pharmacyId: completedOrder.pharmacyId,
+            patientId: completedOrder.patientId,
           });
         }
       }
     } catch (notificationError) {
       logger.error("ORDER", "Khalti payment verified but pharmacy notification failed", {
-        orderId: updatedOrder.id,
+        orderIds: paymentJustCompletedOrderIds,
         error: notificationError?.message,
       });
     }
   }
 
   const statusCode = isSuccess ? 200 : 202;
+  const primaryUpdatedOrder = updatedOrders.find((order) => order.id === primaryOrder.id) || updatedOrders[0] || null;
+
   return {
     statusCode,
     payload: {
       success: isSuccess,
       data: {
-        order: updatedOrder,
+        order: primaryUpdatedOrder,
+        orders: updatedOrders,
         payment: {
           provider: "KHALTI",
           pidx,
@@ -948,6 +1163,7 @@ const verifyKhaltiPaymentInternal = async ({ pidx, userId = null, purchaseOrderI
 };
 
 export const verifyKhaltiPaymentFromCallback = async (req, res) => {
+  // Read callback payment identifiers from body or query.
   const pidx = String(req.body?.pidx || req.query?.pidx || "").trim();
   const purchaseOrderId = String(
     req.body?.purchaseOrderId || req.body?.purchase_order_id || req.query?.purchase_order_id || ""
@@ -983,6 +1199,7 @@ export const verifyKhaltiPaymentFromCallback = async (req, res) => {
 };
 
 export const updateOrderStatus = async (req, res) => {
+  // Read authenticated pharmacy user and target order/status inputs.
   const userId = req.user?.userId;
   const orderId = String(req.params?.orderId || req.params?.id || "").trim();
   const nextStatus = normalizeStatus(req.body?.status);
@@ -995,6 +1212,7 @@ export const updateOrderStatus = async (req, res) => {
     return res.status(400).json({ success: false, message: "Order id is required" });
   }
 
+  // Validate requested next status.
   if (!nextStatus || !ORDER_STATUS_ENUM_VALUES.includes(nextStatus)) {
     return res.status(400).json({
       success: false,
@@ -1003,6 +1221,7 @@ export const updateOrderStatus = async (req, res) => {
   }
 
   try {
+    // Resolve pharmacy by logged-in user account.
     const pharmacy = await prisma.pharmacy.findUnique({
       where: { userId },
       select: { id: true },
@@ -1012,6 +1231,7 @@ export const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: "Pharmacy not found" });
     }
 
+    // Perform status update and inventory adjustments in one transaction.
     const updated = await prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
         where: { id: orderId },
@@ -1040,6 +1260,7 @@ export const updateOrderStatus = async (req, res) => {
       const currentStatus = normalizeStatus(order.status);
       const allowed = STATUS_TRANSITIONS[currentStatus] || [];
 
+      // Validate requested transition against transition map.
       if (!allowed.includes(nextStatus)) {
         throw createHttpError(
           400,
@@ -1047,6 +1268,7 @@ export const updateOrderStatus = async (req, res) => {
         );
       }
 
+      // Hold status changes until Khalti payment is completed.
       if (
         order.paymentMethod === "KHALTI" &&
         order.paymentStatus !== "COMPLETED" &&
@@ -1058,6 +1280,7 @@ export const updateOrderStatus = async (req, res) => {
         );
       }
 
+      // Deduct inventory if the transition requires it.
       if (shouldAttemptInventoryDeduction(nextStatus) && !order.inventoryDeducted) {
         await deductOrderInventory(tx, order, pharmacy.id);
       }
@@ -1074,6 +1297,7 @@ export const updateOrderStatus = async (req, res) => {
       });
     });
 
+    // Notify patient after successful status transition.
     try {
       const statusMessage =
         ORDER_STATUS_PATIENT_MESSAGES[nextStatus] ||
@@ -1123,6 +1347,7 @@ export const updateOrderStatus = async (req, res) => {
 };
 
 export const getPharmacyOrderDetails = async (req, res) => {
+  // Resolve current pharmacy and requested order ID.
   const userId = req.user?.userId;
   const orderId = String(req.params?.orderId || "").trim();
 
@@ -1144,6 +1369,7 @@ export const getPharmacyOrderDetails = async (req, res) => {
       return res.status(404).json({ success: false, message: "Pharmacy not found" });
     }
 
+    // Load order with patient and line-item details.
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -1173,6 +1399,7 @@ export const getPharmacyOrderDetails = async (req, res) => {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
 
+    // Build summary metrics for pharmacy detail screen.
     const itemCount = order.items.reduce((total, item) => total + Number(item.quantity || 0), 0);
     const medicineCount = order.items.length;
     const subtotal = order.items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);

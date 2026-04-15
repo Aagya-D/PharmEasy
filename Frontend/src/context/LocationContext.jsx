@@ -11,7 +11,7 @@ import { nepalLocations, findLocationByCoordinates } from "../data/nepalLocation
 const LocationContext = createContext();
 
 export const LocationProvider = ({ children }) => {
-  // Default to Kathmandu
+  // Default location fallback used when no saved selection exists.
   const defaultLocation = nepalLocations.find(
     (loc) => loc.name === "Kathmandu"
   ) || {
@@ -22,17 +22,21 @@ export const LocationProvider = ({ children }) => {
     lng: 85.324,
   };
 
+  // Current selected location used across location-aware screens.
   const [selectedLocation, setSelectedLocation] = useState(defaultLocation);
+  // Raw geolocation coordinates pending user confirmation.
   const [rawDetectedCoords, setRawDetectedCoords] = useState(null);
+  // Loading indicator for geolocation detection flow.
   const [isLoading, setIsLoading] = useState(false);
 
   /**
    * Update selected location
    */
   const updateLocation = (location) => {
+    // Only accept locations that include valid coordinates.
     if (location && location.lat && location.lng) {
       setSelectedLocation(location);
-      // Store in localStorage for persistence
+      // Persist selected location for reload/session continuity.
       localStorage.setItem("userSearchLocation", JSON.stringify(location));
     }
   };
@@ -42,7 +46,9 @@ export const LocationProvider = ({ children }) => {
    * Saves the exact lat/lng the user confirmed, preserving the nearest city name
    */
   const confirmExactLocation = (lat, lng, nearestLocation = null) => {
+    // Use nearest known location metadata when available.
     const base = nearestLocation || findLocationByCoordinates(lat, lng) || {};
+    // Persist exact coordinates while keeping human-readable location fields.
     const exactLocation = {
       ...base,
       name: base.name || "Custom Location",
@@ -52,6 +58,7 @@ export const LocationProvider = ({ children }) => {
       lng,
       isExactCoords: true,
     };
+    // Save confirmed location and clear temporary detection marker.
     updateLocation(exactLocation);
     setRawDetectedCoords(null);
     return exactLocation;
@@ -63,8 +70,10 @@ export const LocationProvider = ({ children }) => {
    * so the modal can show a map for visual confirmation
    */
   const detectLocation = async () => {
+    // Start geolocation detection loading state.
     setIsLoading(true);
     return new Promise((resolve) => {
+      // Browser geolocation support check.
       if (!navigator.geolocation) {
         console.log("Geolocation not supported");
         setIsLoading(false);
@@ -74,16 +83,18 @@ export const LocationProvider = ({ children }) => {
 
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          // Read raw device coordinates and accuracy value.
           const { latitude, longitude, accuracy } = position.coords;
 
-          // Store raw GPS coordinates for map preview
+          // Store raw GPS values so map confirmation can use exact pin.
           setRawDetectedCoords({ latitude, longitude, accuracy });
 
+          // Resolve nearest known location from location dataset.
           const nearestLocation = findLocationByCoordinates(latitude, longitude);
           
           if (nearestLocation) {
             setIsLoading(false);
-            // Return both raw coords and nearest location for confirmation
+            // Return nearest location plus raw coordinates for confirmation modal.
             resolve({
               ...nearestLocation,
               _rawLat: latitude,
@@ -96,11 +107,13 @@ export const LocationProvider = ({ children }) => {
           }
         },
         (error) => {
+          // Geolocation failure keeps flow non-blocking.
           console.log("Geolocation error:", error);
           setIsLoading(false);
           resolve(null);
         },
         {
+          // Request precise location with tight cache/time constraints.
           enableHighAccuracy: true,
           timeout: 10000,
           maximumAge: 0,
@@ -113,7 +126,9 @@ export const LocationProvider = ({ children }) => {
    * Reset to default (Kathmandu)
    */
   const resetLocation = () => {
+    // Reset selected location to app default.
     updateLocation(defaultLocation);
+    // Clear pending raw coordinates.
     setRawDetectedCoords(null);
   };
 
@@ -121,9 +136,11 @@ export const LocationProvider = ({ children }) => {
    * Load location from localStorage on mount
    */
   useEffect(() => {
+    // Restore location preference from localStorage on mount.
     const savedLocation = localStorage.getItem("userSearchLocation");
     if (savedLocation) {
       try {
+        // Parse and apply persisted location.
         const location = JSON.parse(savedLocation);
         setSelectedLocation(location);
       } catch (error) {
@@ -153,6 +170,7 @@ export const LocationProvider = ({ children }) => {
  * Hook to use LocationContext
  */
 export const useLocation = () => {
+  // Enforce provider usage for location consumers.
   const context = useContext(LocationContext);
   if (!context) {
     throw new Error("useLocation must be used within LocationProvider");

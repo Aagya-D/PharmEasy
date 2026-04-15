@@ -1,27 +1,17 @@
-/**
- * Unified Authentication & Authorization Middleware
- * Single middleware for JWT verification and role-based access control
- * Simple, clear, and efficient authentication flow
- */
+// Unified authentication and optional role-authorization middleware.
 
 import jwt from "jsonwebtoken";
 import config from "../config/environment.js";
 import { AppError } from "./errorHandler.js";
 
-/**
- * Authentication Middleware Factory
- * Verifies JWT token and optionally checks role permissions
- * Usage: authenticate() - just verify token (required)
- *        authenticate({ optional: true }) - optional authentication
- *        authenticate(['ADMIN', 'PHARMACY_ADMIN']) - verify token AND check roles
- *
- * @param {string[]|Object} options - Array of allowed roles OR options object { optional: boolean }
- * @returns {Function} Express middleware
- */
+// Middleware factory.
+// Usage: authenticate() for required auth.
+// Usage: authenticate({ optional: true }) for optional auth.
+// Usage: authenticate(["ROLE_A", "ROLE_B"]) for auth + role gate.
 export const authenticate = (options = null) => {
   return (req, res, next) => {
     try {
-      // Handle options parameter
+      // Parse middleware options.
       let allowedRoles = null;
       let isOptional = false;
 
@@ -31,10 +21,10 @@ export const authenticate = (options = null) => {
         allowedRoles = options;
       }
 
-      // Extract token from Authorization header
+      // Read bearer token from Authorization header.
       const authHeader = req.headers.authorization;
       if (!authHeader?.startsWith("Bearer ")) {
-        // If optional and no token, continue without user
+        // Optional mode allows anonymous requests when token is missing.
         if (isOptional) {
           req.user = null;
           return next();
@@ -46,12 +36,12 @@ export const authenticate = (options = null) => {
 
       const token = authHeader.slice(7);
 
-      // Verify token signature and expiration
+      // Verify token signature and expiration using access secret.
       let decoded;
       try {
         decoded = jwt.verify(token, config.jwt.accessSecret);
       } catch (error) {
-        // If optional and token is invalid, continue without user
+        // Optional mode allows requests with invalid token to continue as anonymous.
         if (isOptional) {
           req.user = null;
           return next();
@@ -62,10 +52,10 @@ export const authenticate = (options = null) => {
         return next(new AppError("Invalid access token", 401));
       }
 
-      // Attach decoded user to request object
+      // Attach decoded user claims to request.
       req.user = decoded;
 
-      // Validate that userId exists in token (guard against malformed tokens)
+      // Validate required claim presence.
       if (!req.user.userId) {
         if (isOptional) {
           req.user = null;
@@ -79,7 +69,7 @@ export const authenticate = (options = null) => {
         );
       }
 
-      // Check role-based authorization if specified
+      // Enforce role allow-list when provided.
       if (allowedRoles && Array.isArray(allowedRoles)) {
         if (!allowedRoles.includes(req.user.role)) {
           return next(

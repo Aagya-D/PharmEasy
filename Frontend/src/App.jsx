@@ -9,16 +9,16 @@ import { routes } from "./routes/AppRoutes";
 import StateMonitor from "./shared/components/StateMonitor";
 
 /**
- * Main App Component
- * Centralized routing with state monitoring
+ * Main app component with shared providers and routing.
  */
 function App() {
+  // Force light-mode defaults for the current UI setup.
   useEffect(() => {
     document.documentElement.classList.remove("dark");
     localStorage.removeItem("theme-mode");
   }, []);
 
-  // Helper to recursively render routes with children
+  // Render nested route tree recursively.
   const renderRoutes = (routeList) => {
     return routeList.map((route, index) => {
       if (route.children && route.children.length > 0) {
@@ -33,6 +33,7 @@ function App() {
   };
 
   return (
+    // Compose global providers around router and route tree.
     <BrowserRouter>
       <AuthProvider>
         <NotificationProvider>
@@ -64,10 +65,11 @@ function App() {
                 }}
               />
               <Routes>
+                {/* Render centralized route definitions. */}
                 {renderRoutes(routes)}
               </Routes>
 
-              {/* Development-only state monitor (Ctrl+Shift+L to toggle) */}
+              {/* Dev-only state monitor. Toggle with Ctrl+Shift+L. */}
               <StateMonitor />
             </CartProvider>
           </LocationProvider>

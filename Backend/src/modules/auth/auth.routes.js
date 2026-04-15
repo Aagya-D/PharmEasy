@@ -1,12 +1,4 @@
-/**
- * Auth Routes
- * Public and protected authentication endpoints
- *
- * NOTE: Removed GET /auth/roles endpoint
- * Reason: Roles are fixed and hardcoded (IDs 1, 2, 3)
- * Frontend no longer needs to fetch roles dynamically
- * This saves one database query per registration
- */
+// Authentication routes for public auth flows and protected account actions.
 
 import express from "express";
 import * as authController from "./auth.controller.js";
@@ -20,62 +12,45 @@ import {
 
 const router = express.Router();
 
-/**
- * Public Routes (no authentication required)
- */
+// Public auth routes.
 
-// POST /auth/register
-// Register new user
-// Body: { email, firstName, lastName, password, roleId }
-// Valid roleIds: 2 (Pharmacy Admin), 3 (Patient)
+// Register a new user account.
 router.post("/register", registerRateLimit, authController.register);
 
-// POST /auth/verify-otp
-// Verify email OTP
+// Verify email OTP.
 router.post("/verify-otp", authController.verifyEmailOTP);
 
-// POST /auth/resend-otp
-// Resend OTP to email
+// Resend verification OTP.
 router.post("/resend-otp", otpResendRateLimit, authController.resendOTP);
 
-// POST /auth/login
-// Login and get tokens
+// Login and issue session tokens.
 router.post("/login", loginRateLimit, authController.login);
 
-// POST /auth/refresh
-// Refresh access token (requires valid refresh token in body)
+// Refresh access token from refresh token.
 router.post("/refresh", authController.refreshTokens);
 
-// POST /auth/forgot-password
-// Request password reset link
+// Request password reset flow.
 router.post(
   "/forgot-password",
   passwordResetRateLimit,
   authController.requestPasswordReset
 );
 
-// POST /auth/reset-password
-// Reset password using token
+// Complete password reset flow.
 router.post("/reset-password", authController.resetPassword);
 
-/**
- * Protected Routes (authentication required)
- */
+// Protected auth/account routes.
 
-// GET /auth/me
-// Get current authenticated user's profile
+// Get authenticated user profile.
 router.get("/me", authenticate(), authController.getCurrentUser);
 
-// POST /auth/logout
-// Logout and revoke refresh token
+// Logout and revoke active refresh sessions.
 router.post("/logout", authenticate(), authController.logout);
 
-// POST /auth/change-password
-// Change password (requires current password verification)
+// Change account password.
 router.post("/change-password", authenticate(), authController.changePassword);
 
-// PATCH /auth/shipping-address
-// Save/update user's default shipping address
+// Save or update default shipping address.
 router.patch("/shipping-address", authenticate(), authController.updateShippingAddress);
 
 export default router;

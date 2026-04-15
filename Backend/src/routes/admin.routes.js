@@ -1,7 +1,4 @@
-/**
- * Admin Routes - System Admin pharmacy verification
- * All routes require authentication AND roleId=1
- */
+// Admin routes. All endpoints require authenticated system admin access.
 
 import express from "express";
 import { authenticate } from "../middlewares/auth.js";
@@ -10,11 +7,7 @@ import adminController from "../controllers/admin.controller.js";
 
 const router = express.Router();
 
-/**
- * GET /api/admin/pharmacies/pending
- * Get all pharmacies with PENDING_VERIFICATION status
- * Requires: JWT + roleId=1
- */
+// List pharmacies waiting for verification.
 router.get(
   "/pharmacies/pending",
   authenticate(),
@@ -22,12 +15,7 @@ router.get(
   adminController.getPendingPharmacies
 );
 
-/**
- * GET /api/admin/pharmacies
- * Get all pharmacies with optional status filter
- * Query: ?status=PENDING_VERIFICATION|VERIFIED|REJECTED
- * Requires: JWT + roleId=1
- */
+// List all pharmacies with optional status filtering.
 router.get(
   "/pharmacies",
   authenticate(),
@@ -35,11 +23,7 @@ router.get(
   adminController.getAllPharmacies
 );
 
-/**
- * GET /api/admin/pharmacy/:id
- * Get specific pharmacy details
- * Requires: JWT + roleId=1
- */
+// Get one pharmacy by ID.
 router.get(
   "/pharmacy/:id",
   authenticate(),
@@ -47,11 +31,7 @@ router.get(
   adminController.getPharmacyById
 );
 
-/**
- * PATCH /api/admin/pharmacy/:id/approve
- * Approve pharmacy (set verificationStatus=VERIFIED)
- * Requires: JWT + roleId=1
- */
+// Approve a pharmacy application.
 router.patch(
   "/pharmacy/:id/approve",
   authenticate(),
@@ -59,12 +39,7 @@ router.patch(
   adminController.approvePharmacy
 );
 
-/**
- * PATCH /api/admin/pharmacy/:id/reject
- * Reject pharmacy (set verificationStatus=REJECTED)
- * Body: { reason: string }
- * Requires: JWT + roleId=1
- */
+// Reject a pharmacy application with reason.
 router.patch(
   "/pharmacy/:id/reject",
   authenticate(),
@@ -72,11 +47,7 @@ router.patch(
   adminController.rejectPharmacy
 );
 
-/**
- * PATCH /api/admin/profile
- * Update admin profile (name, email, phone)
- * Requires: JWT + roleId=1
- */
+// Update admin profile.
 router.patch(
   "/profile",
   authenticate(),
@@ -84,12 +55,7 @@ router.patch(
   adminController.updateProfile
 );
 
-/**
- * PATCH /api/admin/change-password
- * Change password with current password verification
- * Body: { currentPassword: string, newPassword: string }
- * Requires: JWT + roleId=1
- */
+// Change admin password.
 router.patch(
   "/change-password",
   authenticate(),
@@ -97,12 +63,7 @@ router.patch(
   adminController.changePassword
 );
 
-/**
- * GET /api/admin/users
- * Get all users with filtering options
- * Query: ?role=1|2|3&search=text&status=APPROVED|PENDING|REJECTED
- * Requires: JWT + roleId=1
- */
+// Get users with optional role/search/status filters.
 router.get(
   "/users",
   authenticate(),
@@ -110,12 +71,7 @@ router.get(
   adminController.getAllUsers
 );
 
-/**
- * GET /api/admin/logs
- * Get activity logs with filtering and pagination
- * Query: ?category=AUTH|PHARMACY|SYSTEM&userId=xxx&action=xxx&skip=0&take=50
- * Requires: JWT + roleId=1
- */
+// Get activity logs with filters and pagination.
 router.get(
   "/logs",
   authenticate(),
@@ -123,12 +79,7 @@ router.get(
   adminController.getLogs
 );
 
-/**
- * GET /api/admin/sos-locations
- * Get all SOS emergency location requests from patients
- * Query: ?status=pending|fulfilled&limit=100
- * Requires: JWT + roleId=1
- */
+// Get SOS map/location data for admin dashboards.
 router.get(
   "/sos-locations",
   authenticate(),
@@ -136,11 +87,7 @@ router.get(
   adminController.getSOSLocations
 );
 
-/**
- * GET /api/admin/inventory/insights
- * Get inventory insights and shortage analysis across all pharmacies
- * Requires: JWT + roleId=1
- */
+// Get cross-pharmacy inventory insights.
 router.get(
   "/inventory/insights",
   authenticate(),
@@ -148,12 +95,7 @@ router.get(
   adminController.getInventoryInsights
 );
 
-/**
- * POST /api/admin/inventory/restock-alert
- * Send restock alert to affected pharmacies
- * Body: { genericName: string, message: string }
- * Requires: JWT + roleId=1
- */
+// Send restock alerts for selected medicine shortages.
 router.post(
   "/inventory/restock-alert",
   authenticate(),
@@ -161,11 +103,7 @@ router.post(
   adminController.sendRestockAlert
 );
 
-/**
- * GET /api/admin/health-tips
- * Get all health tips
- * Requires: JWT + roleId=1
- */
+// Get all health tips.
 router.get(
   "/health-tips",
   authenticate(),
@@ -173,12 +111,7 @@ router.get(
   adminController.getHealthTips
 );
 
-/**
- * POST /api/admin/health-tips
- * Create a new health tip
- * Body: { title, content, category, imageUrl?, isActive? }
- * Requires: JWT + roleId=1
- */
+// Create a health tip.
 router.post(
   "/health-tips",
   authenticate(),
@@ -186,12 +119,7 @@ router.post(
   adminController.createHealthTip
 );
 
-/**
- * PATCH /api/admin/health-tips/:id
- * Update a health tip
- * Body: { title?, content?, category?, imageUrl?, isActive? }
- * Requires: JWT + roleId=1
- */
+// Update a health tip.
 router.patch(
   "/health-tips/:id",
   authenticate(),
@@ -199,11 +127,7 @@ router.patch(
   adminController.updateHealthTip
 );
 
-/**
- * DELETE /api/admin/health-tips/:id
- * Delete a health tip
- * Requires: JWT + roleId=1
- */
+// Delete a health tip.
 router.delete(
   "/health-tips/:id",
   authenticate(),
@@ -211,11 +135,7 @@ router.delete(
   adminController.deleteHealthTip
 );
 
-/**
- * GET /api/admin/announcements
- * Get all announcements
- * Requires: JWT + roleId=1
- */
+// Get all announcements.
 router.get(
   "/announcements",
   authenticate(),
@@ -223,12 +143,7 @@ router.get(
   adminController.getAnnouncements
 );
 
-/**
- * POST /api/admin/announcements
- * Create a new announcement
- * Body: { title, content, type?, priority?, targetRole?, publishDate?, expiryDate?, isActive? }
- * Requires: JWT + roleId=1
- */
+// Create an announcement.
 router.post(
   "/announcements",
   authenticate(),
@@ -236,12 +151,7 @@ router.post(
   adminController.createAnnouncement
 );
 
-/**
- * PATCH /api/admin/announcements/:id
- * Update an announcement
- * Body: { title?, content?, type?, priority?, targetRole?, publishDate?, expiryDate?, isActive? }
- * Requires: JWT + roleId=1
- */
+// Update an announcement.
 router.patch(
   "/announcements/:id",
   authenticate(),
@@ -249,11 +159,7 @@ router.patch(
   adminController.updateAnnouncement
 );
 
-/**
- * DELETE /api/admin/announcements/:id
- * Delete an announcement
- * Requires: JWT + roleId=1
- */
+// Delete an announcement.
 router.delete(
   "/announcements/:id",
   authenticate(),

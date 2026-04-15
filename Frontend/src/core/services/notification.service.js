@@ -1,6 +1,6 @@
 /**
  * Notification Service - Frontend API wrapper for notification endpoints
- * 
+ *
  * Handles:
  * - Fetching user notifications
  * - Getting unread count for navbar badge
@@ -18,6 +18,7 @@ import httpClient from "./httpClient";
  * @returns {Promise} { success, data: [...notifications], meta: {...} }
  */
 export const getNotifications = async (limit = 20, skip = 0) => {
+  // Fetch notification list with pagination controls.
   return httpClient.get(`/notifications?limit=${limit}&skip=${skip}`);
 };
 
@@ -28,6 +29,7 @@ export const getNotifications = async (limit = 20, skip = 0) => {
  * @returns {Promise} { success, data: { unreadCount: 5 } }
  */
 export const getUnreadCount = async () => {
+  // Fetch unread badge count for navbar/sidebars.
   return httpClient.get(`/notifications/unread-count`);
 };
 
@@ -38,6 +40,7 @@ export const getUnreadCount = async () => {
  * @returns {Promise} { success, data: {...notification}, message: "..." }
  */
 export const markNotificationAsRead = async (notificationId) => {
+  // Mark single notification as read.
   return httpClient.put(`/notifications/${notificationId}/read`);
 };
 
@@ -47,6 +50,7 @@ export const markNotificationAsRead = async (notificationId) => {
  * @returns {Promise} { success, data: { markedCount: 3 }, message: "..." }
  */
 export const markAllAsRead = async () => {
+  // Mark all unread notifications as read.
   return httpClient.put(`/notifications/read-all`);
 };
 
@@ -57,9 +61,11 @@ export const markAllAsRead = async () => {
  * @returns {Promise} { success, message: "..." }
  */
 export const deleteNotification = async (notificationId) => {
+  // Delete notification permanently.
   return httpClient.delete(`/notifications/${notificationId}`);
 };
 
+// Service object export for contexts/components.
 const notificationService = {
   getNotifications,
   getUnreadCount,

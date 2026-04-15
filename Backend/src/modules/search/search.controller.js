@@ -1,11 +1,4 @@
-/**
- * Search Controller - Handles medicine search requests
- * 
- * Provides endpoints for:
- * - Text-based medicine search with geolocation
- * - Finding nearby pharmacies
- * - Search analytics
- */
+// Search controller for medicine and pharmacy discovery endpoints.
 
 import { asyncHandler } from "../../middlewares/errorHandler.js";
 import searchService from "./search.service.js";
@@ -13,11 +6,7 @@ import { BadRequestError } from "../../utils/errors.js";
 import logger from "../../utils/logger.js";
 
 class SearchController {
-  /**
-   * Universal search endpoint for medicines and pharmacies
-   *
-   * GET /api/search/universal?query=paracetamol&lat=27.7172&lng=85.3240
-   */
+  // Universal search endpoint for medicines and pharmacies.
   getUniversalSearchResults = asyncHandler(async (req, res) => {
     const {
       query,
@@ -30,13 +19,16 @@ class SearchController {
       pharmacyLimit,
     } = req.query;
 
+    // Query text is required for all universal searches.
     if (!query || !query.trim()) {
       throw new BadRequestError("Search query parameter is required");
     }
 
+    // Support both lat/lng and latitude/longitude query names.
     const resolvedLat = lat ?? latitude;
     const resolvedLng = lng ?? longitude;
 
+    // Parse optional coordinate pair.
     const parsedLatitude =
       resolvedLat !== undefined ? parseFloat(resolvedLat) : undefined;
     const parsedLongitude =
@@ -45,12 +37,14 @@ class SearchController {
     const hasLatitude = Number.isFinite(parsedLatitude);
     const hasLongitude = Number.isFinite(parsedLongitude);
 
+    // Require coordinates to be provided as a complete pair.
     if (hasLatitude !== hasLongitude) {
       throw new BadRequestError(
         "Both lat and lng must be provided together"
       );
     }
 
+    // Validate coordinate range when present.
     if (
       hasLatitude &&
       (parsedLatitude < -90 ||
@@ -61,6 +55,7 @@ class SearchController {
       throw new BadRequestError("Invalid latitude or longitude");
     }
 
+    // Run universal search with normalized parameters.
     const results = await searchService.getUniversalSearchResults({
       query: query.trim(),
       latitude: hasLatitude ? parsedLatitude : undefined,
@@ -98,48 +93,7 @@ class SearchController {
     });
   });
 
-  /**
-   * Search for medicines by name or generic name
-   * 
-   * GET /api/search?query=Cetamol&latitude=27.7172&longitude=85.3240
-   * 
-   * Query Parameters:
-   * - query: Search term (required)
-   * - latitude: User's latitude (optional, enables distance sorting)
-   * - longitude: User's longitude (optional, enables distance sorting)
-   * - includeOutOfStock: Include out-of-stock items (default: false)
-   * - maxDistance: Maximum distance in km (optional)
-   * - limit: Maximum results (default: 50, max: 100)
-   * 
-   * Response:
-   * {
-   *   "success": true,
-   *   "data": [
-   *     {
-   *       "id": "uuid",
-   *       "medicine": "Cetamol 500mg",
-   *       "genericName": "Paracetamol",
-   *       "price": 50,
-   *       "quantity": 100,
-   *       "inStock": true,
-   *       "pharmacy": {
-   *         "id": "uuid",
-   *         "name": "City Meds",
-   *         "address": "Kathmandu",
-   *         "contactNumber": "9841234567",
-   *         "location": { "lat": 27.7, "lng": 85.3 }
-   *       },
-   *       "distance": 1.2,
-   *       "distanceFormatted": "1.2 km"
-   *     }
-   *   ],
-   *   "meta": {
-   *     "query": "Cetamol",
-   *     "totalResults": 5,
-   *     "hasUserLocation": true
-   *   }
-   * }
-   */
+  // Search medicines by text query and optional location context.
   searchMedicines = asyncHandler(async (req, res) => {
     const {
       query,
@@ -150,12 +104,12 @@ class SearchController {
       limit,
     } = req.query;
 
-    // Validate query parameter
+    // Require query term.
     if (!query) {
       throw new BadRequestError("Search query parameter is required");
     }
 
-    // Parse numeric parameters
+    // Parse and normalize query params.
     const parsedParams = {
       query: query.trim(),
       latitude: latitude ? parseFloat(latitude) : undefined,
@@ -165,7 +119,7 @@ class SearchController {
       limit: limit ? Math.min(parseInt(limit), 100) : 50,
     };
 
-    // Validate that if one coordinate is provided, both must be provided
+    // Require coordinates as a complete pair.
     if (
       (parsedParams.latitude && !parsedParams.longitude) ||
       (!parsedParams.latitude && parsedParams.longitude)
@@ -175,7 +129,7 @@ class SearchController {
       );
     }
 
-    // Log search query for analytics
+    // Log search request metadata.
     logger.info("Medicine search query", {
       query: parsedParams.query,
       hasLocation: !!parsedParams.latitude,
@@ -191,7 +145,7 @@ class SearchController {
       includeOutOfStock: parsedParams.includeOutOfStock,
     });
 
-    // Perform search
+    // Execute search service query.
     const results = await searchService.searchMedicines(parsedParams);
 
     res.status(200).json({
@@ -207,48 +161,16 @@ class SearchController {
     });
   });
 
-  /**
-   * Find nearby pharmacies
-   * 
-   * GET /api/search/nearby?latitude=27.7172&longitude=85.3240&radius=10
-   * 
-   * Query Parameters:
-   * - latitude: User's latitude (required)
-   * - longitude: User's longitude (required)
-   * - radius: Search radius in km (default: 10, max: 50)
-   * - limit: Maximum results (default: 50, max: 100)
-   * 
-   * Response:
-   * {
-   *   "success": true,
-   *   "data": [
-   *     {
-   *       "id": "uuid",
-   *       "name": "City Meds",
-   *       "address": "Kathmandu",
-   *       "contactNumber": "9841234567",
-   *       "location": { "lat": 27.7, "lng": 85.3 },
-   *       "distance": 1.2,
-   *       "distanceFormatted": "1.2 km",
-   *       "medicinesInStock": 150
-   *     }
-   *   ],
-   *   "meta": {
-   *     "totalResults": 5,
-   *     "radius": 10,
-   *     "center": { "lat": 27.7172, "lng": 85.3240 }
-   *   }
-   * }
-   */
+  // Find nearby pharmacies by coordinates and optional radius.
   findNearbyPharmacies = asyncHandler(async (req, res) => {
     const { latitude, longitude, radius, limit } = req.query;
 
-    // Validate required parameters
+    // Require coordinates.
     if (!latitude || !longitude) {
       throw new BadRequestError("Latitude and longitude are required");
     }
 
-    // Parse parameters
+    // Parse and clamp radius/limit.
     const parsedParams = {
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
@@ -256,12 +178,12 @@ class SearchController {
       limit: limit ? Math.min(parseInt(limit), 100) : 50,
     };
 
-    // Validate numeric values
+    // Validate numeric coordinate values.
     if (isNaN(parsedParams.latitude) || isNaN(parsedParams.longitude)) {
       throw new BadRequestError("Invalid latitude or longitude");
     }
 
-    // Log request
+    // Log nearby-search request metadata.
     logger.info("Nearby pharmacies search", {
       location: {
         lat: parsedParams.latitude,
@@ -278,7 +200,7 @@ class SearchController {
       limit: parsedParams.limit,
     });
 
-    // Perform search
+    // Execute nearby pharmacy search.
     const results = await searchService.findNearbyPharmacies(parsedParams);
 
     console.log('[SEARCH CONTROLLER] Nearby pharmacies result:', {
@@ -301,30 +223,7 @@ class SearchController {
     });
   });
 
-  /**
-   * Get search statistics (analytics)
-   * 
-   * GET /api/search/stats?query=Cetamol
-   * 
-   * Query Parameters:
-   * - query: Search term (required)
-   * 
-   * Response:
-   * {
-   *   "success": true,
-   *   "data": {
-   *     "totalResults": 10,
-   *     "inStock": 8,
-   *     "outOfStock": 2,
-   *     "uniquePharmacies": 5,
-   *     "priceRange": {
-   *       "min": 40,
-   *       "max": 60,
-   *       "avg": 50
-   *     }
-   *   }
-   * }
-   */
+  // Return aggregated search statistics for a query.
   getSearchStats = asyncHandler(async (req, res) => {
     const { query } = req.query;
 
@@ -340,14 +239,11 @@ class SearchController {
     });
   });
 
-  /**
-   * Get top medicines near user location for patient home storefront.
-   *
-   * GET /api/search/top-medicines?lat=27.7172&lng=85.3240&limit=8&category=fever
-   */
+  // Return top medicines near user location for patient storefront.
   getTopMedicinesNearUser = asyncHandler(async (req, res) => {
     const { lat, lng, latitude, longitude, limit, category } = req.query;
 
+    // Resolve both coordinate naming variants.
     const resolvedLat = lat ?? latitude;
     const resolvedLng = lng ?? longitude;
 
@@ -359,10 +255,12 @@ class SearchController {
     const hasLatitude = Number.isFinite(parsedLatitude);
     const hasLongitude = Number.isFinite(parsedLongitude);
 
+    // Validate coordinate pair when provided.
     if (hasLatitude !== hasLongitude) {
       throw new BadRequestError("Both lat and lng must be provided together");
     }
 
+    // Validate coordinate ranges.
     if (
       hasLatitude &&
       (parsedLatitude < -90 ||
@@ -373,6 +271,7 @@ class SearchController {
       throw new BadRequestError("Invalid latitude or longitude");
     }
 
+    // Query top medicines with optional category filter.
     const medicines = await searchService.getTopMedicinesNearLocation({
       latitude: hasLatitude ? parsedLatitude : undefined,
       longitude: hasLongitude ? parsedLongitude : undefined,

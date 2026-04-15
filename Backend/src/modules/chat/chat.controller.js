@@ -1,25 +1,12 @@
-/**
- * Chat Controller
- * GET /api/chat/rooms - List active chat rooms
- * GET /api/chat/rooms/:roomId - Get chat room details
- * GET /api/chat/rooms/:roomId/messages - Retrieve chat messages for a room
- * GET /api/chat/unread-count - Get unread message count
- * POST /api/chat/rooms/:roomId/messages - Send a message
- * PUT /api/chat/rooms/:roomId/mark-read - Mark messages as read
- * Security: Only the patient or the pharmacy involved can access.
- */
+// Chat controller for room list, room messages, unread counts, and message actions.
 
 import { prisma } from "../../database/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 
-/**
- * GET /api/chat/rooms
- * Returns all chat rooms for the authenticated user.
- * Response shape matches what the frontend PatientChat component expects:
- *   { success, data: { chatRooms: [ { id, pharmacy, patient, sosRequest, lastMessage, unreadCount } ] } }
- */
+// Return chat rooms for authenticated patient or pharmacy user.
 export const getChatRooms = async (req, res, next) => {
   try {
+    // Read authenticated user ID and optional status filter.
     const userId = req.user?.userId;
     const statusFilter = String(req.query?.status || "").trim().toLowerCase();
 
@@ -35,13 +22,16 @@ export const getChatRooms = async (req, res, next) => {
       "DECLINED",
     ];
 
+    // Allowed sidebar status filter values.
     const allowedFilters = new Set(["", "all", "active", "completed", "archive"]);
     if (!allowedFilters.has(statusFilter)) {
       return next(new AppError("status must be one of: active, completed, archive, all", 400));
     }
 
+    // Require authenticated user.
     if (!userId) return next(new AppError("Authentication required", 401));
 
+    // Resolve user role to patient/pharmacy room scope.
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { roleId: true },
@@ -52,15 +42,17 @@ export const getChatRooms = async (req, res, next) => {
     const isPatient  = user.roleId === 3;
     const isPharmacy = user.roleId === 2;
 
-    // Neither patient nor pharmacy — return empty list gracefully
+    // Non-patient/non-pharmacy roles get empty room list.
     if (!isPatient && !isPharmacy) {
       return res.status(200).json({ success: true, data: { chatRooms: [] } });
     }
 
+    // Build where clause by role scope.
     const whereClause = isPatient
       ? { patientId: userId }
       : { pharmacyId: userId };
 
+    // Apply active/completed status filters when requested.
     if (statusFilter === "active") {
       whereClause.sosRequest = {
         is: {
@@ -75,19 +67,19 @@ export const getChatRooms = async (req, res, next) => {
       };
     }
 
-    // Single query — fetch rooms with all data needed in one round-trip
+    // Load rooms with related entities in one query.
     const rooms = await prisma.chatRoom.findMany({
       where: whereClause,
       orderBy: { createdAt: "desc" },
       include: {
-        // pharmacy is a User; its Pharmacy profile lives at pharmacy.pharmacy
+        // Pharmacy is stored as User; profile details are nested in user.pharmacy.
         pharmacy: {
           select: {
             id: true,
             name: true,                     // User.name (fallback display name)
             pharmacy: {
               select: {
-                pharmacyName: true,         // Pharmacy.pharmacyName (preferred)
+                pharmacyName: true,
                 address: true,
               },
             },
@@ -107,7 +99,7 @@ export const getChatRooms = async (req, res, next) => {
             createdAt: true,
           },
         },
-        // Grab only the single most-recent message for sidebar "last message" snippet
+        // Fetch latest message snippet for room list sidebar.
         messages: {
           orderBy: { createdAt: "desc" },
           take: 1,
@@ -122,7 +114,7 @@ export const getChatRooms = async (req, res, next) => {
       },
     });
 
-    // Efficient unread counting — one groupBy query instead of N separate counts
+    // Count unread messages per room using grouped query.
     const unreadGroups = await prisma.chatMessage.groupBy({
       by: ["roomId"],
       where: {
@@ -136,33 +128,33 @@ export const getChatRooms = async (req, res, next) => {
       unreadGroups.map((g) => [g.roomId, g._count.id])
     );
 
-    // Build the response in the shape the frontend expects
+    // Shape response to match frontend room list contract.
     const chatRooms = rooms.map((room) => ({
-      id:           room.id,                   // frontend uses room.id everywhere
+      id:           room.id,
       sosRequestId: room.sosRequestId,
       patientId:    room.patientId,
       pharmacyId:   room.pharmacyId,
       createdAt:    room.createdAt,
 
-      // pharmacy.name — frontend getPharmacyName() reads room.pharmacy.name
+      // Pharmacy summary for room list cards.
       pharmacy: {
         id:   room.pharmacy.id,
         name: room.pharmacy.pharmacy?.pharmacyName || room.pharmacy.name,
       },
 
-      // patient.name — used by pharmacy-side view
+      // Patient summary for pharmacy-side view.
       patient: {
         id:   room.patient.id,
         name: room.patient.name,
       },
 
-      // sosRequest — frontend reads .medicineName, .urgency, .status, .createdAt
+      // SOS metadata used by chat header and status UI.
       sosRequest: room.sosRequest
         ? {
             id:            room.sosRequest.id,
             medicineName:  room.sosRequest.medicineName,
-            urgency:       room.sosRequest.urgencyLevel,  // alias for frontend
-            urgencyLevel:  room.sosRequest.urgencyLevel,  // keep original too
+            urgency:       room.sosRequest.urgencyLevel,
+            urgencyLevel:  room.sosRequest.urgencyLevel,
             status:        room.sosRequest.status,
             patientName:   room.sosRequest.patientName,
             contactNumber: room.sosRequest.contactNumber,
@@ -181,12 +173,10 @@ export const getChatRooms = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/chat/rooms/:roomId/messages
- * Returns all messages for a chat room
- */
+// Return all messages for one chat room.
 export const getChatMessages = async (req, res, next) => {
   try {
+    // Read room and user identifiers.
     const { roomId } = req.params;
     const userId = req.user?.userId;
 
@@ -198,7 +188,7 @@ export const getChatMessages = async (req, res, next) => {
       return next(new AppError("roomId is required", 400));
     }
 
-    // Fetch the chat room to verify authorization
+    // Load room metadata for authorization checks.
     const chatRoom = await prisma.chatRoom.findUnique({
       where: { id: roomId },
       select: {
@@ -220,7 +210,7 @@ export const getChatMessages = async (req, res, next) => {
       return next(new AppError("Chat room not found", 404));
     }
 
-    // Check if the requesting user is authorized
+    // Permit only room participants.
     const isAuthorized =
       userId === chatRoom.patientId || userId === chatRoom.pharmacyId;
 
@@ -228,7 +218,7 @@ export const getChatMessages = async (req, res, next) => {
       return next(new AppError("You are not authorized to view this chat", 403));
     }
 
-    // Fetch messages sorted by createdAt ascending (oldest first)
+    // Fetch messages in chronological order.
     const messages = await prisma.chatMessage.findMany({
       where: { roomId },
       orderBy: { createdAt: "asc" },
@@ -239,6 +229,7 @@ export const getChatMessages = async (req, res, next) => {
       },
     });
 
+    // Normalize message payload for frontend.
     const formattedMessages = messages.map((msg) => ({
       id: msg.id,
       content: msg.content,
@@ -265,10 +256,7 @@ export const getChatMessages = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/chat/unread-count
- * Returns total unread message count for the authenticated user
- */
+// Return total unread message count for current user.
 export const getUnreadCount = async (req, res, next) => {
   try {
     const userId = req.user?.userId;
@@ -283,17 +271,16 @@ export const getUnreadCount = async (req, res, next) => {
       return next(new AppError("User not found", 404));
     }
 
+    // Determine room scope from user role.
     let chatRoomIds = [];
 
-    // Get chat room IDs for the user
+    // Load room IDs by role scope.
     if (user.roleId === 3) {
-      // Patient
       chatRoomIds = await prisma.chatRoom.findMany({
         where: { patientId: userId },
         select: { id: true },
       });
     } else if (user.roleId === 2) {
-      // Pharmacy
       chatRoomIds = await prisma.chatRoom.findMany({
         where: { pharmacyId: userId },
         select: { id: true },
@@ -302,7 +289,7 @@ export const getUnreadCount = async (req, res, next) => {
 
     const roomIds = chatRoomIds.map((room) => room.id);
 
-    // Count unread messages from other users
+    // Count unread messages sent by other participants.
     const unreadCount = await prisma.chatMessage.count({
       where: {
         roomId: { in: roomIds },
@@ -321,12 +308,10 @@ export const getUnreadCount = async (req, res, next) => {
   }
 };
 
-/**
- * POST /api/chat/rooms/:roomId/messages
- * Send a new message in a chat room
- */
+// Send one message to a chat room.
 export const sendMessage = async (req, res, next) => {
   try {
+    // Read route/body/user values.
     const { roomId } = req.params;
     const { content } = req.body;
     const userId = req.user?.userId;
@@ -339,7 +324,7 @@ export const sendMessage = async (req, res, next) => {
       return next(new AppError("Message content is required", 400));
     }
 
-    // Verify the chat room exists and user is authorized
+    // Validate room existence and user participation.
     const chatRoom = await prisma.chatRoom.findUnique({
       where: { id: roomId },
       select: {
@@ -360,7 +345,7 @@ export const sendMessage = async (req, res, next) => {
       return next(new AppError("You are not authorized to send messages in this chat", 403));
     }
 
-    // Create the message
+    // Persist message row.
     const message = await prisma.chatMessage.create({
       data: {
         roomId,
@@ -374,8 +359,7 @@ export const sendMessage = async (req, res, next) => {
       },
     });
 
-    // Emit via Socket.IO so both sides receive the message in real-time
-    // (covers the REST path — socket send_message handler covers the WS path)
+    // Emit realtime events for REST-created messages.
     const io = req.app.get("io");
     if (io) {
       const roomName = `chatroom_${roomId}`;
@@ -390,7 +374,7 @@ export const sendMessage = async (req, res, next) => {
       };
       io.to(roomName).emit("receive_message", payload);
 
-      // Sidebar notification for the recipient
+      // Build recipient notification payload for sidebar updates.
       const recipientId =
         userId === chatRoom.patientId ? chatRoom.pharmacyId : chatRoom.patientId;
 
@@ -403,10 +387,10 @@ export const sendMessage = async (req, res, next) => {
         createdAt: message.createdAt,
       };
 
-      // Canonical NEW_MESSAGE event — consumed by NotificationContext
+      // Canonical event consumed by NotificationContext.
       io.emit("NEW_MESSAGE", notifPayload);
 
-      // Legacy alias kept for backward-compat with PharmacyNotificationBell
+      // Legacy alias for backward compatibility.
       io.emit("new_message_notification", notifPayload);
     }
 
@@ -430,12 +414,7 @@ export const sendMessage = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/chat/rooms/by-sos/:sosRequestId
- * Resolves a SOS request ID to its associated ChatRoom ID.
- * Used by the frontend ChatWindow to obtain the roomId needed for
- * history fetching and socket join_room.
- */
+// Resolve SOS request ID to chat room ID.
 export const getRoomBySosRequest = async (req, res, next) => {
   try {
     const { sosRequestId } = req.params;
@@ -450,7 +429,7 @@ export const getRoomBySosRequest = async (req, res, next) => {
     });
 
     if (!chatRoom) {
-      // Return a soft 404 so the frontend can retry with a placeholder instead of crashing
+      // Return soft 404 so client can retry gracefully.
       return res.status(404).json({
         success: false,
         notInitialized: true,
@@ -469,10 +448,7 @@ export const getRoomBySosRequest = async (req, res, next) => {
   }
 };
 
-/**
- * PUT /api/chat/rooms/:roomId/mark-read
- * Mark all messages in a room as read for the current user
- */
+// Mark all unread room messages as read for current user.
 export const markMessagesAsRead = async (req, res, next) => {
   try {
     const { roomId } = req.params;
@@ -482,7 +458,7 @@ export const markMessagesAsRead = async (req, res, next) => {
       return next(new AppError("Authentication required", 401));
     }
 
-    // Verify the chat room exists and user is authorized
+    // Verify room exists and user is a participant.
     const chatRoom = await prisma.chatRoom.findUnique({
       where: { id: roomId },
       select: {
@@ -502,7 +478,7 @@ export const markMessagesAsRead = async (req, res, next) => {
       return next(new AppError("You are not authorized to access this chat", 403));
     }
 
-    // Mark all messages from other users as read
+    // Mark unread messages from other participant as read.
     await prisma.chatMessage.updateMany({
       where: {
         roomId,

@@ -1,18 +1,10 @@
 /**
- * Pharmacy Service - Business logic for pharmacy onboarding and verification
- * Handles the two-step pharmacy registration process
- * 
- * Flow:
- * 1. Authenticated user (roleId=2) submits pharmacy details
- * 2. Pharmacy record created with PENDING_VERIFICATION status
- * 3. SystemAdmin reviews and approves/rejects
- * 4. Only VERIFIED pharmacies can access protected features
+ * Pharmacy onboarding and verification logic.
  */
 
 import { prisma } from "../../database/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 
-// Nepal geographic boundaries for validation
 const NEPAL_BOUNDS = {
   minLat: 26.3478,
   maxLat: 30.4469,
@@ -20,11 +12,7 @@ const NEPAL_BOUNDS = {
   maxLng: 88.2015,
 };
 
-/**
- * Submit pharmacy onboarding details
- * User must be authenticated with roleId=2 (PHARMACY_ADMIN)
- * One user can only register one pharmacy
- */
+// Save pharmacy onboarding details for a pharmacy admin.
 export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
   const {
     pharmacyName,
@@ -36,13 +24,11 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
     contactNumber,
   } = pharmacyData;
 
-  // Validate required fields
   if (!pharmacyName || !address || !licenseNumber || !contactNumber) {
     throw new AppError("Missing required pharmacy details", 400);
   }
 
-  // CRITICAL: Validate license document is provided
-  // This is the most important piece of documentation for pharmacy verification
+  // The license file is required before we let onboarding continue.
   if (!licenseDocument || 
       (typeof licenseDocument === 'object' && Object.keys(licenseDocument).length === 0) ||
       (typeof licenseDocument === 'string' && licenseDocument.trim().length === 0)) {
@@ -52,7 +38,6 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
     );
   }
 
-  // Ensure licenseDocument is a valid string (URL from Cloudinary)
   if (typeof licenseDocument !== 'string') {
     throw new AppError(
       "Onboarding failed: Invalid license document format. Document must be a valid file URL.",
@@ -60,7 +45,7 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
     );
   }
 
-  // Convert latitude/longitude from string to Float (HTML forms send strings)
+  // Forms send strings, so normalize coordinates before validation.
   let latitude = null;
   let longitude = null;
 
@@ -72,7 +57,6 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
     if (latitude < -90 || latitude > 90) {
       throw new AppError("Latitude must be between -90 and 90", 400);
     }
-    // Validate Nepal boundaries
     if (latitude < NEPAL_BOUNDS.minLat || latitude > NEPAL_BOUNDS.maxLat) {
       throw new AppError(
         `Pharmacy location must be within Nepal. Latitude must be between ${NEPAL_BOUNDS.minLat} and ${NEPAL_BOUNDS.maxLat}`,
@@ -89,7 +73,6 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
     if (longitude < -180 || longitude > 180) {
       throw new AppError("Longitude must be between -180 and 180", 400);
     }
-    // Validate Nepal boundaries
     if (longitude < NEPAL_BOUNDS.minLng || longitude > NEPAL_BOUNDS.maxLng) {
       throw new AppError(
         `Pharmacy location must be within Nepal. Longitude must be between ${NEPAL_BOUNDS.minLng} and ${NEPAL_BOUNDS.maxLng}`,
@@ -98,7 +81,7 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
     }
   }
 
-  // Check if user exists and has correct role
+  // Only pharmacy admins can submit onboarding.
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { role: true },
@@ -112,8 +95,7 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
     throw new AppError("Only Pharmacy Admin users can register a pharmacy", 403);
   }
 
-  // Security: Prevent System Admin (roleId=1) from registering pharmacies
-  // This should never happen due to role check above, but defense-in-depth
+  // The admin role should never reach this path.
   if (user.roleId === 1) {
     throw new AppError(
       "System Admin accounts cannot register pharmacies. This action is blocked.",
@@ -121,26 +103,23 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
     );
   }
 
-  // Check if user already has a pharmacy registered
+  // One user can only own one pharmacy record.
   const existingPharmacy = await prisma.pharmacy.findUnique({
     where: { userId },
   });
 
   if (existingPharmacy) {
-    // If rejected, they need admin to reset their status
-    // Cannot re-upload documents after admin decision
+    // Rejected applications stay locked until support or admin review changes them.
     if (existingPharmacy.verificationStatus === "REJECTED") {
       throw new AppError(
         "Your pharmacy registration was rejected. Please contact support for assistance.",
         403
       );
     }
-    // If pending or verified, they cannot register again
-    // Prevents duplicate submissions and document re-uploads
     throw new AppError("You have already registered a pharmacy", 409);
   }
 
-  // Check if license number is already registered
+  // License numbers must stay unique across all pharmacies.
   const licenseExists = await prisma.pharmacy.findUnique({
     where: { licenseNumber },
   });
@@ -149,18 +128,14 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
     throw new AppError("License number already registered", 409);
   }
 
-  // Create pharmacy record with PENDING_VERIFICATION status
-  // Also update user status from ONBOARDING_REQUIRED to PENDING
+  // Keep the user and pharmacy changes together so partial onboarding does not leak through.
   const pharmacy = await prisma.$transaction(async (tx) => {
-    // Normalize and validate license document
-    // Must be a non-empty string (Cloudinary URL)
+    // Store a clean URL so later admin screens can render the document.
     const normalizedLicenseDocument =
       typeof licenseDocument === "string" && licenseDocument.trim().length > 0
         ? licenseDocument.trim()
         : null;
 
-    // Double-check: This should never be null at this point due to validation above
-    // But we add this as a defense-in-depth measure
     if (!normalizedLicenseDocument) {
       throw new AppError(
         "Critical error: License document validation failed. Cannot proceed with onboarding.",
@@ -168,13 +143,13 @@ export const submitPharmacyOnboarding = async (userId, pharmacyData) => {
       );
     }
 
-    // Update user status to PENDING (awaiting admin approval)
+    // Move the user out of onboarding-required once the pharmacy record is created.
     await tx.user.update({
       where: { id: userId },
       data: { status: "PENDING" },
     });
 
-    // Create pharmacy record
+    // Store the pharmacy details that admins need for review.
     const newPharmacy = await tx.pharmacy.create({
       data: {
         userId,

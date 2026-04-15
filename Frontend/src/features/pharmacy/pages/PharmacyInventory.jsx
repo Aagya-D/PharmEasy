@@ -38,6 +38,7 @@ export default function PharmacyInventory() {
 
   // Statistics calculated from inventory
   const stats = React.useMemo(() => {
+    // Keep the summary cards derived from the current in-memory inventory.
     const totalItems = inventory.length;
     const lowStockItems = inventory.filter(item => item.quantity > 0 && item.quantity < 20).length;
     const outOfStockItems = inventory.filter(item => item.quantity === 0).length;
@@ -67,6 +68,7 @@ export default function PharmacyInventory() {
       setError(null);
       logger.info("INVENTORY", "Fetching inventory", { page });
       
+      // Pull the current page from the backend before rendering the table.
       const response = await inventoryService.getMyInventory(page, 50);
       
       // Validate response structure
@@ -101,6 +103,7 @@ export default function PharmacyInventory() {
 
   // Filter inventory based on search
   const filteredInventory = inventory.filter(item => {
+    // Search across medicine name, generic name, and category.
     const searchLower = searchTerm.toLowerCase();
     const normalizedCategory = (item.category || "").toLowerCase().replace(/_/g, " ");
     return (
@@ -113,6 +116,7 @@ export default function PharmacyInventory() {
   const handleView = async (item) => {
     try {
       setEditLoading(true);
+      // Fetch the latest record before showing the detail modal.
       logger.info("INVENTORY", "Fetching medicine details for secure view", { itemId: item.id });
       const response = await inventoryService.getInventoryItemById(item.id);
       setActiveDetailMedicine(response?.data || item);
@@ -128,6 +132,7 @@ export default function PharmacyInventory() {
   const handleAddMedicine = async (payload) => {
     try {
       setAddSubmitting(true);
+      // Send the form payload straight to the create endpoint.
       logger.info("INVENTORY", "Adding new medicine", { name: payload.name });
       await inventoryService.addMedicine(payload);
       toast.success(`✅ ${payload.name} added to inventory!`);
@@ -146,6 +151,7 @@ export default function PharmacyInventory() {
 
     try {
       setEditSubmitting(true);
+      // Update first, then re-fetch so the detail modal shows fresh data.
       logger.info("INVENTORY", "Updating medicine", { itemId: activeDetailMedicine.id });
       await inventoryService.updateInventoryItem(activeDetailMedicine.id, payload);
       const refreshedResponse = await inventoryService.getInventoryItemById(activeDetailMedicine.id);
@@ -164,6 +170,7 @@ export default function PharmacyInventory() {
 
   // Handle delete — opens ConfirmModal
   const handleDelete = (itemId, itemName) => {
+    // Keep deletion behind a confirmation step.
     setConfirmDelete({ open: true, itemId, itemName });
   };
 
@@ -172,6 +179,7 @@ export default function PharmacyInventory() {
     const { itemId } = confirmDelete;
     setConfirmDelete({ open: false, itemId: null, itemName: "" });
     try {
+      // Remove the item only after the user confirms the action.
       logger.info("INVENTORY", "Deleting inventory item", { itemId });
       await inventoryService.deleteInventoryItem(itemId);
       logger.success("INVENTORY", "Item deleted successfully");
@@ -186,6 +194,7 @@ export default function PharmacyInventory() {
 
   // Get status badge based on quantity
   const getStatusBadge = (quantity) => {
+    // Map quantity to a compact visual status label.
     if (quantity === 0) {
       return <span className="px-2.5 py-1 rounded-full text-xs bg-red-50 text-red-600">Out of Stock</span>;
     } else if (quantity < 20) {
@@ -197,6 +206,7 @@ export default function PharmacyInventory() {
 
   // Get expiry badge
   const getExpiryBadge = (expiryDate) => {
+    // Show expiry warnings inline so the table stays readable.
     const daysUntilExpiry = Math.floor(
       (new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24)
     );

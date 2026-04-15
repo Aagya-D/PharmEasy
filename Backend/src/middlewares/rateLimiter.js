@@ -1,47 +1,36 @@
-/**
- * Rate Limiting Middleware
- * Prevents brute force attacks on sensitive endpoints
- * Uses in-memory store (use Redis for production)
- */
+// Rate limiting middleware for sensitive auth endpoints.
 
 import notificationService from "../modules/notifications/notification.service.js";
 
-/**
- * Simple in-memory rate limiter
- * For production, use Redis or a dedicated rate limiting service
- */
+// In-memory rate limiter.
+// For multi-instance deployments, replace with Redis-backed store.
 class RateLimiter {
   constructor() {
+    // Map key -> array of attempt timestamps.
     this.attempts = new Map();
-    // Cleanup old entries every 5 minutes
+    // Periodic cleanup of stale entries.
     setInterval(() => this.cleanup(), 5 * 60 * 1000);
   }
 
-  /**
-   * Check if request is within rate limit
-   * @param {string} key - unique identifier (email, IP, etc.)
-   * @param {number} limit - max attempts
-   * @param {number} windowMs - time window in milliseconds
-   */
+  // Check whether current attempt is allowed for key/window.
   isAllowed(key, limit, windowMs) {
     const now = Date.now();
     const userAttempts = this.attempts.get(key) || [];
 
-    // Remove expired attempts
+    // Keep only attempts inside the configured window.
     const validAttempts = userAttempts.filter((time) => now - time < windowMs);
 
     if (validAttempts.length >= limit) {
       return false;
     }
 
+    // Record current attempt timestamp.
     validAttempts.push(now);
     this.attempts.set(key, validAttempts);
     return true;
   }
 
-  /**
-   * Get remaining attempts
-   */
+  // Return remaining attempt count for key/window.
   getRemaining(key, limit, windowMs) {
     const now = Date.now();
     const userAttempts = this.attempts.get(key) || [];
@@ -49,15 +38,13 @@ class RateLimiter {
     return Math.max(0, limit - validAttempts.length);
   }
 
-  /**
-   * Cleanup expired entries
-   */
+  // Remove expired attempt entries from in-memory map.
   cleanup() {
     const now = Date.now();
     for (const [key, attempts] of this.attempts.entries()) {
       const validAttempts = attempts.filter(
         (time) => now - time < 15 * 60 * 1000
-      ); // 15 min window
+      );
       if (validAttempts.length === 0) {
         this.attempts.delete(key);
       } else {
@@ -69,21 +56,21 @@ class RateLimiter {
 
 const limiter = new RateLimiter();
 
-/**
- * Rate limit login attempts
- * 5 attempts per 15 minutes per email
- */
+// Login rate limit: 5 attempts per 15 minutes per email.
 export const loginRateLimit = async (req, res, next) => {
+  // Use email as limiter key for credential brute-force protection.
   const key = `login:${req.body.email}`;
   const limit = 5;
   const windowMs = 15 * 60 * 1000; // 15 minutes
 
   if (!limiter.isAllowed(key, limit, windowMs)) {
+    // Build structured security alert payload.
     const email = req.body?.email || "unknown";
     const ipAddress = req.ip || "unknown";
     const securityMessage = `Security flag: Login rate limit triggered for ${email} from IP ${ipAddress}.`;
 
     try {
+      // Notify admin channels when threshold is exceeded.
       await notificationService.notifySecurityFlag(securityMessage, {
         signal: "LOGIN_RATE_LIMIT",
         email,
@@ -92,6 +79,7 @@ export const loginRateLimit = async (req, res, next) => {
         windowMinutes: 15,
       });
 
+      // Emit real-time system alert for connected admins.
       const io = req.app?.get("io");
       if (io) {
         io.emit("SYSTEM_ALERT", {
@@ -107,10 +95,10 @@ export const loginRateLimit = async (req, res, next) => {
         });
       }
     } catch {
-      // Non-blocking: rate limit response should still be returned
+      // Notification failure should not block rate-limit response.
     }
 
-    const remaining = limiter.getRemaining(key, limit, windowMs);
+    // Return 429 response for blocked login attempts.
     return res.status(429).json({
       success: false,
       error: {
@@ -123,10 +111,7 @@ export const loginRateLimit = async (req, res, next) => {
   next();
 };
 
-/**
- * Rate limit OTP resend
- * 3 attempts per 10 minutes per email
- */
+// OTP resend rate limit: 3 attempts per 10 minutes per email.
 export const otpResendRateLimit = (req, res, next) => {
   const key = `otp:resend:${req.body.email}`;
   const limit = 3;
@@ -145,10 +130,7 @@ export const otpResendRateLimit = (req, res, next) => {
   next();
 };
 
-/**
- * Rate limit password reset
- * 3 attempts per 60 minutes per email
- */
+// Password reset rate limit: 3 attempts per 60 minutes per email.
 export const passwordResetRateLimit = (req, res, next) => {
   const key = `password:reset:${req.body.email}`;
   const limit = 3;
@@ -167,10 +149,7 @@ export const passwordResetRateLimit = (req, res, next) => {
   next();
 };
 
-/**
- * Rate limit registration
- * 10 attempts per hour per IP
- */
+// Registration rate limit: 10 attempts per hour per IP.
 export const registerRateLimit = (req, res, next) => {
   const key = `register:${req.ip}`;
   const limit = 10;

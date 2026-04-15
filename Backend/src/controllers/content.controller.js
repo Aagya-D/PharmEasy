@@ -1,27 +1,21 @@
-/**
- * Content Controller - Public health tips and announcements
- * Handles read-only operations for active content visible to all authenticated users
- */
+// Content controller for read-only health tips and announcements.
 
 import { prisma } from "../database/prisma.js";
 import { AppError } from "../utils/errors.js";
 
-/**
- * GET /api/content/health-tips
- * Get all active health tips (public)
- * @access Authenticated users (any role)
- */
+// Get all currently active and published health tips.
 export const getActiveHealthTips = async (req, res, next) => {
   try {
+    // Return only active records already published and not expired.
     const healthTips = await prisma.healthTip.findMany({
       where: {
         isActive: true,
         publishDate: {
-          lte: new Date(), // Only published tips
+          lte: new Date(),
         },
         OR: [
-          { expiryDate: null }, // No expiry
-          { expiryDate: { gte: new Date() } }, // Not yet expired
+          { expiryDate: null },
+          { expiryDate: { gte: new Date() } },
         ],
       },
       orderBy: {
@@ -49,11 +43,7 @@ export const getActiveHealthTips = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/content/health-tips/latest
- * Get single most recent active health tip
- * @access Authenticated users (any role)
- */
+// Get the latest active health tip.
 export const getLatestHealthTip = async (req, res, next) => {
   try {
     const healthTip = await prisma.healthTip.findFirst({
@@ -90,12 +80,7 @@ export const getLatestHealthTip = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/content/announcements
- * Get all active announcements filtered by target role
- * Query: ?targetRole=PATIENT|PHARMACY|ADMIN (optional)
- * @access Authenticated users (any role)
- */
+// Get active announcements, optionally filtered by target role.
 export const getActiveAnnouncements = async (req, res, next) => {
   try {
     const { targetRole } = req.query;
@@ -111,10 +96,10 @@ export const getActiveAnnouncements = async (req, res, next) => {
       ],
     };
 
-    // Filter by target role if provided
+    // Apply role filter while still allowing global announcements.
     if (targetRole) {
       whereClause.OR = [
-        { targetRole: null }, // Global announcements
+        { targetRole: null },
         { targetRole: targetRole.toUpperCase() },
         { targetRole: 'ALL' },
       ];
@@ -123,7 +108,7 @@ export const getActiveAnnouncements = async (req, res, next) => {
     const announcements = await prisma.announcement.findMany({
       where: whereClause,
       orderBy: [
-        { priority: 'desc' }, // high > normal > low
+        { priority: 'desc' },
         { publishDate: 'desc' },
       ],
       select: {
@@ -149,12 +134,7 @@ export const getActiveAnnouncements = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/content/announcements/priority
- * Get single highest priority announcement for target role
- * Query: ?targetRole=PATIENT|PHARMACY|ADMIN (required)
- * @access Authenticated users (any role)
- */
+// Get highest-priority active announcement for a target role.
 export const getHighPriorityAnnouncement = async (req, res, next) => {
   try {
     const { targetRole } = req.query;
@@ -210,11 +190,7 @@ export const getHighPriorityAnnouncement = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/content/health-tips/category/:category
- * Get health tips by category
- * @access Authenticated users (any role)
- */
+// Get active health tips by category.
 export const getHealthTipsByCategory = async (req, res, next) => {
   try {
     const { category } = req.params;

@@ -9,10 +9,11 @@ import { createLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
 import notificationService from "../notifications/notification.service.js";
 import { isValidNepaliPhone } from "../../utils/validation.js";
 
-// ─── SOS Expiration Config ────────────────────────────
+// SOS requests expire after a short wait so stale alerts do not linger.
 const SOS_TTL_MINUTES = 30;
 
 const extractDistrictName = (address = "") => {
+  // The last comma-separated part is usually the district or closest match.
   const normalized = String(address || "").trim();
   if (!normalized) return "Unknown District";
 
@@ -28,9 +29,7 @@ const extractDistrictName = (address = "") => {
 };
 
 /**
- * Automatically expire stale SOS requests.
- * Marks any "pending" SOS older than 30 minutes as "expired".
- * Called lazily on every SOS read to keep data fresh without a cron job.
+ * Expire stale SOS requests during reads instead of using a scheduled job.
  */
 async function expireStaleSOSRequests() {
   const cutoff = new Date(Date.now() - SOS_TTL_MINUTES * 60 * 1000);
@@ -57,7 +56,7 @@ export const getDashboard = async (req, res) => {
   const startTime = Date.now();
   const patientId = req.user?.userId;
 
-  // Validate user identity
+  // Dashboard data is only available to authenticated patients.
   if (!patientId) {
     return res.status(401).json({
       success: false,
@@ -66,14 +65,14 @@ export const getDashboard = async (req, res) => {
   }
 
   try {
-    // Get patient orders (recent 5)
+    // Show only a small recent slice so the dashboard stays fast.
     const orders = await prisma.order.findMany({
       where: { patientId },
       take: 5,
       orderBy: { createdAt: 'desc' },
     });
 
-    // Count unique medicines bought so far (exclude cancelled orders)
+    // Count unique medicines, not raw order rows, for the summary card.
     const purchasedItems = await prisma.orderItem.findMany({
       where: {
         order: {
@@ -130,7 +129,7 @@ export const getProfile = async (req, res) => {
   const startTime = Date.now();
   const patientId = req.user?.userId;
 
-  // Validate user identity
+  // Profile data is only available to signed-in patients.
   if (!patientId) {
     return res.status(401).json({
       success: false,
@@ -181,7 +180,7 @@ export const updateProfile = async (req, res) => {
   const patientId = req.user?.userId;
   const { name, phone } = req.body;
 
-  // Validate user identity
+  // Only authenticated patients can update their profile.
   if (!patientId) {
     return res.status(401).json({
       success: false,
@@ -189,7 +188,7 @@ export const updateProfile = async (req, res) => {
     });
   }
 
-  // Validate phone format if provided
+  // Keep the phone number valid before storing it.
   if (phone && !isValidNepaliPhone(phone)) {
     return res.status(400).json({
       success: false,
@@ -212,7 +211,7 @@ export const updateProfile = async (req, res) => {
       }
     });
 
-    // Log activity
+    // Record the profile change for audit history.
     await createLog(
       patientId,
       LOG_ACTIONS.PATIENT_UPDATED,
@@ -430,7 +429,7 @@ export const submitSOSRequest = async (req, res) => {
   const startTime = Date.now();
   const patientId = req.user?.userId;
 
-  // Validate user identity first
+  // SOS requests are patient-only actions.
   if (!patientId) {
     return res.status(401).json({
       success: false,
@@ -438,7 +437,7 @@ export const submitSOSRequest = async (req, res) => {
     });
   }
 
-  // Check if req.body exists (multer should populate this)
+  // Multer should fill req.body, but we still guard against empty payloads.
   if (!req.body || Object.keys(req.body).length === 0) {
     return res.status(400).json({
       success: false,
@@ -461,7 +460,7 @@ export const submitSOSRequest = async (req, res) => {
   } = req.body;
 
   try {
-    // Validate required fields
+    // The request needs the basic details before we can alert pharmacies.
     if (!medicineName || !patientName || !contactNumber || !address) {
       return res.status(400).json({
         success: false,
@@ -469,7 +468,7 @@ export const submitSOSRequest = async (req, res) => {
       });
     }
 
-    // Validate Nepal phone format
+    // SOS requests need a valid Nepali number so pharmacies can call back.
     if (!isValidNepaliPhone(contactNumber)) {
       return res.status(400).json({
         success: false,
@@ -477,7 +476,7 @@ export const submitSOSRequest = async (req, res) => {
       });
     }
 
-    // GPS coordinates are mandatory for SOS requests
+    // Use GPS so nearby pharmacies can be ranked by distance.
     const parsedLat = latitude ? parseFloat(latitude) : null;
     const parsedLng = longitude ? parseFloat(longitude) : null;
     if (!parsedLat || !parsedLng || parsedLat === 0 || parsedLng === 0 || isNaN(parsedLat) || isNaN(parsedLng)) {
@@ -487,7 +486,7 @@ export const submitSOSRequest = async (req, res) => {
       });
     }
 
-    // Prepare SOS request data
+    // Build the SOS payload that gets stored in the database.
     const sosData = {
       patientId,
       medicineName,
@@ -504,17 +503,18 @@ export const submitSOSRequest = async (req, res) => {
       status: 'pending',
     };
 
-    // Add prescription URL if file was uploaded
+    // Attach the prescription file when the patient uploads one.
     if (req.file && req.file.path) {
       sosData.prescriptionUrl = req.file.path;
     }
 
-    // Create SOS request
+    // Save the SOS request before notifying pharmacies.
     const sosRequest = await prisma.sOSRequest.create({
       data: sosData
     });
 
     const districtName = extractDistrictName(sosRequest.address);
+    // Broadcast the alert after the record exists so the link is valid.
     await notificationService.notifyGlobalSosAlert(
       sosRequest.medicineName,
       districtName,
@@ -795,7 +795,7 @@ export const getActiveSOS = async (req, res) => {
   }
 };
 
-// ─── Favorite Medicines ──────────────────────────────
+// Favorite medicines
 
 /**
  * GET /api/patient/favorites
@@ -845,7 +845,7 @@ export const addFavorite = async (req, res) => {
   }
 
   try {
-    // Upsert: if already favorited, update metadata
+    // Update the same row when the medicine is already in favorites.
     const favorite = await prisma.favoriteMedicine.upsert({
       where: { userId_medicineName: { userId, medicineName } },
       update: {
@@ -903,7 +903,7 @@ export const removeFavorite = async (req, res) => {
   }
 };
 
-// ─── Cart Management ───────────────────────────────
+// Cart management
 
 const cartItemSelect = {
   id: true,

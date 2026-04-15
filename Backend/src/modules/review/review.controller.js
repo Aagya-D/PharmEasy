@@ -1,29 +1,21 @@
-/**
- * Review Controller
- * POST   /api/reviews          - Submit a new review (patient only)
- * GET    /api/reviews/:pharmacyId - Get all reviews for a pharmacy (public)
- *
- * The POST handler saves the review and recalculates the pharmacy's
- * averageRating / totalReviews inside a Prisma transaction.
- */
+// Review controller for creating patient reviews and listing pharmacy reviews.
 
 import { prisma } from "../../database/prisma.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 
-/**
- * POST /api/reviews
- * Body: { pharmacyId, rating, comment? }
- */
+// Submit or update a patient review for one pharmacy.
 export const submitReview = async (req, res, next) => {
   try {
+    // Resolve authenticated patient ID.
     const patientId = req.user?.userId;
     if (!patientId) {
       return next(new AppError("Authentication required", 401));
     }
 
+    // Read incoming review payload.
     const { pharmacyId, rating, comment, sosRequestId } = req.body;
 
-    // ── Validation ──────────────────────────────────────────
+    // Validate required fields.
     if (!pharmacyId) {
       return next(new AppError("pharmacyId is required", 400));
     }
@@ -31,12 +23,13 @@ export const submitReview = async (req, res, next) => {
       return next(new AppError("rating is required", 400));
     }
 
+    // Parse and validate rating range.
     const numRating = Number(rating);
     if (!Number.isInteger(numRating) || numRating < 1 || numRating > 5) {
       return next(new AppError("rating must be an integer between 1 and 5", 400));
     }
 
-    // Verify pharmacy exists
+    // Ensure pharmacy exists before writing review.
     const pharmacy = await prisma.pharmacy.findUnique({
       where: { id: pharmacyId },
       select: { id: true, averageRating: true, totalReviews: true },
@@ -45,13 +38,14 @@ export const submitReview = async (req, res, next) => {
       return next(new AppError("Pharmacy not found", 404));
     }
 
-    // ── Transaction: upsert review + recalculate average + complete SOS ──
+    // Transaction: upsert review, recalculate aggregate, optionally complete SOS.
     const result = await prisma.$transaction(async (tx) => {
+      // Check whether patient already reviewed this pharmacy.
       const existing = await tx.review.findUnique({
         where: { pharmacyId_patientId: { pharmacyId, patientId } },
       });
 
-      // 1. Create new review or update an existing one for this patient+pharmacy
+      // Create new review or update existing patient+pharmacy review.
       const review = existing
         ? await tx.review.update({
             where: { pharmacyId_patientId: { pharmacyId, patientId } },
@@ -75,7 +69,7 @@ export const submitReview = async (req, res, next) => {
             },
           });
 
-      // 2. Recalculate aggregate rating from source-of-truth reviews
+      // Recalculate average and count from source reviews.
       const aggregate = await tx.review.aggregate({
         where: { pharmacyId },
         _avg: { rating: true },
@@ -84,7 +78,7 @@ export const submitReview = async (req, res, next) => {
       const newAvg = Math.round(((aggregate._avg.rating || 0) * 100)) / 100;
       const newCount = aggregate._count._all || 0;
 
-      // 3. Update pharmacy rating snapshot
+      // Persist aggregate snapshot on pharmacy record.
       await tx.pharmacy.update({
         where: { id: pharmacyId },
         data: {
@@ -93,7 +87,7 @@ export const submitReview = async (req, res, next) => {
         },
       });
 
-      // 4. Auto-complete the SOS request if provided and belongs to this patient
+      // Auto-complete accepted SOS request if linked and owned by patient.
       if (sosRequestId) {
         await tx.sOSRequest.updateMany({
           where: { id: sosRequestId, patientId, status: "accepted" },
@@ -126,7 +120,7 @@ export const submitReview = async (req, res, next) => {
         : "Review submitted successfully",
     });
   } catch (error) {
-    // Handle race condition on first write, then treat as update.
+    // Handle unique-race case by returning existing review.
     if (error.code === "P2002") {
       const existingReview = await prisma.review.findUnique({
         where: {
@@ -164,18 +158,17 @@ export const submitReview = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/reviews/:pharmacyId
- * Returns all reviews for a pharmacy, newest first.
- */
+// Get all reviews for one pharmacy, newest first.
 export const getPharmacyReviews = async (req, res, next) => {
   try {
+    // Read pharmacy ID from route params.
     const { pharmacyId } = req.params;
 
     if (!pharmacyId) {
       return next(new AppError("pharmacyId is required", 400));
     }
 
+    // Load pharmacy rating summary snapshot.
     const pharmacy = await prisma.pharmacy.findUnique({
       where: { id: pharmacyId },
       select: { id: true, averageRating: true, totalReviews: true, pharmacyName: true },
@@ -185,6 +178,7 @@ export const getPharmacyReviews = async (req, res, next) => {
       return next(new AppError("Pharmacy not found", 404));
     }
 
+    // Fetch all review rows with patient names.
     const reviews = await prisma.review.findMany({
       where: { pharmacyId },
       orderBy: { createdAt: "desc" },
@@ -193,6 +187,7 @@ export const getPharmacyReviews = async (req, res, next) => {
       },
     });
 
+    // Normalize API response shape.
     const formatted = reviews.map((r) => ({
       id: r.id,
       rating: r.rating,

@@ -1,13 +1,5 @@
 /**
- * Authentication Service - Two-Stage Registration with OTP Hashing
- * Implements secure registration flow with optional Redis for pending users
- * Falls back to Prisma-only for simplicity if Redis is unavailable
- *
- * Flow:
- * 1. REGISTER: Store pending user data + hashed OTP
- * 2. VERIFY-OTP: Move pending user to User table, mark as verified
- * 3. LOGIN: Authenticate and issue tokens
- * 4. REFRESH: Rotate refresh tokens securely
+ * Authentication service for registration, OTP checks, login, and token refresh.
  */
 
 import { prisma } from "../../database/prisma.js";
@@ -33,18 +25,10 @@ import { sendOTPEmail, sendPasswordResetEmail } from "../../utils/email.js";
 import { AppError } from "../../middlewares/errorHandler.js";
 import logger from "../../utils/logger.js";
 
-// Constants
-const VALID_REGISTRATION_ROLES = [2, 3]; // Pharmacy Admin, Patient
+const VALID_REGISTRATION_ROLES = [2, 3];
 const OTP_EXPIRE_SECONDS = Number(process.env.OTP_EXPIRY_MINUTES || 5) * 60;
 
-/**
- * ============================================
- * REGISTRATION - STAGE 1
- * ============================================
- * Create pending user record with hashed OTP
- * User is not yet in User table
- * If pharmacyDetails provided (roleId=2), store temporarily for post-verification
- */
+// Registration step 1. Save the user and send a hashed OTP.
 export const register = async ({
   email,
   name,
@@ -52,15 +36,15 @@ export const register = async ({
   phone,
   roleTypeId,
   roleId,
-  pharmacyDetails, // NEW: Optional pharmacy data for Pharmacy Admin registration
+  pharmacyDetails,
 }) => {
   try {
     logger.operation('AUTH_SERVICE', 'register', 'START', { email, roleId, hasPharmacyDetails: !!pharmacyDetails });
 
-    // Accept either roleTypeId or roleId for backward compatibility
+    // Accept both field names so older clients still work.
     const role = roleTypeId || roleId;
 
-    // Validate and normalize all inputs
+    // Validate and normalize the user data before anything is saved.
     logger.debug('AUTH_SERVICE', '[REGISTER] Validating email', { email });
     const emailResult = validateEmail(email);
     if (!emailResult.valid) {
@@ -89,6 +73,7 @@ export const register = async ({
 
     let normalizedPhone = phone || null;
     if (phone) {
+      // Keep phone numbers in a clean format when the user provides one.
       logger.debug('AUTH_SERVICE', '[REGISTER] Validating phone', { phone });
       const phoneResult = validatePhone(phone);
       if (!phoneResult.valid) {
@@ -99,7 +84,6 @@ export const register = async ({
       normalizedPhone = phoneResult.data;
     }
 
-    // Validate role
     logger.debug('AUTH_SERVICE', '[REGISTER] Validating role', { roleId: role, validRoles: [2, 3] });
     if (!role || !VALID_REGISTRATION_ROLES.includes(role)) {
       logger.validation('AUTH_SERVICE', 'roleId', false, 'Invalid role');
@@ -110,15 +94,15 @@ export const register = async ({
     }
     logger.validation('AUTH_SERVICE', 'roleId', true);
     
-    // Validate pharmacy details if role is Pharmacy Admin
     if (role === 2 && pharmacyDetails) {
+      // Pharmacy admins can submit pharmacy details during sign up.
+      // We validate early so users get fast feedback before user/OTP writes happen.
       logger.debug('AUTH_SERVICE', '[REGISTER] Validating pharmacy details', { pharmacyName: pharmacyDetails.pharmacyName, licenseNumber: pharmacyDetails.licenseNumber });
       if (!pharmacyDetails.pharmacyName || !pharmacyDetails.licenseNumber || !pharmacyDetails.address || !pharmacyDetails.contactNumber) {
         logger.validation('AUTH_SERVICE', 'pharmacyDetails', false, 'Missing required fields');
         throw new AppError("Missing required pharmacy details (name, license, address, contact)", 400);
       }
       
-      // Check if license number already exists
       logger.debug('AUTH_SERVICE', '[REGISTER] Checking license number uniqueness', { licenseNumber: pharmacyDetails.licenseNumber });
       const existingLicense = await prisma.pharmacy.findUnique({
         where: { licenseNumber: pharmacyDetails.licenseNumber.trim() },
@@ -130,26 +114,26 @@ export const register = async ({
       logger.validation('AUTH_SERVICE', 'license_uniqueness', true);
     }
 
-    // Check if email already registered and verified
     logger.debug('AUTH_SERVICE', '[REGISTER] Checking if email exists', { email: normalizedEmail });
     const existingUser = await prisma.user.findUnique({
       where: { email: normalizedEmail },
     });
+    // A verified account cannot be re-registered with the same email.
     if (existingUser && existingUser.isVerified) {
       logger.warn('AUTH_SERVICE', '[REGISTER] Email already registered and verified', { email: normalizedEmail });
       throw new AppError("Email already registered", 409);
     }
 
-    // Hash password and OTP
     logger.debug('AUTH_SERVICE', '[REGISTER] Hashing password and generating OTP');
     const hashedPassword = await hashPassword(password);
     const otp = generateOTP();
     const otpHash = hashToken(otp);
     logger.debug('AUTH_SERVICE', '[REGISTER] Password hashed, OTP generated', { otpLength: otp.length });
 
+    // Upsert keeps the flow safe for repeated attempts on an unverified email.
+    // If the user retries registration before verification, we refresh the profile and password.
     logger.info('AUTH_SERVICE', `[REGISTER] Creating pending user for email: ${normalizedEmail}, roleId: ${role}`);
 
-    // If user exists but unverified, update; otherwise create
     const user = await prisma.user.upsert({
       where: { email: normalizedEmail },
       create: {
@@ -158,7 +142,7 @@ export const register = async ({
         password: hashedPassword,
         ...(normalizedPhone && { phone: normalizedPhone }),
         roleId: role,
-        status: role === 2 ? "ONBOARDING_REQUIRED" : "APPROVED", // ✅ Pharmacy users need onboarding
+        status: role === 2 ? "ONBOARDING_REQUIRED" : "APPROVED",
         isVerified: false,
         isActive: true,
       },
@@ -167,7 +151,7 @@ export const register = async ({
         password: hashedPassword,
         ...(normalizedPhone && { phone: normalizedPhone }),
         roleId: role,
-        status: role === 2 ? "ONBOARDING_REQUIRED" : "APPROVED", // ✅ Update status on re-register
+        status: role === 2 ? "ONBOARDING_REQUIRED" : "APPROVED",
         isVerified: false,
       },
       include: { role: true },
@@ -175,35 +159,38 @@ export const register = async ({
 
     logger.info('AUTH_SERVICE', `[REGISTER] User created/updated with ID: ${user.id}, email: ${normalizedEmail}`);
 
-    // ✅ Invalidate old OTPs for this user (prevent confusion from multiple registration attempts)
+    // Clear any older OTPs so only the newest code can be used.
+    // This avoids confusion when users request OTP multiple times.
     logger.debug('AUTH_SERVICE', '[REGISTER] Invalidating old OTP tokens', { userId: user.id });
     await prisma.oTPToken.updateMany({
       where: {
         userId: user.id,
         isUsed: false,
       },
-    data: {
-      expiresAt: new Date(), // Expire them immediately
-    },
-  });
+      data: {
+        expiresAt: new Date(),
+      },
+    });
 
-  // Store OTP with hash (not plaintext)
-  await prisma.oTPToken.create({
-    data: {
-      userId: user.id,
-      code: otpHash, // Store HASHED OTP, not plaintext
-      isUsed: false,
-      expiresAt: new Date(Date.now() + OTP_EXPIRE_SECONDS * 1000),
-    },
-  });
+    await prisma.oTPToken.create({
+      data: {
+        userId: user.id,
+        code: otpHash,
+        isUsed: false,
+        expiresAt: new Date(Date.now() + OTP_EXPIRE_SECONDS * 1000),
+      },
+    });
 
+  // A new OTP is sent after the database write is done.
+  // We never store the plain OTP in DB. Only hash is stored.
   console.log(
     `[REGISTER] OTP token created for userId: ${user.id}, OTP expires in ${OTP_EXPIRE_SECONDS} seconds`
   );
   
-  // Create pharmacy record if pharmacy details provided (roleId=2)
   if (role === 2 && pharmacyDetails) {
     try {
+      // Store the pharmacy record now so onboarding can continue after verification.
+      // Pharmacy onboarding status starts as pending until admin review.
       const pharmacy = await prisma.pharmacy.create({
         data: {
           userId: user.id,
@@ -219,12 +206,12 @@ export const register = async ({
       console.log(`[REGISTER] Pharmacy created for userId: ${user.id}, pharmacyId: ${pharmacy.id}`);
     } catch (err) {
       console.error(`[REGISTER] Failed to create pharmacy: ${err.message}`);
-      // Don't fail registration if pharmacy creation fails
-      // User can still complete onboarding manually
+      // Keep registration going if pharmacy creation fails.
     }
   }
 
-  // Send OTP email (non-blocking)
+  // Email delivery is best effort. A failed email should not block registration.
+  // User can always request resend OTP if email provider is delayed.
   sendOTPEmail(normalizedEmail, otp, normalizedName).catch((err) =>
     console.error("Email send failed:", err)
   );
@@ -244,25 +231,21 @@ export const register = async ({
   }
 };
 
-/**
- * ============================================
- * OTP VERIFICATION - STAGE 2
- * ============================================
- * Verify OTP and mark user as verified
- * User moves from pending to verified state
- */
+// Registration step 2. Verify the OTP and mark the user as verified.
 export const verifyOTP = async (userIdOrEmail, otpCode) => {
+  // OTP format is validated first to avoid useless DB lookups.
   const otpResult = validateOTP(otpCode);
   if (!otpResult.valid) throw new AppError(otpResult.error, 400);
   const normalizedOtp = otpResult.data;
 
-  // Determine if input is email or userId (cuid)
+  // Support both email and user ID because the controller sends either form.
   const isEmail =
     typeof userIdOrEmail === "string" &&
     (userIdOrEmail.includes("@") || userIdOrEmail.includes("."));
 
   let user;
   if (isEmail) {
+    // Validate email format before querying user by email.
     const emailResult = validateEmail(userIdOrEmail);
     if (!emailResult.valid) throw new AppError(emailResult.error, 400);
     const normalizedEmail = emailResult.data;
@@ -282,6 +265,7 @@ export const verifyOTP = async (userIdOrEmail, otpCode) => {
       },
     });
   } else {
+    // If it is not email-like, we treat the input as user ID.
     console.log(`[VERIFY OTP] Looking up user by ID: ${userIdOrEmail}`);
     user = await prisma.user.findUnique({
       where: { id: userIdOrEmail },
@@ -307,12 +291,12 @@ export const verifyOTP = async (userIdOrEmail, otpCode) => {
 
   console.log(`[VERIFY OTP] Found user: ${user.email}`);
 
-  // Check if already verified
+  // Do nothing if the account is already verified.
   if (user.isVerified) {
     throw new AppError("User already verified", 400);
   }
 
-  // Find valid OTP
+  // Only the most recent unused OTP is accepted.
   const otpTokens = await prisma.oTPToken.findMany({
     where: {
       userId: user.id,
@@ -329,6 +313,7 @@ export const verifyOTP = async (userIdOrEmail, otpCode) => {
   }
 
   const otpToken = otpTokens[0];
+  // Compare hashes instead of storing or comparing the code in plain text.
   const otpHashMatch = hashToken(normalizedOtp) === otpToken.code;
 
   if (!otpHashMatch) {
@@ -338,7 +323,8 @@ export const verifyOTP = async (userIdOrEmail, otpCode) => {
 
   console.log(`[VERIFY OTP] OTP validated, marking user as verified`);
 
-  // Mark OTP as used and user as verified
+  // Mark both records together so the account and OTP stay in sync.
+  // Promise.all keeps both operations in the same request lifecycle.
   await Promise.all([
     prisma.oTPToken.update({
       where: { id: otpToken.id },
@@ -356,14 +342,9 @@ export const verifyOTP = async (userIdOrEmail, otpCode) => {
   };
 };
 
-/**
- * ============================================
- * RESEND OTP
- * ============================================
- * Generate new OTP and send to email
- * Handles both pending (unverified) and existing users
- */
+// Send a fresh OTP for an unverified account.
 export const resendOTP = async (email) => {
+  // Same normalization rules as registration.
   const emailResult = validateEmail(email);
   if (!emailResult.valid) throw new AppError(emailResult.error, 400);
   const normalizedEmail = emailResult.data;
@@ -380,16 +361,16 @@ export const resendOTP = async (email) => {
     throw new AppError("User already verified", 400);
   }
 
-  // Invalidate old OTPs
+  // Expire previous codes before creating a new one.
   await prisma.oTPToken.updateMany({
     where: { userId: user.id, isUsed: false },
     data: { expiresAt: new Date() },
   });
 
-  // Create new OTP
   const otp = generateOTP();
   const otpHash = hashToken(otp);
 
+  // Keep the OTP hash in the database and send the plain code by email.
   await prisma.oTPToken.create({
     data: {
       userId: user.id,
@@ -408,18 +389,14 @@ export const resendOTP = async (email) => {
   return { userId: user.id, message: "OTP resent successfully" };
 };
 
-/**
- * ============================================
- * LOGIN
- * ============================================
- * Authenticate user and issue tokens
- */
+// Authenticate the user and return tokens.
 export const login = async (
   email,
   password,
   userAgent = null,
   ipAddress = null
 ) => {
+  // Login uses the same email validator used in registration.
   const emailResult = validateEmail(email);
   if (!emailResult.valid) throw new AppError(emailResult.error, 400);
   const normalizedEmail = emailResult.data;
@@ -441,40 +418,44 @@ export const login = async (
   });
 
   if (!user) {
+    // Keep message generic so attackers cannot enumerate users.
     throw new AppError("Invalid email or password", 401);
   }
 
-  // Check email verification
+  // Block login until the email is verified.
   if (!user.isVerified) {
     throw new AppError("Email not verified. Check inbox for OTP.", 403);
   }
 
-  // Check account status
+  // Disabled accounts cannot create sessions.
   if (!user.isActive) {
     throw new AppError("Account is disabled", 403);
   }
 
-  // Verify password
+  // Password check is the last step before issuing tokens.
   const passwordMatch = await comparePassword(password, user.password);
   if (!passwordMatch) {
+    // Same generic message as missing user for better security.
     throw new AppError("Invalid email or password", 401);
   }
 
   console.log(`[LOGIN] Authenticated user: ${user.email}`);
 
-  // Get pharmacy status for PHARMACY_ADMIN users
+  // Pharmacy admins need their verification status in the access token.
   const pharmacyStatus = user.pharmacy?.verificationStatus || null;
 
-  // Generate tokens (include pharmacy status for pharmacy admins)
+  // Issue a short-lived access token and a long-lived refresh token.
   const accessToken = generateAccessToken(user.id, user.role.name, pharmacyStatus);
   const refreshToken = generateRefreshToken(user.id);
 
-  // Store hashed refresh token
+  // Store only the hashed refresh token.
+  // This protects active sessions even if DB is leaked.
   const hashedRefreshToken = await hashPassword(refreshToken);
+  // Keep the refresh token metadata together so later cleanup can reason about the session.
   const refreshTokenData = {
     hash: hashedRefreshToken,
     issuedAt: Date.now(),
-    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
     version: 1,
   };
 
@@ -488,23 +469,19 @@ export const login = async (
     },
   });
 
-  // Update last login
   await prisma.user.update({
     where: { id: user.id },
     data: { lastLogin: new Date() },
   });
 
+  // This timestamp is used by the admin and audit views as the last successful sign-in.
   console.log(
     `[LOGIN] Tokens issued for user: ${user.id}, refresh expires in 7 days`
   );
 
-  // ✅ FIX: Calculate isOnboarded based on role
-  // - SYSTEM_ADMIN (roleId=1): Always onboarded (no onboarding needed)
-  // - PHARMACY_ADMIN (roleId=2): Onboarded only if pharmacy exists
-  // - PATIENT (roleId=3): Always onboarded (no onboarding needed)
-  let isOnboarded = true; // Default for SYSTEM_ADMIN and PATIENT
+  // Pharmacy admins are onboarded only after a pharmacy record exists.
+  let isOnboarded = true;
   if (user.roleId === 2) {
-    // Pharmacy Admin needs pharmacy to be onboarded
     isOnboarded = !!user.pharmacy;
   }
 
@@ -527,23 +504,17 @@ export const login = async (
     isOnboarded,
     accessToken,
     refreshToken,
-    expiresIn: 900, // 15 minutes
+    expiresIn: 900,
   };
 };
 
-/**
- * ============================================
- * REFRESH ACCESS TOKEN
- * ============================================
- * Validate refresh token and issue new access token
- * Implements token rotation for security
- */
+// Verify a refresh token and return a new access token.
 export const refreshAccessToken = async (refreshToken) => {
   if (!refreshToken) {
     throw new AppError("Refresh token required", 400);
   }
 
-  // Verify token signature
+  // Fail fast if the token signature is bad or the token is expired.
   let decoded;
   try {
     decoded = verifyRefreshToken(refreshToken);
@@ -553,7 +524,8 @@ export const refreshAccessToken = async (refreshToken) => {
 
   const userId = decoded.userId;
 
-  // Find stored token in database
+  // The token must match one of the active hashed tokens in the database.
+  // This allows multiple active sessions on different devices.
   const storedTokens = await prisma.refreshToken.findMany({
     where: { userId, isRevoked: false, expiresAt: { gt: new Date() } },
   });
@@ -562,9 +534,10 @@ export const refreshAccessToken = async (refreshToken) => {
     throw new AppError("Refresh token invalid or revoked", 401);
   }
 
-  // Verify provided token matches hashed token
+  // Compare the incoming token against every active hash so multi-device sessions keep working.
   let matched = false;
   for (const tokenRecord of storedTokens) {
+    // Compare plain incoming token with each hashed DB token.
     const isMatch = await comparePassword(refreshToken, tokenRecord.token);
     if (isMatch) {
       matched = true;
@@ -576,6 +549,7 @@ export const refreshAccessToken = async (refreshToken) => {
     throw new AppError("Refresh token invalid or revoked", 401);
   }
 
+  // Pull the latest pharmacy status so the new access token stays current.
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { 
@@ -592,10 +566,10 @@ export const refreshAccessToken = async (refreshToken) => {
     throw new AppError("User not found", 404);
   }
 
-  // Get pharmacy status for PHARMACY_ADMIN users
+  // The access token must reflect the latest pharmacy verification state.
   const pharmacyStatus = user.pharmacy?.verificationStatus || null;
 
-  // Generate new access token with pharmacy status
+  // Refresh only the access token. The refresh token stays unchanged here.
   const newAccessToken = generateAccessToken(user.id, user.role.name, pharmacyStatus);
 
   console.log(`[REFRESH] New access token issued for user: ${userId}`);
@@ -603,13 +577,10 @@ export const refreshAccessToken = async (refreshToken) => {
   return { userId: user.id, accessToken: newAccessToken, expiresIn: 900 };
 };
 
-/**
- * ============================================
- * LOGOUT
- * ============================================
- * Revoke refresh token
- */
+// Revoke the user's refresh tokens.
 export const logout = async (userId) => {
+  // Revoke every active refresh token for the user.
+  // This logs out all devices, not only the current browser.
   await prisma.refreshToken.updateMany({
     where: { userId, isRevoked: false },
     data: { isRevoked: true, revokedAt: new Date() },
@@ -620,12 +591,7 @@ export const logout = async (userId) => {
   return { message: "Logged out successfully" };
 };
 
-/**
- * ============================================
- * FORGOT PASSWORD
- * ============================================
- * Generate reset token and send via email
- */
+// Start the password reset flow by sending a reset link.
 export const forgotPassword = async (email) => {
   const emailResult = validateEmail(email);
   if (!emailResult.valid) throw new AppError(emailResult.error, 400);
@@ -635,18 +601,19 @@ export const forgotPassword = async (email) => {
     where: { email: normalizedEmail },
   });
 
-  // Don't reveal if user exists (security best practice)
+  // Do not reveal whether the email exists.
   if (!user) {
     return { message: "If email exists, reset link will be sent" };
   }
 
-  // Generate and save reset token
+  // The reset token is stored so it can be checked later.
+  // Token lifetime is intentionally short for security.
   const resetToken = generateSecureToken();
   await prisma.passwordResetToken.create({
     data: {
       userId: user.id,
       token: resetToken,
-      expiresAt: new Date(Date.now() + 1 * 60 * 60 * 1000), // 1 hour
+      expiresAt: new Date(Date.now() + 1 * 60 * 60 * 1000),
     },
   });
 
@@ -659,12 +626,7 @@ export const forgotPassword = async (email) => {
   return { message: "If email exists, reset link will be sent" };
 };
 
-/**
- * ============================================
- * RESET PASSWORD
- * ============================================
- * Verify reset token and update password
- */
+// Finish the password reset flow.
 export const resetPassword = async (resetToken, newPassword) => {
   if (!resetToken) {
     throw new AppError("Reset token required", 400);
@@ -679,13 +641,15 @@ export const resetPassword = async (resetToken, newPassword) => {
     where: { token: resetToken },
   });
 
+  // A reset token can be used only once and must still be valid.
   if (!token || token.isUsed || token.expiresAt < new Date()) {
     throw new AppError("Invalid or expired reset token", 400);
   }
 
   const hashedPassword = await hashPassword(newPassword);
 
-  // Update password, mark token as used, revoke refresh tokens
+  // Resetting the password should also invalidate old sessions.
+  // This prevents continued access from stolen refresh tokens.
   await Promise.all([
     prisma.user.update({
       where: { id: token.userId },
@@ -695,6 +659,7 @@ export const resetPassword = async (resetToken, newPassword) => {
       where: { id: token.id },
       data: { isUsed: true, usedAt: new Date() },
     }),
+    // Revoke every refresh token so the password reset forces a clean sign-in.
     prisma.refreshToken.updateMany({
       where: { userId: token.userId },
       data: { isRevoked: true, revokedAt: new Date() },
@@ -710,17 +675,20 @@ export const resetPassword = async (resetToken, newPassword) => {
   };
 };
 
-// Export service wrapper with controller-expected method names
 const userService = {
+  // Keep legacy method names mapped to the latest service functions.
   registerUser: register,
+  // Verify email OTP using the same verifier used by main auth flow.
   verifyEmailOTP: async ({ email, otp }) => {
-    // Wrapper to handle object parameter format from controller
     return await verifyOTP(email, otp);
   },
+  // Authenticate user and issue access/refresh tokens.
   authenticateUser: login,
+  // Re-send a fresh OTP to unverified users.
   resendOTP: resendOTP,
+  // Read user profile with role and pharmacy metadata for controllers.
   getUserById: async (userId) => {
-    // Guard: validate userId is provided
+    // Some callers treat missing users as a normal outcome.
     if (!userId) {
       console.error('[AUTH_SERVICE] getUserById called with empty userId');
       return null;
@@ -749,18 +717,22 @@ const userService = {
       return null;
     }
   },
+  // Find user by email for internal flows.
   getUserByEmail: async (email) =>
     await prisma.user.findUnique({ where: { email } }),
+  // Send password reset OTP while keeping account existence private.
   sendPasswordResetOTP: async (email) => {
+    // Validate and normalize email before DB lookup.
     const emailResult = validateEmail(email);
     if (!emailResult.valid) throw new AppError(emailResult.error, 400);
     const normalizedEmail = emailResult.data;
 
+    // Look up user by normalized email.
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
     });
 
-    // For security, don't throw if user doesn't exist
+    // Keep the reset flow quiet when the account does not exist.
     if (!user) {
       console.log(
         `[PASSWORD RESET] User not found for email: ${normalizedEmail}`
@@ -768,16 +740,16 @@ const userService = {
       return { message: "If account exists, OTP sent to email" };
     }
 
-    // Invalidate old OTPs for this user
+    // Clear earlier codes so only the latest OTP works.
     await prisma.oTPToken.updateMany({
       where: { userId: user.id, isUsed: false },
       data: { expiresAt: new Date() },
     });
 
-    // Create new OTP
     const otp = generateOTP();
     const otpHash = hashToken(otp);
 
+    // Persist the hashed OTP and email the plain value.
     await prisma.oTPToken.create({
       data: {
         userId: user.id,
@@ -797,14 +769,18 @@ const userService = {
 
     return { userId: user.id, message: "OTP sent to email" };
   },
+  // Backward-compatible wrapper kept for older callers.
   createAndSendOTP: async (userId, type = "EMAIL_VERIFICATION") => {
-    // Use existing OTP creation logic
     return await register({ userId, type });
   },
+  // Save a refresh token in hashed form for session tracking.
   saveRefreshToken: async (userId, token) => {
+    // Store refresh tokens in hashed form only.
     if (!userId || !token) return;
 
+    // Hash token before persistence so raw token is never stored.
     const hashedRefreshToken = await hashPassword(token);
+    // Create refresh token record with fixed 7-day expiry.
     await prisma.refreshToken.create({
       data: {
         userId,
@@ -813,9 +789,12 @@ const userService = {
       },
     });
   },
+  // Verify a refresh token against active hashed tokens.
   verifyRefreshToken: async (userId, token) => {
+    // Compare against every active token because the raw token is not stored.
     if (!userId || !token) return false;
 
+    // Load active, non-revoked tokens ordered from newest to oldest.
     const candidateTokens = await prisma.refreshToken.findMany({
       where: {
         userId,
@@ -825,6 +804,7 @@ const userService = {
       orderBy: { createdAt: "desc" },
     });
 
+    // Compare the raw incoming token against each hashed candidate.
     for (const record of candidateTokens) {
       const isMatch = await comparePassword(token, record.token);
       if (isMatch) {
@@ -832,15 +812,19 @@ const userService = {
       }
     }
 
+    // No active token matched.
     return false;
   },
+  // Verify recently rotated tokens inside a short grace window.
   verifyPreviousRefreshToken: async (userId, token) => {
-    // Allow brief grace period to avoid race-condition logouts on concurrent requests.
+    // Give a short overlap window so parallel requests do not fight each other.
     if (!userId || !token) return false;
 
+    // Allow 2-minute overlap after revocation.
     const gracePeriodMs = 2 * 60 * 1000;
     const graceWindowStart = new Date(Date.now() - gracePeriodMs);
 
+    // Read a small set of recently revoked tokens.
     const recentlyRevoked = await prisma.refreshToken.findMany({
       where: {
         userId,
@@ -851,6 +835,7 @@ const userService = {
       take: 3,
     });
 
+    // Check whether the incoming token matches a recently revoked token.
     for (const record of recentlyRevoked) {
       const isMatch = await comparePassword(token, record.token);
       if (isMatch) {
@@ -858,13 +843,17 @@ const userService = {
       }
     }
 
+    // Token is not in grace-period history.
     return false;
   },
+  // Rotate refresh token by revoking old token and issuing a replacement.
   rotateRefreshToken: async (userId, oldToken, newToken) => {
+    // Validate required rotation inputs.
     if (!userId || !oldToken || !newToken) {
       throw new AppError("Missing token rotation parameters", 400);
     }
 
+    // Find the active token that matches the old refresh token.
     const activeTokens = await prisma.refreshToken.findMany({
       where: {
         userId,
@@ -875,6 +864,7 @@ const userService = {
     });
 
     let matchedToken = null;
+    // Find the exact active token record that matches the old raw token.
     for (const record of activeTokens) {
       const isMatch = await comparePassword(oldToken, record.token);
       if (isMatch) {
@@ -888,9 +878,13 @@ const userService = {
     }
 
     const oldExpiry = matchedToken.expiresAt;
+    // Hash the replacement token before storing it.
     const hashedNewToken = await hashPassword(newToken);
 
+    // Revoke the old token and create the replacement in one transaction.
+    // Using one transaction keeps rotation atomic.
     await prisma.$transaction([
+      // Step 1: revoke the old token record.
       prisma.refreshToken.update({
         where: { id: matchedToken.id },
         data: {
@@ -898,6 +892,7 @@ const userService = {
           revokedAt: new Date(),
         },
       }),
+      // Step 2: create the replacement token record with same expiry/device metadata.
       prisma.refreshToken.create({
         data: {
           userId,
@@ -909,9 +904,12 @@ const userService = {
       }),
     ]);
   },
+  // Revoke every active refresh token for a user.
   clearRefreshToken: async (userId) => {
+    // Missing user ID is treated as no-op for compatibility.
     if (!userId) return;
 
+    // Mark all active tokens as revoked.
     await prisma.refreshToken.updateMany({
       where: {
         userId,
@@ -923,13 +921,17 @@ const userService = {
       },
     });
   },
+  // Set a new password hash for a user account.
   setPassword: async (userId, password) => {
+    // Hash plain password before updating user record.
     const hashedPassword = await hashPassword(password);
+    // Persist the new password hash.
     return await prisma.user.update({
       where: { id: userId },
       data: { password: hashedPassword },
     });
   },
+  // Re-export OTP verifier for callers using service object.
   verifyOTP: verifyOTP,
 };
 

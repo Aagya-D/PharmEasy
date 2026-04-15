@@ -17,12 +17,14 @@ const AdminInventoryInsight = () => {
   const [alertSent, setAlertSent] = useState(false);
 
   useEffect(() => {
+    // Load the global shortage view as soon as the page mounts.
     fetchInventoryInsights();
   }, []);
 
   const fetchInventoryInsights = async () => {
     setIsLoading(true);
     try {
+      // This endpoint returns both aggregate counts and the shortage table.
       const response = await httpClient.get('/admin/inventory/insights');
       const data = response.data;
       
@@ -46,6 +48,7 @@ const AdminInventoryInsight = () => {
   const openRestockAlert = (medicine) => {
     setSelectedMedicine(medicine);
     setNotificationMessage(
+      // Build a ready-to-send alert so the admin only needs to confirm it.
       `URGENT: Restock Alert for ${medicine.genericName}\n\n` +
       `Current Status: OUT OF STOCK in ${medicine.outOfStockCount} pharmacies\n` +
       `This is a critical medicine shortage. Please restock immediately.\n\n` +
@@ -60,6 +63,7 @@ const AdminInventoryInsight = () => {
     
     setSendingAlert(true);
     try {
+      // Send the alert through the admin API so pharmacy teams receive it centrally.
       const response = await httpClient.post('/admin/inventory/restock-alert', {
         genericName: selectedMedicine.genericName,
         message: notificationMessage,

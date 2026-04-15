@@ -13,11 +13,14 @@ import { prisma } from "../../database/prisma.js";
 import { isValidNepaliPhone } from "../../utils/validation.js";
 import notificationService from "../notifications/notification.service.js";
 
+// Normalize shipping address payload from either nested or flat request shape.
 const normalizeShippingAddress = (payload) => {
+  // Reject invalid payload shapes early.
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return null;
   }
 
+  // Sanitize and normalize all shipping fields.
   const cleaned = {
     fullName: String(payload.fullName || "").trim(),
     phone: String(payload.phone || "").replace(/\D/g, "").trim(),
@@ -37,6 +40,7 @@ const normalizeShippingAddress = (payload) => {
         : Number(payload._lng),
   };
 
+  // Require core delivery fields before saving address.
   if (!cleaned.fullName || !cleaned.phone || !cleaned.region || !cleaned.city || !cleaned.area || !cleaned.street) {
     throw new ValidationError(
       "Shipping address requires fullName, phone, region, city, area, and street"
@@ -47,10 +51,12 @@ const normalizeShippingAddress = (payload) => {
     throw new ValidationError("Shipping address phone must be a valid 10-digit Nepali number");
   }
 
+  // Coordinates must be saved as a pair.
   if ((cleaned._lat === null) !== (cleaned._lng === null)) {
     throw new ValidationError("Both _lat and _lng are required when saving GPS coordinates");
   }
 
+  // Validate numeric coordinate values when provided.
   if (
     (cleaned._lat !== null && Number.isNaN(cleaned._lat)) ||
     (cleaned._lng !== null && Number.isNaN(cleaned._lng))
@@ -62,26 +68,33 @@ const normalizeShippingAddress = (payload) => {
 };
 
 const COOKIE_OPTIONS = {
+  // Block JavaScript access to auth cookies.
   httpOnly: true,
+  // Use secure cookies in production only.
   secure: process.env.NODE_ENV === "production",
+  // Lax is enough for same-site app flows.
   sameSite: "lax",
   path: "/",
 };
 
+// Keep cookie lifetime values in one place.
 const ACCESS_TOKEN_COOKIE_MAX_AGE = TOKEN_EXPIRY_MS.ACCESS;
 const REFRESH_TOKEN_COOKIE_MAX_AGE = TOKEN_EXPIRY_MS.REFRESH;
 const ACCESS_TOKEN_EXPIRES_IN_SECONDS = Math.floor(TOKEN_EXPIRY_MS.ACCESS / 1000);
 
+// In-memory tracker for suspicious login attempts.
 const failedLoginTracker = new Map();
 const FAILED_LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const FAILED_LOGIN_THRESHOLD = 3;
 const SECURITY_ALERT_COOLDOWN_MS = 5 * 60 * 1000;
 
 const registerFailedLoginAttempt = ({ email, ipAddress }) => {
+  // Track failed attempts per email and IP so we can spot brute force patterns.
   const key = `${String(email || "unknown").toLowerCase()}::${String(ipAddress || "unknown")}`;
   const now = Date.now();
   const current = failedLoginTracker.get(key) || { attempts: [], lastAlertAt: 0 };
 
+  // Keep only attempts inside the rolling time window.
   const validAttempts = current.attempts.filter((ts) => now - ts <= FAILED_LOGIN_WINDOW_MS);
   validAttempts.push(now);
 
@@ -100,7 +113,7 @@ export const register = async (req, res, next) => {
   try {
     logger.operation('AUTH', 'register', 'START', { email: req.body.email });
 
-    // Accept various field names for flexibility
+    // Accept older and newer request shapes so the frontend can evolve safely.
     const {
       email,
       password,
@@ -115,7 +128,7 @@ export const register = async (req, res, next) => {
 
     logger.debug('AUTH', '[REGISTER] Request body received', { email, roleId, hasPharmacyDetails: !!pharmacyDetails });
 
-    // Combine firstName and lastName if needed
+    // Build one display name from the fields the client sends.
     const fullName =
       name ||
       (firstName && lastName
@@ -124,7 +137,7 @@ export const register = async (req, res, next) => {
 
     logger.debug('AUTH', '[REGISTER] Full name resolved', { name: fullName });
 
-    // Validate phone number if provided
+    // Phone is optional, but if present it must be a valid Nepali number.
     if (phone) {
       if (!isValidNepaliPhone(phone)) {
         return res.status(400).json({
@@ -134,7 +147,7 @@ export const register = async (req, res, next) => {
       }
     }
 
-    // Call the correct service method
+    // The service creates the pending user and sends the OTP.
     const result = await userService.registerUser({
       email,
       password,
@@ -149,7 +162,7 @@ export const register = async (req, res, next) => {
     logger.timing('AUTH', 'register', duration, 'SUCCESS');
     logger.operation('AUTH', 'register', 'SUCCESS', { userId: result.userId, email: result.email });
 
-    // Log activity
+    // Keep an audit trail for registration events.
     await createLog(
       result.userId,
       LOG_ACTIONS.USER_REGISTERED,
@@ -164,6 +177,7 @@ export const register = async (req, res, next) => {
 
     const resolvedRoleId = Number(roleId || roleTypeId);
     if (resolvedRoleId === 2) {
+      // New pharmacy signups should appear in the admin queue right away.
       const pharmacyName =
         String(pharmacyDetails?.pharmacyName || "").trim() ||
         fullName ||
@@ -177,6 +191,7 @@ export const register = async (req, res, next) => {
 
       const io = req.app.get("io");
       if (io) {
+        // Push a real-time alert so admins do not have to refresh.
         io.emit("SYSTEM_ALERT", {
           event: "NEW_PHARMACY_REGISTRATION",
           title: "NEW_PHARMACY_REGISTRATION",
@@ -216,7 +231,7 @@ export const verifyEmailOTP = async (req, res, next) => {
     const startTime = Date.now();
     logger.operation('AUTH', 'verifyEmailOTP', 'START', { email: req.body.email || req.body.userId });
 
-    // Accept both 'email' and 'userId' (they contain the same value - the email address)
+    // The controller accepts either email or userId for older clients.
     const { email, userId, otp } = req.body;
     const emailAddress = email || userId;
 
@@ -239,10 +254,10 @@ export const verifyEmailOTP = async (req, res, next) => {
 
     logger.debug('AUTH', '[VERIFY_OTP] User verified successfully', { userId: user.id, email: user.email });
 
-    // Get pharmacy status if user is pharmacy admin
+    // Pharmacy admins need their verification state on the token.
     const pharmacyStatus = user.pharmacy?.verificationStatus || null;
 
-    // Generate tokens with pharmacy status
+    // Issue fresh access and refresh tokens after OTP verification.
     const accessToken = generateAccessToken(
       user.id,
       user.role.name,
@@ -267,11 +282,8 @@ export const verifyEmailOTP = async (req, res, next) => {
     logger.timing('AUTH', 'verifyEmailOTP', duration, 'SUCCESS');
     logger.operation('AUTH', 'verifyEmailOTP', 'SUCCESS', { userId: user.id });
 
-    // ✅ FIX: Calculate isOnboarded based on role (consistent with login)
-    // - SYSTEM_ADMIN (roleId=1): Always onboarded
-    // - PHARMACY_ADMIN (roleId=2): Onboarded only if pharmacy exists
-    // - PATIENT (roleId=3): Always onboarded
-    let isOnboarded = true; // Default for SYSTEM_ADMIN and PATIENT
+    // Pharmacy admins are onboarded only after a pharmacy record exists.
+    let isOnboarded = true;
     if (user.roleId === 2) {
       isOnboarded = !!user.pharmacy;
     }
@@ -320,7 +332,7 @@ export const login = async (req, res, next) => {
 
     const { email, password } = req.body;
 
-    // 1. VALIDATE INPUT
+    // Fail fast on missing credentials.
     if (!email || !password) {
       logger.warn('AUTH', '[LOGIN] Missing email or password', { emailProvided: !!email, passwordProvided: !!password });
       throw new ValidationError("Email and password are required.");
@@ -328,12 +340,12 @@ export const login = async (req, res, next) => {
 
     logger.debug('AUTH', '[LOGIN] Input validation passed', { email });
 
-    // 2. AUTHENTICATE USER AND GET TOKENS
+    // Let the service handle account checks and token creation.
     const result = await userService.authenticateUser(email, password);
 
     logger.debug('AUTH', '[LOGIN] Authentication successful', { userId: result.userId, email: result.email, roleId: result.roleId });
 
-    // 3. SET SECURE COOKIES
+    // Store the tokens in httpOnly cookies for browser sessions.
     res.cookie("access_token", result.accessToken, {
       ...COOKIE_OPTIONS,
       maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE,
@@ -349,7 +361,7 @@ export const login = async (req, res, next) => {
     logger.timing('AUTH', 'login', duration, 'SUCCESS');
     logger.operation('AUTH', 'login', 'SUCCESS', { userId: result.userId, roleId: result.roleId });
 
-    // Log activity
+    // Record successful login for audit history.
     await createLog(
       result.userId,
       LOG_ACTIONS.USER_LOGIN,
@@ -362,8 +374,7 @@ export const login = async (req, res, next) => {
       }
     );
 
-    // 4. RETURN USER DATA
-    // ✅ FIX: Ensure needsOnboarding is false for SYSTEM_ADMIN and PATIENT
+    // Only pharmacy admins need onboarding.
     const needsOnboarding = result.roleId === 2 && !result.pharmacy;
 
     res.status(200).json({
@@ -392,16 +403,16 @@ export const login = async (req, res, next) => {
     logger.error('AUTH', `[LOGIN] Failed: ${err.message}`, err);
     logger.operation('AUTH', 'login', 'ERROR', { error: err.message });
     
-    // Handle Email not verified error
+    // If the account is not verified, resend the OTP and guide the user back.
     if (err.message && err.message.includes("Email not verified")) {
       logger.warn('AUTH', '[LOGIN] Email not verified', { email: req.body.email });
       const { email } = req.body;
       try {
-        // Send OTP to unverified email
+        // Send a fresh OTP so the user can continue without a separate request.
         await userService.resendOTP(email);
         logger.debug('AUTH', '[LOGIN] OTP resent to unverified email', { email });
 
-        // Return specific error so frontend knows to redirect to verify OTP
+        // Tell the frontend to send the user to the OTP screen.
         return res.status(403).json({
           success: false,
           message: "Email not verified. OTP sent to your email.",
@@ -410,7 +421,7 @@ export const login = async (req, res, next) => {
         });
       } catch (otpErr) {
         logger.error('AUTH', `[LOGIN] Failed to resend OTP: ${otpErr.message}`, otpErr);
-        // If OTP sending fails, return generic error
+        // If OTP sending fails, keep the message generic.
         return res.status(403).json({
           success: false,
           message: "Email not verified. Please verify your email.",
@@ -493,26 +504,24 @@ export const refreshTokens = async (req, res, next) => {
 
     let payload;
     try {
+      // Verify refresh JWT before checking persisted token state.
       payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
     } catch (e) {
       throw new AuthenticationError("Invalid or expired refresh token");
     }
 
-    // VERIFY TOKEN IN REDIS (PRIMARY)
+    // Verify token against active hashed token records.
     const valid = await userService.verifyRefreshToken(payload.userId, token);
 
     if (!valid) {
-      // ============================================
-      // FALLBACK: Check if client is retrying with previous token
-      // (within 2-minute grace period after rotation)
-      // ============================================
+      // Fallback: accept a recently rotated token for a short grace window.
       const prevValid = await userService.verifyPreviousRefreshToken(
         payload.userId,
         token
       );
 
       if (!prevValid) {
-        // Both current and previous tokens invalid - clear session
+        // Both checks failed, so clear sessions and force re-login.
         await userService.clearRefreshToken(payload.userId).catch(() => {});
         throw new AuthenticationError(
           "Refresh token invalid or revoked. Please login again."
@@ -524,9 +533,7 @@ export const refreshTokens = async (req, res, next) => {
       );
     }
 
-    // ============================================
-    // GENERATE NEW TOKENS
-    // ============================================
+    // Generate new access and refresh tokens for the active user.
     const user = await userService.getUserById(payload.userId);
     if (!user) {
       await userService.clearRefreshToken(payload.userId).catch(() => {});
@@ -537,10 +544,10 @@ export const refreshTokens = async (req, res, next) => {
     const newAccess = generateAccessToken(payload.userId, user?.role?.name, pharmacyStatus);
     const newRefresh = generateRefreshToken(payload.userId);
 
-    // ROTATE REFRESH TOKEN (preserves original expiry)
+    // Rotate refresh token while keeping the original expiry window.
     await userService.rotateRefreshToken(payload.userId, token, newRefresh);
 
-    // SET NEW COOKIES (secure, httpOnly)
+    // Set updated auth cookies.
     res.cookie("access_token", newAccess, {
       ...COOKIE_OPTIONS,
       maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE,
@@ -590,16 +597,19 @@ export const refreshTokens = async (req, res, next) => {
 // ---------------- LOGOUT ----------------
 export const logout = async (req, res, next) => {
   try {
+    // Read refresh token cookie if present.
     const token = req.cookies?.refresh_token;
     if (token) {
       try {
+        // Decode token and revoke active refresh sessions.
         const payload = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
         await userService.clearRefreshToken(payload.userId);
       } catch (e) {
-        // ignore invalid tokens
+        // Ignore invalid token and continue clearing cookies.
       }
     }
 
+    // Clear auth cookies for browser clients.
     res.clearCookie("access_token", COOKIE_OPTIONS);
     res.clearCookie("refresh_token", COOKIE_OPTIONS);
 
@@ -618,8 +628,7 @@ export const requestPasswordReset = async (req, res, next) => {
       throw new ValidationError("Email is required");
     }
 
-    // Send OTP to email (if user exists or not)
-    // Security: Don't reveal if user exists
+    // Always return the same response to prevent account enumeration.
     try {
       await userService.sendPasswordResetOTP(email);
     } catch (err) {
@@ -638,11 +647,14 @@ export const resetPassword = async (req, res, next) => {
   try {
     const { email, otp, newPassword } = req.body;
 
+    // Verify OTP before allowing password change.
     await userService.verifyOTP(email, otp, "PASSWORD_RESET");
 
+    // Load user by email after OTP verification.
     const user = await userService.getUserByEmail(email);
     if (!user) throw new ValidationError("User not found");
 
+    // Save new password hash.
     await userService.setPassword(user.id, newPassword);
 
     res.json({
@@ -665,6 +677,7 @@ export const resendOTP = async (req, res, next) => {
       });
     }
 
+    // Delegate OTP regeneration to service.
     const result = await userService.resendOTP(email);
 
     res.status(200).json({ 
@@ -705,7 +718,7 @@ export const getCurrentUser = async (req, res, next) => {
 
     logger.debug('AUTH', '[GET_CURRENT_USER] User retrieved', { userId, email: user.email, status: user.status });
 
-    // Calculate isOnboarded and needsOnboarding flags
+    // Calculate onboarding flags for UI routing.
     const isPharmacy = user.roleId === 2;
     const isOnboarded = isPharmacy 
       ? (user.pharmacy && user.pharmacy.verificationStatus === 'VERIFIED') 
@@ -752,7 +765,7 @@ export const changePassword = async (req, res, next) => {
 
     logger.operation('AUTH', 'changePassword', 'START', { userId });
 
-    // Validation
+    // Validate required password fields.
     if (!currentPassword || !newPassword || !confirmPassword) {
       return res.status(400).json({
         success: false,
@@ -760,6 +773,7 @@ export const changePassword = async (req, res, next) => {
       });
     }
 
+    // Require new and confirm password to match.
     if (newPassword !== confirmPassword) {
       return res.status(400).json({
         success: false,
@@ -767,6 +781,7 @@ export const changePassword = async (req, res, next) => {
       });
     }
 
+    // Enforce minimum password length.
     if (newPassword.length < 8) {
       return res.status(400).json({
         success: false,
@@ -774,6 +789,7 @@ export const changePassword = async (req, res, next) => {
       });
     }
 
+    // Block reusing the same password.
     if (currentPassword === newPassword) {
       return res.status(400).json({
         success: false,
@@ -781,7 +797,7 @@ export const changePassword = async (req, res, next) => {
       });
     }
 
-    // Get user from database
+    // Load current password hash for comparison.
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, email: true, password: true, name: true }
@@ -794,7 +810,7 @@ export const changePassword = async (req, res, next) => {
       });
     }
 
-    // Verify current password
+    // Verify current password before update.
     const isCurrentPasswordValid = await comparePassword(currentPassword, user.password);
     if (!isCurrentPasswordValid) {
       logger.warn('AUTH', '[CHANGE_PASSWORD] Invalid current password', { userId });
@@ -804,10 +820,10 @@ export const changePassword = async (req, res, next) => {
       });
     }
 
-    // Hash new password
+    // Hash the new password before saving.
     const hashedNewPassword = await hashPassword(newPassword);
 
-    // Update password in database
+    // Update stored password hash.
     await prisma.user.update({
       where: { id: userId },
       data: { password: hashedNewPassword }
@@ -817,7 +833,7 @@ export const changePassword = async (req, res, next) => {
     logger.timing('AUTH', 'changePassword', duration, 'SUCCESS');
     logger.operation('AUTH', 'changePassword', 'SUCCESS', { userId });
 
-    // Log activity
+    // Record password change in audit logs.
     await createLog(
       userId,
       LOG_ACTIONS.PASSWORD_CHANGED,
@@ -841,14 +857,18 @@ export const changePassword = async (req, res, next) => {
 // ---------------- UPDATE SHIPPING ADDRESS ----------------
 export const updateShippingAddress = async (req, res, next) => {
   try {
+    // Read authenticated user ID from token payload.
     const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ success: false, message: "Authentication required" });
     }
 
+    // Accept either nested shippingAddress object or flat body payload.
     const incomingAddress = req.body?.shippingAddress || req.body;
+    // Normalize and validate shipping address fields.
     const shippingAddress = normalizeShippingAddress(incomingAddress);
 
+    // Save normalized address and return minimal user profile fields.
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: { shippingAddress },

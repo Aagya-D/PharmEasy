@@ -89,6 +89,7 @@ export default function PharmacyDashboard() {
       setLoading(true);
       setError(null);
 
+      // Fetch stats, recent orders, and analytics together so the dashboard updates in one pass.
       const [dashboardRes, ordersRes, analyticsRes] = await Promise.allSettled([
         getDashboardStats(),
         httpClient.get("/pharmacy/orders", { params: { page: 1, limit: 40 } }),
@@ -133,6 +134,7 @@ export default function PharmacyDashboard() {
   }, []);
 
   const data = useMemo(() => {
+    // Normalize the raw API payload into the exact cards and charts this page renders.
     const pendingOrders = Number(stats?.pendingOrders || 0);
     const fulfilledOrders = Number(stats?.fulfilledOrders || 0);
     const outOfStock = Number(stats?.outOfStock || 0);
@@ -170,6 +172,7 @@ export default function PharmacyDashboard() {
       },
     ];
 
+    // The table only shows the currently selected status bucket.
     const filteredOrders = activeTab === "ALL"
       ? orders
       : orders.filter((order) => String(order.status || "").toUpperCase() === activeTab);
@@ -184,6 +187,7 @@ export default function PharmacyDashboard() {
       itemCount: Array.isArray(order.items) ? order.items.length : 0,
     }));
 
+    // Count payment methods so the side panel reflects actual order volume.
     const paymentMap = orders.reduce(
       (acc, order) => {
         const key = String(order.paymentMethod || "UNKNOWN").toUpperCase();
@@ -197,6 +201,7 @@ export default function PharmacyDashboard() {
       .map(([method, count]) => ({ method, count }))
       .sort((a, b) => b.count - a.count);
 
+    // Build the status split from the full order list, not just the filtered table rows.
     const statusMap = orders.reduce(
       (acc, order) => {
         const key = String(order.status || "PENDING").toUpperCase();
@@ -210,6 +215,7 @@ export default function PharmacyDashboard() {
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
 
+    // Lowest-stock items are surfaced first so the most urgent issues stay visible.
     const stockAlerts = [...inventory]
       .sort((a, b) => Number(a.quantity || 0) - Number(b.quantity || 0))
       .slice(0, 8)
@@ -220,6 +226,7 @@ export default function PharmacyDashboard() {
         expiry: item.expiryDate,
       }));
 
+    // Keep a short live feed focused on the actions the pharmacy needs to react to.
     const recentActivity = [
       orders[0]
         ? {

@@ -13,6 +13,7 @@ import MedicineImage from "../../../shared/components/ui/MedicineImage";
 
 const FALLBACK_VALUE = "Not specified";
 
+// Preset medicine categories used by the edit form.
 const PRESET_MEDICINE_CATEGORIES = [
   { value: "fever", label: "Fever / Cold" },
   { value: "chronic", label: "Chronic Care" },
@@ -23,6 +24,7 @@ const PRESET_MEDICINE_CATEGORIES = [
   { value: "general", label: "General" },
 ];
 
+// Build editable form state from the current medicine record.
 const getInitialEditData = (source) => {
   if (!source) return null;
 
@@ -107,6 +109,7 @@ export default function MedicineDetailModal({
     };
   }, [imagePreview]);
 
+  // Group fields into the sections shown in the detail view.
   const sections = useMemo(() => {
     const source = viewData || {};
 

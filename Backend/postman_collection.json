@@ -350,6 +350,700 @@
         "description": "Permanently delete inventory item from pharmacy. Validates ownership."
       },
       "response": []
+    },
+    {
+      "name": "SOS Chat Notification",
+      "item": [
+        {
+          "name": "Patient SOS Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "medicineName",
+                  "value": "Paracetamol 500mg",
+                  "type": "text"
+                },
+                {
+                  "key": "genericName",
+                  "value": "Paracetamol",
+                  "type": "text"
+                },
+                {
+                  "key": "quantity",
+                  "value": "2",
+                  "type": "text"
+                },
+                {
+                  "key": "urgencyLevel",
+                  "value": "high",
+                  "type": "text"
+                },
+                {
+                  "key": "patientName",
+                  "value": "John Doe",
+                  "type": "text"
+                },
+                {
+                  "key": "contactNumber",
+                  "value": "98XXXXXXXX",
+                  "type": "text"
+                },
+                {
+                  "key": "address",
+                  "value": "Kathmandu, Nepal",
+                  "type": "text"
+                },
+                {
+                  "key": "latitude",
+                  "value": "27.7172",
+                  "type": "text"
+                },
+                {
+                  "key": "longitude",
+                  "value": "85.3240",
+                  "type": "text"
+                },
+                {
+                  "key": "additionalNotes",
+                  "value": "Need urgent delivery",
+                  "type": "text"
+                },
+                {
+                  "key": "prescriptionRequired",
+                  "value": "false",
+                  "type": "text"
+                },
+                {
+                  "key": "prescription",
+                  "type": "file",
+                  "src": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/patient/sos/request",
+              "host": ["{{base_url}}"],
+              "path": ["patient", "sos", "request"]
+            },
+            "description": "Submit patient SOS request with optional prescription upload (multipart/form-data)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Nearby SOS Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pharmacy/sos/nearby?radius=10",
+              "host": ["{{base_url}}"],
+              "path": ["pharmacy", "sos", "nearby"],
+              "query": [
+                {
+                  "key": "radius",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get nearby pending SOS requests for verified pharmacy."
+          },
+          "response": []
+        },
+        {
+          "name": "Respond to SOS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"response\": \"accepted\",\n  \"note\": \"Medicine available for pickup\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pharmacy/sos/:id/respond",
+              "host": ["{{base_url}}"],
+              "path": ["pharmacy", "sos", ":id", "respond"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "sos_request_id"
+                }
+              ]
+            },
+            "description": "Respond to SOS with accepted or rejected."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject SOS",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Out of stock right now\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pharmacy/sos/:id/reject",
+              "host": ["{{base_url}}"],
+              "path": ["pharmacy", "sos", ":id", "reject"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "sos_request_id"
+                }
+              ]
+            },
+            "description": "Reject SOS while keeping it visible to other pharmacies."
+          },
+          "response": []
+        },
+        {
+          "name": "Complete SOS",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pharmacy/sos/:id/complete",
+              "host": ["{{base_url}}"],
+              "path": ["pharmacy", "sos", ":id", "complete"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "sos_request_id"
+                }
+              ]
+            },
+            "description": "Mark accepted SOS case as completed."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Chat Rooms",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/chat/rooms",
+              "host": ["{{base_url}}"],
+              "path": ["chat", "rooms"]
+            },
+            "description": "Get chat rooms for authenticated patient or pharmacy user."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Chat Room by SOS Request ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/chat/rooms/by-sos/:sosRequestId",
+              "host": ["{{base_url}}"],
+              "path": ["chat", "rooms", "by-sos", ":sosRequestId"],
+              "variable": [
+                {
+                  "key": "sosRequestId",
+                  "value": "sos_request_id"
+                }
+              ]
+            },
+            "description": "Resolve SOS request ID to chat room ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Chat Messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/chat/rooms/:roomId/messages",
+              "host": ["{{base_url}}"],
+              "path": ["chat", "rooms", ":roomId", "messages"],
+              "variable": [
+                {
+                  "key": "roomId",
+                  "value": "chat_room_id"
+                }
+              ]
+            },
+            "description": "Get messages for a specific chat room."
+          },
+          "response": []
+        },
+        {
+          "name": "Send Chat Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Hello, we are processing your SOS request.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/chat/rooms/:roomId/messages",
+              "host": ["{{base_url}}"],
+              "path": ["chat", "rooms", ":roomId", "messages"],
+              "variable": [
+                {
+                  "key": "roomId",
+                  "value": "chat_room_id"
+                }
+              ]
+            },
+            "description": "Send one message to a chat room."
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Chat Messages as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/chat/rooms/:roomId/mark-read",
+              "host": ["{{base_url}}"],
+              "path": ["chat", "rooms", ":roomId", "mark-read"],
+              "variable": [
+                {
+                  "key": "roomId",
+                  "value": "chat_room_id"
+                }
+              ]
+            },
+            "description": "Mark unread messages in a room as read for current user."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Unread Chat Count",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/chat/unread-count",
+              "host": ["{{base_url}}"],
+              "path": ["chat", "unread-count"]
+            },
+            "description": "Get unread chat message count for current user."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications?limit=20&skip=0",
+              "host": ["{{base_url}}"],
+              "path": ["notifications"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "skip",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "Get paginated notifications for the authenticated user."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Notification Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/unread-count",
+              "host": ["{{base_url}}"],
+              "path": ["notifications", "unread-count"]
+            },
+            "description": "Get unread notification count for the authenticated user."
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/:id/read",
+              "host": ["{{base_url}}"],
+              "path": ["notifications", ":id", "read"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "notification_id"
+                }
+              ]
+            },
+            "description": "Mark a specific notification as read."
+          },
+          "response": []
+        },
+        {
+          "name": "Mark All Notifications as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/read-all",
+              "host": ["{{base_url}}"],
+              "path": ["notifications", "read-all"]
+            },
+            "description": "Mark all unread notifications as read for current user."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cart-Checkout-Orders",
+      "item": [
+        {
+          "name": "Get Cart",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/patient/cart",
+              "host": ["{{base_url}}"],
+              "path": ["patient", "cart"]
+            },
+            "description": "Retrieve authenticated patient's cart."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Cart Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"medicineId\": \"inventory_item_id\",\n  \"quantity\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/patient/cart/items",
+              "host": ["{{base_url}}"],
+              "path": ["patient", "cart", "items"]
+            },
+            "description": "Add or increment one medicine in cart."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Cart Item",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 2,\n  \"selected\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/patient/cart/items/:itemId",
+              "host": ["{{base_url}}"],
+              "path": ["patient", "cart", "items", ":itemId"],
+              "variable": [
+                {
+                  "key": "itemId",
+                  "value": "cart_item_id"
+                }
+              ]
+            },
+            "description": "Update cart item quantity and selection flag."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Cart Item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/patient/cart/items/:itemId",
+              "host": ["{{base_url}}"],
+              "path": ["patient", "cart", "items", ":itemId"],
+              "variable": [
+                {
+                  "key": "itemId",
+                  "value": "cart_item_id"
+                }
+              ]
+            },
+            "description": "Remove a single item from cart."
+          },
+          "response": []
+        },
+        {
+          "name": "Checkout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemIds\": [\"cart_item_id\"],\n  \"deliveryAddress\": \"Kathmandu, Nepal\",\n  \"paymentMethod\": \"CASH_ON_DELIVERY\",\n  \"contactNumber\": \"98XXXXXXXX\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/patient/orders/checkout",
+              "host": ["{{base_url}}"],
+              "path": ["patient", "orders", "checkout"]
+            },
+            "description": "Create an order from selected cart items."
+          },
+          "response": []
+        },
+        {
+          "name": "Payment Verification Callback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pidx\": \"khalti_pidx_from_checkout\",\n  \"purchase_order_id\": \"order-order_id\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/orders/payment/khalti/callback/verify",
+              "host": ["{{base_url}}"],
+              "path": ["orders", "payment", "khalti", "callback", "verify"]
+            },
+            "description": "Verify Khalti payment from callback payload."
+          },
+          "response": []
+        },
+        {
+          "name": "Pharmacy Order Listing",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pharmacy/orders?page=1&limit=20&status=pending",
+              "host": ["{{base_url}}"],
+              "path": ["pharmacy", "orders"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "pending"
+                }
+              ]
+            },
+            "description": "List pharmacy orders with pagination and optional status filter."
+          },
+          "response": []
+        },
+        {
+          "name": "Pharmacy Order Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pharmacy/orders/:orderId",
+              "host": ["{{base_url}}"],
+              "path": ["pharmacy", "orders", ":orderId"],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "order_id"
+                }
+              ]
+            },
+            "description": "Get details of one pharmacy order."
+          },
+          "response": []
+        },
+        {
+          "name": "Pharmacy Status Update",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACCEPTED\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pharmacy/orders/:orderId/status",
+              "host": ["{{base_url}}"],
+              "path": ["pharmacy", "orders", ":orderId", "status"],
+              "variable": [
+                {
+                  "key": "orderId",
+                  "value": "order_id"
+                }
+              ]
+            },
+            "description": "Update pharmacy order status (e.g. ACCEPTED, PREPARING, READY, COMPLETED, CANCELLED)."
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "variable": [

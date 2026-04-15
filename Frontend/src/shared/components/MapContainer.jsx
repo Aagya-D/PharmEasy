@@ -1,22 +1,11 @@
-/**
- * MapContainer Component
- * 
- * Interactive map with Leaflet showing user location and pharmacy markers
- * 
- * Features:
- * - User location marker (blue pin)
- * - Pharmacy markers (red pins)
- * - Interactive popups with pharmacy details
- * - "Get Directions" links to Google Maps
- * - Auto-centering on user location or search results
- */
+// Leaflet map container for user and pharmacy markers.
 
 import React, { useEffect, useRef } from "react";
 import { MapContainer as LeafletMap, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Navigation, Phone, MapPin as MapPinIcon, ExternalLink } from "lucide-react";
 
-// Fix for default marker icons in React-Leaflet
+// Configure default Leaflet marker assets for bundler compatibility.
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
@@ -28,7 +17,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-// Custom blue marker for user location
+// Custom marker icon for user location.
 const userLocationIcon = new L.Icon({
   iconUrl: "data:image/svg+xml;base64," + btoa(`
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
@@ -41,7 +30,7 @@ const userLocationIcon = new L.Icon({
   popupAnchor: [0, -16],
 });
 
-// Custom red marker for pharmacies
+// Custom marker icon for pharmacies.
 const pharmacyIcon = new L.Icon({
   iconUrl: "data:image/svg+xml;base64," + btoa(`
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="36" height="36">
@@ -55,28 +44,25 @@ const pharmacyIcon = new L.Icon({
   popupAnchor: [0, -36],
 });
 
-/**
- * Map View Controller
- * Auto-centers and zooms the map based on markers
- */
+// Map view controller that adjusts center/bounds from marker data.
 function MapViewController({ center, zoom, markers }) {
   const map = useMap();
 
   useEffect(() => {
     if (markers && markers.length > 0) {
-      // Fit bounds to show all markers
+      // Fit bounds to include all markers.
       const bounds = L.latLngBounds(
         markers.map((m) => [m.latitude, m.longitude])
       );
       
-      // Include user location if provided
+      // Include user location in bounds when provided.
       if (center) {
         bounds.extend(center);
       }
       
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
     } else if (center) {
-      // Just center on user location
+      // Fallback to simple center when no markers exist.
       map.setView(center, zoom || 13);
     }
   }, [map, center, markers, zoom]);
@@ -84,16 +70,7 @@ function MapViewController({ center, zoom, markers }) {
   return null;
 }
 
-/**
- * MapContainer Component
- * 
- * @param {Object} props
- * @param {Object} props.userLocation - User's location { latitude, longitude }
- * @param {Array} props.pharmacies - Array of pharmacy objects with location data
- * @param {Object} props.selectedPharmacy - Currently selected pharmacy
- * @param {Function} props.onPharmacyClick - Callback when pharmacy marker is clicked
- * @param {String} props.height - Map container height (default: "500px")
- */
+// Main map component for search and nearby-pharmacy surfaces.
 export default function MapContainer({
   userLocation,
   pharmacies = [],
@@ -101,16 +78,13 @@ export default function MapContainer({
   onPharmacyClick,
   height = "500px",
 }) {
+  // Default map center when user location is unavailable.
   const defaultCenter = [27.7172, 85.3240]; // Kathmandu, Nepal as fallback
   const center = userLocation
     ? [userLocation.latitude, userLocation.longitude]
     : defaultCenter;
 
-  /**
-   * Normalize pharmacy data - handles both:
-   * - Medicine search results: { pharmacy: { location, name, ... }, medicine, price, ... }
-   * - Nearby pharmacy results: { location, name, address, ... }
-   */
+  // Normalize pharmacy object across medicine-search and nearby-search shapes.
   const getPharmacyInfo = (result) => {
     if (result.pharmacy && result.pharmacy.location) {
       return result.pharmacy; // medicine search shape
@@ -118,9 +92,7 @@ export default function MapContainer({
     return result; // nearby pharmacy shape (location is directly on the object)
   };
 
-  /**
-   * Generate Google Maps directions URL
-   */
+  // Build Google Maps directions URL.
   const getDirectionsUrl = (result) => {
     const info = getPharmacyInfo(result);
     if (!info || !info.location) return "#";
@@ -134,9 +106,7 @@ export default function MapContainer({
     }
   };
 
-  /**
-   * Format currency for Nepal
-   */
+  // Format Nepali Rupees amount for popup display.
   const formatPrice = (price) => {
     return new Intl.NumberFormat("en-NP", {
       style: "currency",
@@ -159,7 +129,7 @@ export default function MapContainer({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {/* Auto-center controller */}
+        {/* Auto-center controller. */}
         <MapViewController
           center={center}
           markers={pharmacies
@@ -170,7 +140,7 @@ export default function MapContainer({
             .filter(Boolean)}
         />
 
-        {/* User Location Marker (Blue Pin) */}
+        {/* User location marker. */}
         {userLocation && (
           <Marker
             position={[userLocation.latitude, userLocation.longitude]}
@@ -187,7 +157,7 @@ export default function MapContainer({
           </Marker>
         )}
 
-        {/* Pharmacy Markers (Red Pins) */}
+        {/* Pharmacy markers. */}
         {pharmacies.map((result) => {
           const info = getPharmacyInfo(result);
           if (!info || !info.location) return null;
@@ -209,12 +179,12 @@ export default function MapContainer({
             >
               <Popup maxWidth={300}>
                 <div className="p-2">
-                  {/* Pharmacy Name */}
+                  {/* Pharmacy name. */}
                   <h3 className="font-bold text-lg text-gray-900 mb-2">
                     {info.name}
                   </h3>
 
-                  {/* Medicine Info (only for medicine search results) */}
+                  {/* Medicine info for medicine-search results. */}
                   {result.medicine && (
                   <div className="bg-blue-50 rounded p-2 mb-3">
                     <p className="font-semibold text-blue-900">{result.medicine}</p>
@@ -235,7 +205,7 @@ export default function MapContainer({
                   </div>
                   )}
 
-                  {/* Medicines in stock count (only for nearby pharmacy results) */}
+                  {/* Medicines-in-stock summary for nearby-search results. */}
                   {result.medicinesInStock !== undefined && (
                     <div className="bg-green-50 rounded p-2 mb-3">
                       <p className="text-sm text-green-800 font-medium">
@@ -244,13 +214,13 @@ export default function MapContainer({
                     </div>
                   )}
 
-                  {/* Address */}
+                  {/* Address. */}
                   <div className="flex items-start gap-2 mb-2">
                     <MapPinIcon size={14} className="text-gray-500 mt-1 flex-shrink-0" />
                     <p className="text-sm text-gray-600">{info.address}</p>
                   </div>
 
-                  {/* Distance */}
+                  {/* Distance from user location. */}
                   {result.distance && (
                     <div className="flex items-center gap-2 mb-2">
                       <Navigation size={14} className="text-gray-500" />
@@ -260,7 +230,7 @@ export default function MapContainer({
                     </div>
                   )}
 
-                  {/* Contact */}
+                  {/* Contact number. */}
                   {info.contactNumber && (
                     <div className="flex items-center gap-2 mb-3">
                       <Phone size={14} className="text-gray-500" />
@@ -273,7 +243,7 @@ export default function MapContainer({
                     </div>
                   )}
 
-                  {/* Get Directions Button */}
+                  {/* Directions link. */}
                   <a
                     href={getDirectionsUrl(result)}
                     target="_blank"

@@ -52,6 +52,7 @@ export function HowItWorksSection() {
       className="px-6 py-20 bg-[#f7f6f3]"
     >
       <div className="max-w-7xl mx-auto">
+        {/* Intro label */}
         <p className="mb-3 text-center text-xs font-semibold tracking-[0.18em] text-[#007f95]/80">
           WORKFLOW DESIGN
         </p>

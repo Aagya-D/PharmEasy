@@ -1,7 +1,4 @@
-/**
- * PharmEasy Backend
- * Main Express application entry point
- */
+// PharmEasy backend entry point.
 
 import express from "express";
 import cors from "cors";
@@ -29,20 +26,20 @@ import chatRoutes from "./modules/chat/chat.routes.js";
 import reviewRoutes from "./modules/review/review.routes.js";
 import userRoutes from "./modules/user/user.routes.js";
 import chatHandler from "./sockets/chatHandler.js";
-// Note: adminExtendedRoutes uses CommonJS, will need conversion or dynamic import
+// adminExtendedRoutes still uses CommonJS and is handled separately.
 
-// ES Module __dirname workaround
+// Resolve __dirname for ES modules.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables
+// Load environment variables.
 dotenv.config();
 
-// Validate environment variables before starting
+// Validate environment variables before starting.
 try {
   validateEnvironment();
 } catch (error) {
-  console.error('❌ Environment validation failed:');
+  console.error("Environment validation failed:");
   console.error(error.message);
   process.exit(1);
 }
@@ -53,11 +50,9 @@ const PORT = process.env.PORT || 5050;
 const HOST =
   process.env.HOST || (NODE_ENV === "production" ? "0.0.0.0" : "localhost");
 
-// ============================================
-// MIDDLEWARE
-// ============================================
+// Middleware.
 
-// CORS Configuration
+// CORS setup.
 const parseOriginValues = (...rawValues) =>
   rawValues
     .flatMap((value) => String(value || "").split(","))
@@ -126,11 +121,11 @@ app.use(
   })
 );
 
-// Body Parser
+// Body parser.
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-// Response Helper Middleware
+// Add a simple success response helper.
 app.use((req, res, next) => {
   res.success = (data) => {
     res.status(200).json({
@@ -141,14 +136,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// Request/Response Logger (comprehensive)
+// Request and response logger.
 app.use(loggingMiddleware);
 
-// Public static folder for local upload fallback assets
+// Serve local upload fallback assets.
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 
-// Simple health check (no dependencies)
+// Health check endpoint.
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     success: true,
@@ -160,11 +155,11 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Comprehensive status check (includes DB)
+// Status check endpoint with database validation.
 app.get("/api/status", asyncHandler(async (req, res) => {
   const startTime = Date.now();
-  
-  // Check database connection
+
+  // Check database connectivity.
   let dbStatus = "disconnected";
   let dbLatency = null;
   try {
@@ -175,9 +170,9 @@ app.get("/api/status", asyncHandler(async (req, res) => {
   } catch (error) {
     dbStatus = "error";
   }
-  
+
   const responseTime = Date.now() - startTime;
-  
+
   res.status(200).json({
     success: true,
     message: "Server status check",
@@ -219,66 +214,56 @@ app.get(
 
 
 
-// Authentication routes
+// Authentication routes.
 app.use("/api/auth", authRoutes);
 
-// Search routes (public access - no authentication required)
-// Routes include: /api/search, /api/search/nearby, /api/search/stats
+// Search routes are public.
 app.use("/api", searchRoutes);
 
-// Patient routes (dashboard, orders, medications, SOS)
-// Routes include: /patient/dashboard, /patient/orders, /patient/medications, /patient/sos/request, etc.
+// Patient routes.
 app.use("/api/patient", patientRoutes);
 
-// Cart routes (persistent patient cart operations)
+// Cart routes.
 app.use("/api/cart", cartRoutes);
 
-// Order routes (checkout + pharmacy order status transitions)
+// Order routes.
 app.use("/api/orders", orderRoutes);
 
-// Notification routes (user notifications, real-time alerts)
-// Routes include: /notifications, /notifications/unread-count, /notifications/:id/read, etc.
+// Notification routes.
 app.use("/api/notifications", notificationRoutes);
 
-// Pharmacy routes (onboarding, pharmacy management & admin verification)
-// Routes include: /pharmacy/onboard, /pharmacy/my-pharmacy, /admin/pharmacies, /admin/pharmacy/:id, etc.
+// Pharmacy routes.
 app.use("/api", pharmacyRoutes);
 
-// Inventory routes (medicine CRUD for verified pharmacies)
-// Routes include: /inventory, /inventory/my-stock, /inventory/:id
+// Inventory routes.
 app.use("/api", inventoryRoutes);
 
-// Admin routes (profile settings, password change, pharmacy management)
-// Routes include: /admin/profile, /admin/change-password, /admin/pharmacies, etc.
+// Admin routes.
 app.use("/api/admin", adminRoutes);
 
-// Content routes (public health tips and announcements for all authenticated users)
-// Routes include: /content/health-tips, /content/announcements, etc.
+// Content routes.
 app.use("/api/content", contentRoutes);
 
-// Chat routes (real-time messaging between Patient and Pharmacy per SOS)
-// Routes include: /chat/:sosRequestId
+// Chat routes.
 app.use("/api/chat", chatRoutes);
 
-// Review routes (patient-to-pharmacy ratings and reviews)
-// Routes include: POST /reviews, GET /reviews/:pharmacyId
+// Review routes.
 app.use("/api/reviews", reviewRoutes);
 
-// User profile routes (avatar upload/update)
+// User profile routes.
 app.use("/api/user", userRoutes);
 
-// Admin extended routes will be loaded dynamically
-// Dynamic import for CommonJS module compatibility
+// Load admin extended routes dynamically.
 import("./modules/admin/admin-extended.routes.js")
   .then((module) => {
     app.use("/api/admin", module.default || module);
-    logger.info("✓ Admin extended routes loaded");
+    logger.info("Admin extended routes loaded");
   })
   .catch((err) => {
-    logger.error("✗ Failed to load admin extended routes:", err);
+    logger.error("Failed to load admin extended routes:", err);
   });
 
-// Root API endpoint
+// Root API endpoint.
 app.get("/api", (req, res) => {
   res.status(200).json({
     success: true,
@@ -292,12 +277,10 @@ app.get("/api", (req, res) => {
   });
 });
 
-// ============================================
-// STATIC FILE SERVING (Production Only)
-// ============================================
+// Serve the frontend build in production.
 
 if (NODE_ENV === "production") {
-  // Serve static files from the Frontend build directory
+  // Serve static files from the frontend build.
   const frontendBuildPath = path.join(__dirname, "../../Frontend/dist");
   
   app.use(express.static(frontendBuildPath, {
@@ -306,10 +289,8 @@ if (NODE_ENV === "production") {
     lastModified: true,
   }));
 
-  // Catch-all route for SPA - must be AFTER API routes
-  // Only serve index.html for non-API routes
+  // Serve the SPA shell for non-API routes.
   app.get("/{*splat}", (req, res, next) => {
-    // Never serve index.html for API routes
     if (req.path.startsWith('/api')) {
       return next();
     }
@@ -317,9 +298,7 @@ if (NODE_ENV === "production") {
   });
 }
 
-// ============================================
-// 404 HANDLER (Development Only - API routes)
-// ============================================
+// Return JSON 404s in development.
 
 if (NODE_ENV !== "production") {
   app.use((req, res) => {
@@ -333,23 +312,19 @@ if (NODE_ENV !== "production") {
   });
 }
 
-// ============================================
-// ERROR HANDLER (Must be last)
-// ============================================
+// Error handler.
 
 app.use(errorHandler);
 
-// ============================================
-// SERVER START
-// ============================================
+// Start the server.
 
 const startServer = async () => {
   try {
-    // Test database connection
+    // Check the database connection.
     await prisma.$queryRaw`SELECT 1`;
-    console.log("✓ Database connection successful");
+    console.log("Database connection successful");
 
-    // Create HTTP server and attach Socket.IO
+    // Create the HTTP server and Socket.IO instance.
     const server = http.createServer(app);
 
     const io = new SocketIOServer(server, {
@@ -370,21 +345,19 @@ const startServer = async () => {
       pingInterval: 25000,
     });
 
-    // Register chat socket handler
+    // Register the chat socket handler.
     chatHandler(io);
-    // Expose io globally so controllers can emit real-time events
+    // Make io available to controllers.
     app.set("io", io);
-    console.log("✓ Socket.IO initialized with chat handler");
+    console.log("Socket.IO initialized with chat handler");
 
-    // Handle port-in-use errors gracefully — attempt auto-kill then retry once
+    // Handle port-in-use errors and retry once.
     server.on("error", async (err) => {
       if (err.code === "EADDRINUSE") {
-        console.warn(`\n⚠️  Port ${PORT} is already in use. Attempting auto-cleanup...`);
+        console.warn(`\nPort ${PORT} is already in use. Attempting auto-cleanup...`);
         try {
-          // Try to free the port automatically
           const { execSync } = await import("child_process");
           if (process.platform === "win32") {
-            // Find PID on the port and kill it
             const out = execSync(`netstat -ano | findstr ":${PORT}"`, { encoding: "utf8" });
             const pids = [...new Set(
               out.split("\n")
@@ -397,12 +370,12 @@ const startServer = async () => {
           } else {
             execSync(`lsof -ti :${PORT} | xargs kill -9 2>/dev/null || true`, { encoding: "utf8" });
           }
-          console.log(`✓ Cleared port ${PORT}. Retrying in 1 second...`);
+          console.log(`Cleared port ${PORT}. Retrying in 1 second...`);
           await new Promise(r => setTimeout(r, 1000));
           server.listen(PORT, HOST);
           return;
         } catch (killErr) {
-          console.error(`\n❌ Could not auto-clear port ${PORT}.`);
+          console.error(`\nCould not auto-clear port ${PORT}.`);
           console.error(`   Manually kill the process and retry:\n`);
           console.error(`   Windows:  netstat -ano | findstr ":${PORT}" → taskkill /PID <pid> /F`);
           console.error(`   Mac/Linux: lsof -i :${PORT} → kill -9 <pid>\n`);
@@ -414,46 +387,25 @@ const startServer = async () => {
     });
 
     server.listen(PORT, HOST, () => {
-      console.log(`
-╭────────────────────────────────────────────╮
-│  🚀 PharmEasy Backend Server Started       │
-├────────────────────────────────────────────┤
-│  URL:         http://${HOST}:${PORT}
-│  Environment: ${NODE_ENV}
-│  Node:        ${process.version}
-╰────────────────────────────────────────────╯
-
-📚 Available Endpoints:
-  • Health:    GET  /api/health
-  • DB Check:  GET  /api/db-check
-  • Auth:      POST /api/auth/register
-  • Auth:      POST /api/auth/login
-  • Auth:      POST /api/auth/verify-otp
-
-🔐 Authentication:
-  • Access Token expiry:  30 minutes
-  • Refresh Token expiry: 7 days
-  • OTP expiry:           5 minutes
-  • Reset Token expiry:   1 hour
-
-📖 API Documentation:
-  GET /api - View all endpoints
-
-⚠️  Default test credentials available after seed:
-  npm run prisma:seed
-      `);
+      console.log(`PharmEasy backend server started at http://${HOST}:${PORT}`);
+      console.log(`Environment: ${NODE_ENV}`);
+      console.log(`Node: ${process.version}`);
+      console.log("Available endpoints: GET /api/health, GET /api/db-check, POST /api/auth/register, POST /api/auth/login, POST /api/auth/verify-otp");
+      console.log("Authentication: access token 30 minutes, refresh token 7 days, OTP 5 minutes, reset token 1 hour");
+      console.log("API documentation: GET /api");
+      console.log("Default test credentials are available after seeding: npm run prisma:seed");
     });
 
-    // Graceful shutdown
+    // Graceful shutdown.
     const gracefulShutdown = async (signal) => {
-      console.log(`\n📍 ${signal} received, shutting down gracefully...`);
+      console.log(`\n${signal} received, shutting down gracefully...`);
       server.close(async () => {
         await prisma.$disconnect();
-        console.log("✓ Server closed");
+        console.log("Server closed");
         process.exit(0);
       });
 
-      // Force shutdown after 10 seconds
+      // Force shutdown after 10 seconds.
       setTimeout(() => {
         console.error("Force closing server");
         process.exit(1);
@@ -463,7 +415,7 @@ const startServer = async () => {
     process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
     process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   } catch (error) {
-    console.error("❌ Failed to start server:", error.message);
+    console.error("Failed to start server:", error.message);
     await prisma.$disconnect();
     process.exit(1);
   }

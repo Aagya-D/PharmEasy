@@ -167,7 +167,7 @@ const AdminCMS = () => {
     <>
     <AdminLayout>
       <div className="min-h-screen bg-gray-50">
-        {/* Header */}
+        {/* Page header */}
         <div className="bg-white shadow-sm border-b border-gray-200 mb-6">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex justify-between items-center">
@@ -192,7 +192,7 @@ const AdminCMS = () => {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Tabs */}
+          {/* Content tabs */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
             <div className="flex border-b border-gray-200">
               <button
@@ -220,7 +220,7 @@ const AdminCMS = () => {
             </div>
           </div>
 
-          {/* Create Button */}
+          {/* Create button */}
           <div className="mb-6">
             <button
               onClick={() => openCreateModal(activeTab === 'healthTips' ? 'healthTip' : 'announcement')}
@@ -231,7 +231,7 @@ const AdminCMS = () => {
             </button>
           </div>
 
-          {/* Content List */}
+          {/* Content list */}
           <div className="grid grid-cols-1 gap-6">
             {isLoading ? (
               <div className="flex items-center justify-center py-12">

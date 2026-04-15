@@ -1,7 +1,4 @@
-/**
- * Pharmacy Controller - HTTP request handlers for pharmacy operations
- * Handles pharmacy onboarding and admin verification endpoints
- */
+// HTTP handlers for pharmacy onboarding, catalog, and payment settings.
 
 import pharmacyService from "./pharmacy.service.js";
 import logger from "../../utils/logger.js";
@@ -14,12 +11,7 @@ import { encryptText } from "../../utils/encryption.js";
 const KHALTI_PUBLIC_KEY_REGEX = /^[a-zA-Z0-9]{20,80}$/;
 const MASKED_SECRET = "••••••••••••••••••••";
 
-/**
- * POST /api/pharmacy/onboard
- * Submit pharmacy onboarding details with license document upload
- * Requires: Authentication, roleId=2 (PHARMACY_ADMIN)
- * Accepts: multipart/form-data with REQUIRED "licenseDocument" file
- */
+// Submit pharmacy onboarding details with the license document.
 export const onboardPharmacy = async (req, res, next) => {
   try {
     const startTime = Date.now();
@@ -35,7 +27,7 @@ export const onboardPharmacy = async (req, res, next) => {
       fileSize: req.file?.size
     });
 
-    // Validate contactNumber
+    // Validate the contact number.
     if (!isValidNepaliPhone(pharmacyData.contactNumber)) {
       return res.status(400).json({
         success: false,
@@ -43,15 +35,15 @@ export const onboardPharmacy = async (req, res, next) => {
       });
     }
 
-    // If file was uploaded via Cloudinary, attach the URL
+    // Use the uploaded file URL when Cloudinary returns one.
     if (req.file && req.file.path) {
       logger.debug('PHARMACY', '[ONBOARD] File uploaded successfully', { 
         fileName: req.file.originalname, 
         cloudinaryUrl: req.file.path,
         fileSize: req.file.size
       });
-      pharmacyData.licenseDocument = req.file.path; // Cloudinary URL
-      pharmacyData.licenseDocumentPublicId = req.file.filename; // Cloudinary public_id
+      pharmacyData.licenseDocument = req.file.path;
+      pharmacyData.licenseDocumentPublicId = req.file.filename;
     } else {
       logger.error('PHARMACY', '[ONBOARD] No file received in request', { 
         hasFile: !!req.file,
@@ -68,7 +60,7 @@ export const onboardPharmacy = async (req, res, next) => {
     logger.timing('PHARMACY', 'onboardPharmacy', duration, 'SUCCESS');
     logger.operation('PHARMACY', 'onboardPharmacy', 'SUCCESS', { pharmacyId: pharmacy.id, userId });
 
-    // Log activity
+    // Record the onboarding request in the audit trail.
     await createLog(
       userId,
       LOG_ACTIONS.PHARMACY_ONBOARDED,
@@ -98,11 +90,7 @@ export const onboardPharmacy = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/pharmacy/my-pharmacy
- * Get authenticated user's pharmacy details
- * Requires: Authentication, roleId=2 (PHARMACY_ADMIN)
- */
+// Return the authenticated user's pharmacy details.
 export const getMyPharmacy = async (req, res, next) => {
   try {
     const userId = req.user.userId;
@@ -125,11 +113,7 @@ export const getMyPharmacy = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/pharmacy/:id/catalog
- * Public storefront endpoint for patients
- * Returns pharmacy profile + in-stock inventory only
- */
+// Return the public storefront catalog for a verified pharmacy.
 export const getPharmacyCatalog = async (req, res, next) => {
   try {
     const pharmacyId = req.params.id;
@@ -212,11 +196,7 @@ export const getPharmacyCatalog = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/pharmacy/:id/inventory
- * Public storefront endpoint for patients
- * Returns pharmacy profile + full inventory catalog (in-stock and out-of-stock)
- */
+// Return the full public inventory catalog for a verified pharmacy.
 export const getPharmacyInventory = async (req, res, next) => {
   try {
     const pharmacyId = req.params.id;
@@ -296,10 +276,7 @@ export const getPharmacyInventory = async (req, res, next) => {
   }
 };
 
-/**
- * GET /api/pharmacy/settings/khalti
- * Get Khalti merchant connection status and safe display fields
- */
+// Return Khalti connection status and safe display fields.
 export const getKhaltiSettings = async (req, res, next) => {
   try {
     const userId = req.user.userId;
@@ -344,16 +321,15 @@ export const getKhaltiSettings = async (req, res, next) => {
   }
 };
 
-/**
- * PUT /api/pharmacy/settings/khalti
- * Save/update Khalti merchant keys for the authenticated pharmacy admin
- */
+// Save or update Khalti merchant keys for the authenticated pharmacy admin.
 export const updateKhaltiSettings = async (req, res, next) => {
   try {
+    // Read authenticated user and incoming Khalti keys.
     const userId = req.user.userId;
     const publicKeyInput = String(req.body?.publicKey || "").trim();
     const secretKeyInput = String(req.body?.secretKey || "").trim();
 
+    // Confirm this user owns a pharmacy profile.
     const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
     if (!pharmacy) {
       return res.status(404).json({
@@ -362,6 +338,7 @@ export const updateKhaltiSettings = async (req, res, next) => {
       });
     }
 
+    // Validate Khalti public key format.
     if (!publicKeyInput || !KHALTI_PUBLIC_KEY_REGEX.test(publicKeyInput)) {
       return res.status(400).json({
         success: false,
@@ -369,6 +346,7 @@ export const updateKhaltiSettings = async (req, res, next) => {
       });
     }
 
+    // Prevent obvious config mistakes.
     if (secretKeyInput && secretKeyInput === publicKeyInput) {
       return res.status(400).json({
         success: false,
@@ -376,6 +354,7 @@ export const updateKhaltiSettings = async (req, res, next) => {
       });
     }
 
+    // Read existing payment config so we can preserve secret when omitted.
     const existing = await prisma.pharmacyPaymentConfig.findUnique({
       where: { pharmacyId: pharmacy.id },
       select: {
@@ -384,9 +363,12 @@ export const updateKhaltiSettings = async (req, res, next) => {
       },
     });
 
+    // Encrypt new secret key when provided.
     const encryptedSecret = secretKeyInput ? encryptText(secretKeyInput) : null;
+    // Keep old encrypted secret if caller only updates public key.
     const finalEncryptedSecret = encryptedSecret || existing?.khaltiSecretKeyEncrypted || null;
 
+    // First-time connections must include a secret key.
     if (!finalEncryptedSecret) {
       return res.status(400).json({
         success: false,
@@ -394,6 +376,7 @@ export const updateKhaltiSettings = async (req, res, next) => {
       });
     }
 
+    // Upsert merchant settings for this pharmacy.
     const updated = await prisma.pharmacyPaymentConfig.upsert({
       where: { pharmacyId: pharmacy.id },
       create: {
@@ -418,6 +401,7 @@ export const updateKhaltiSettings = async (req, res, next) => {
       },
     });
 
+    // Record settings update for audit visibility.
     await createLog(
       userId,
       LOG_ACTIONS.PHARMACY_UPDATED,
@@ -430,6 +414,7 @@ export const updateKhaltiSettings = async (req, res, next) => {
       }
     );
 
+    // Return safe config fields to client.
     return res.status(200).json({
       success: true,
       message: "Khalti merchant settings saved successfully",
@@ -456,6 +441,7 @@ export const updateKhaltiSettings = async (req, res, next) => {
  */
 export const getPendingPharmacies = async (req, res, next) => {
   try {
+    // Load all pharmacies waiting for admin verification.
     const pharmacies = await pharmacyService.getPendingPharmacies();
 
     res.status(200).json({
@@ -476,6 +462,7 @@ export const getPendingPharmacies = async (req, res, next) => {
  */
 export const getAllPharmacies = async (req, res, next) => {
   try {
+    // Normalize optional verification status filter.
     const status = typeof req.query?.status === "string" ? req.query.status : undefined;
 
     const filters = {};
@@ -504,6 +491,7 @@ export const getAllPharmacies = async (req, res, next) => {
  */
 export const getPharmacyById = async (req, res, next) => {
   try {
+    // Read pharmacy identifier from route param.
     const { id } = req.params;
 
     const pharmacy = await pharmacyService.getPharmacyById(id);
@@ -524,10 +512,11 @@ export const getPharmacyById = async (req, res, next) => {
  */
 export const verifyPharmacy = async (req, res, next) => {
   try {
+    // Read pharmacy ID and admin actor ID.
     const { id } = req.params;
     const adminUserId = req.user.userId;
 
-    // ── Capture BEFORE state for audit delta ──
+    // Capture the state before the change.
     const beforePharmacy = await prisma.pharmacy.findUnique({
       where: { id },
       select: { id: true, pharmacyName: true, verificationStatus: true, verifiedBy: true, verifiedAt: true },
@@ -535,7 +524,7 @@ export const verifyPharmacy = async (req, res, next) => {
 
     const pharmacy = await pharmacyService.verifyPharmacy(id, adminUserId);
 
-    // ── Audit: full delta + client metadata ──
+    // Record the full audit delta and client metadata.
     await createAuditLog({
       actorId: adminUserId,
       action: LOG_ACTIONS.PHARMACY_APPROVED,
@@ -572,11 +561,12 @@ export const verifyPharmacy = async (req, res, next) => {
  */
 export const rejectPharmacy = async (req, res, next) => {
   try {
+    // Read request payload and acting admin identity.
     const { id } = req.params;
     const { reason } = req.body;
     const adminUserId = req.user.userId;
 
-    // ── Capture BEFORE state for audit delta ──
+    // Capture the state before the change.
     const beforePharmacy = await prisma.pharmacy.findUnique({
       where: { id },
       select: { id: true, pharmacyName: true, verificationStatus: true, rejectionReason: true },
@@ -588,7 +578,7 @@ export const rejectPharmacy = async (req, res, next) => {
       reason
     );
 
-    // ── Audit: full delta + client metadata ──
+    // Record the full audit delta and client metadata.
     await createAuditLog({
       actorId: adminUserId,
       action: LOG_ACTIONS.PHARMACY_REJECTED,
@@ -625,11 +615,12 @@ export const rejectPharmacy = async (req, res, next) => {
  */
 export const updatePharmacyStatus = async (req, res, next) => {
   try {
+    // Read status update input for admin action.
     const { id } = req.params;
     const { status, reason } = req.body;
     const adminUserId = req.user.userId;
 
-    // ── Capture BEFORE state for audit delta ──
+    // Capture the state before the change.
     const beforePharmacy = await prisma.pharmacy.findUnique({
       where: { id },
       select: { id: true, pharmacyName: true, verificationStatus: true, rejectionReason: true, verifiedBy: true },
@@ -642,7 +633,7 @@ export const updatePharmacyStatus = async (req, res, next) => {
       reason
     );
 
-    // ── Audit: full delta + client metadata ──
+    // Record the full audit delta and client metadata.
     await createAuditLog({
       actorId: adminUserId,
       action: `PHARMACY_STATUS_${status}`,
@@ -679,6 +670,7 @@ export const updatePharmacyStatus = async (req, res, next) => {
  */
 export const resetOnboarding = async (req, res, next) => {
   try {
+    // Read current pharmacy admin user ID.
     const userId = req.user.userId;
     logger.operation('PHARMACY', 'resetOnboarding', 'START', { userId });
 
@@ -704,7 +696,7 @@ export const resetOnboarding = async (req, res, next) => {
  */
 export const getNearbySOS = async (req, res, next) => {
   try {
-    // ── Auto-expire stale SOS requests (30 min TTL) ──
+    // Expire stale SOS requests after 30 minutes.
     const SOS_TTL_MINUTES = 30;
     const cutoff = new Date(Date.now() - SOS_TTL_MINUTES * 60 * 1000);
     try {
@@ -712,12 +704,14 @@ export const getNearbySOS = async (req, res, next) => {
         where: { status: "pending", createdAt: { lt: cutoff } },
         data: { status: "expired" },
       });
-    } catch (_) { /* non-blocking */ }
+    } catch (_) {
+      // Expiry cleanup is best-effort and should not block the endpoint.
+    }
 
     const userId = req.user.userId;
-    const { radius = 50 } = req.query; // Default 50km radius for broader visibility
+    const { radius = 50 } = req.query; // Default 50km radius for broader visibility.
 
-    // Get pharmacy details including location
+    // Load the pharmacy location.
     const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
 
     if (!pharmacy) {
@@ -741,7 +735,7 @@ export const getNearbySOS = async (req, res, next) => {
       });
     }
 
-    // Get SOS requests that haven't been rejected by this pharmacy
+    // Skip SOS requests this pharmacy already rejected.
     const rejectedSOSIds = await prisma.pharmacyResponse.findMany({
       where: {
         pharmacyId: pharmacy.id,
@@ -752,6 +746,7 @@ export const getNearbySOS = async (req, res, next) => {
       }
     });
 
+    // Build simple ID list for SOS exclusion query.
     const rejectedIds = rejectedSOSIds.map(r => r.sosId);
 
     const sosRequests = await prisma.sOSRequest.findMany({
@@ -759,7 +754,7 @@ export const getNearbySOS = async (req, res, next) => {
         status: 'pending',
         latitude: { not: null },
         longitude: { not: null },
-        id: { notIn: rejectedIds } // Exclude rejected requests
+        id: { notIn: rejectedIds }
       },
       select: {
         id: true,
@@ -800,7 +795,7 @@ export const getNearbySOS = async (req, res, next) => {
       }
     });
 
-    // Calculate distance and filter by radius
+    // Calculate distance and filter by radius.
     const nearbySOS = sosRequests
       .map(sos => {
         const distance = calculateDistance(
@@ -810,7 +805,7 @@ export const getNearbySOS = async (req, res, next) => {
           sos.longitude
         );
 
-        // Keep legacy fields and add normalized aliases expected by emergency cards.
+        // Keep legacy fields and add the aliases used by the UI.
         return {
           ...sos,
           distance,
@@ -855,6 +850,7 @@ export const getNearbySOS = async (req, res, next) => {
  * Returns distance in kilometers
  */
 function calculateDistance(lat1, lon1, lat2, lon2) {
+  // Use Earth radius in kilometers for Haversine result.
   const R = 6371; // Earth's radius in km
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
@@ -867,6 +863,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 function toRad(degrees) {
+  // Convert degrees to radians.
   return degrees * (Math.PI / 180);
 }
 
@@ -877,6 +874,7 @@ function toRad(degrees) {
  */
 export const respondToSOS = async (req, res, next) => {
   try {
+    // Read pharmacy user, target SOS ID, and response type.
     const userId = req.user.userId;
     const { id: sosId } = req.params;
     const { response, note } = req.body; // response: 'accepted' or 'rejected'
@@ -888,7 +886,7 @@ export const respondToSOS = async (req, res, next) => {
       });
     }
 
-    // Get pharmacy details
+    // Load pharmacy profile for verification and ownership checks.
     const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
 
     if (!pharmacy) {
@@ -905,7 +903,7 @@ export const respondToSOS = async (req, res, next) => {
       });
     }
 
-    // Get the SOS request
+    // Load SOS request with patient info for notifications.
     const sosRequest = await prisma.sOSRequest.findUnique({
       where: { id: sosId },
       include: {
@@ -927,7 +925,7 @@ export const respondToSOS = async (req, res, next) => {
       });
     }
 
-    // Check if already accepted by another pharmacy
+    // Block double-accept when another pharmacy already accepted.
     if (sosRequest.status === 'accepted' && response === 'accepted') {
       return res.status(400).json({
         success: false,
@@ -936,7 +934,7 @@ export const respondToSOS = async (req, res, next) => {
     }
 
     if (response === 'accepted') {
-      // Accept the SOS request
+      // Mark SOS as accepted by this pharmacy.
       const updatedSOS = await prisma.sOSRequest.update({
         where: { id: sosId },
         data: {
@@ -956,7 +954,7 @@ export const respondToSOS = async (req, res, next) => {
         }
       });
 
-      // Create pharmacy response record
+      // Persist pharmacy response record.
       await prisma.pharmacyResponse.create({
         data: {
           sosId,
@@ -966,7 +964,7 @@ export const respondToSOS = async (req, res, next) => {
         }
       });
 
-      // Create ChatRoom for real-time communication (idempotent - upsert pattern)
+      // Create ChatRoom for patient-pharmacy communication if missing.
       try {
         const existingRoom = await prisma.chatRoom.findFirst({
           where: { sosRequestId: sosId },
@@ -987,7 +985,7 @@ export const respondToSOS = async (req, res, next) => {
             pharmacyUserId: userId,
           });
 
-          // Notify the pharmacy's own UI so the sidebar refreshes immediately
+            // Notify the pharmacy UI so the sidebar refreshes immediately.
           const io = req.app.get("io");
           if (io) {
             io.emit("new_chat_available", {
@@ -1017,7 +1015,7 @@ export const respondToSOS = async (req, res, next) => {
           logger.info('[PHARMACY] ChatRoom already exists for SOS', { sosId, roomId: existingRoom.id });
         }
       } catch (chatRoomError) {
-        // Non-blocking — log but never fail the accept response
+        // Chat room creation failure should not block acceptance.
         logger.error('[PHARMACY] ChatRoom creation error:', { error: chatRoomError.message, sosId });
       }
 
@@ -1027,7 +1025,7 @@ export const respondToSOS = async (req, res, next) => {
         patientId: sosRequest.patientId
       });
 
-      // Trigger notification to patient
+      // Notify patient about accepted SOS.
       try {
         await notificationService.notifySosStatusChange(
           sosRequest.patientId,
@@ -1041,7 +1039,7 @@ export const respondToSOS = async (req, res, next) => {
         console.error('[PHARMACY] Failed to send SOS acceptance notification:', notificationError);
       }
 
-      // Notify OTHER pharmacies that this SOS has been claimed
+      // Notify other pharmacies that this SOS has been claimed.
       try {
         await notificationService.notifySosClaimedByOther(
           sosId,
@@ -1066,7 +1064,7 @@ export const respondToSOS = async (req, res, next) => {
         }
       });
     } else {
-      // Reject the SOS request (only for this pharmacy)
+      // Reject SOS only for this pharmacy without closing the global case.
       await prisma.pharmacyResponse.create({
         data: {
           sosId,
@@ -1081,7 +1079,7 @@ export const respondToSOS = async (req, res, next) => {
         sosId
       });
 
-      // Trigger notification to patient
+      // Notify patient about rejection response from this pharmacy.
       try {
         await notificationService.notifySosStatusChange(
           sosRequest.patientId,
@@ -1124,9 +1122,11 @@ export const rejectSOS = async (req, res, next) => {
 
 export const completeSOS = async (req, res, next) => {
   try {
+    // Read pharmacy user and SOS identifier.
     const userId = req.user.userId;
     const { id: sosId } = req.params;
 
+    // Confirm requester pharmacy exists.
     const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
     if (!pharmacy) {
       return res.status(404).json({
@@ -1135,6 +1135,7 @@ export const completeSOS = async (req, res, next) => {
       });
     }
 
+    // Load minimal SOS fields needed for completion checks.
     const sosRequest = await prisma.sOSRequest.findUnique({
       where: { id: sosId },
       select: {
@@ -1153,6 +1154,7 @@ export const completeSOS = async (req, res, next) => {
       });
     }
 
+    // Only accepted SOS can be moved to completed.
     if (sosRequest.status !== "accepted") {
       return res.status(400).json({
         success: false,
@@ -1160,6 +1162,7 @@ export const completeSOS = async (req, res, next) => {
       });
     }
 
+    // Only the accepting pharmacy can complete the case.
     if (sosRequest.acceptedBy !== pharmacy.id) {
       return res.status(403).json({
         success: false,
@@ -1167,16 +1170,19 @@ export const completeSOS = async (req, res, next) => {
       });
     }
 
+    // Mark SOS case as completed.
     const updatedSOS = await prisma.sOSRequest.update({
       where: { id: sosId },
       data: { status: "COMPLETED" },
     });
 
+    // Locate chat room to broadcast status update event.
     const chatRoom = await prisma.chatRoom.findFirst({
       where: { sosRequestId: sosId },
       select: { id: true, patientId: true, pharmacyId: true },
     });
 
+    // Broadcast completion event to connected clients.
     const io = req.app.get("io");
     if (io) {
       io.emit("sos_case_status_updated", {
@@ -1188,6 +1194,7 @@ export const completeSOS = async (req, res, next) => {
       });
     }
 
+    // Notify patient that request has been fulfilled.
     try {
       await notificationService.createNotification(
         sosRequest.patientId,
@@ -1243,10 +1250,11 @@ export const updateSOSStatus = async (req, res, next) => {
  */
 export const updateLocation = async (req, res, next) => {
   try {
+    // Read coordinates and optional address override.
     const userId = req.user.userId;
     const { latitude, longitude, address } = req.body;
 
-    // Validation
+    // Validate required coordinate fields.
     if (!latitude || !longitude) {
       return res.status(400).json({
         success: false,
@@ -1268,7 +1276,7 @@ export const updateLocation = async (req, res, next) => {
       });
     }
 
-    // Get pharmacy
+    // Load pharmacy profile linked to current user.
     const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
 
     if (!pharmacy) {
@@ -1285,7 +1293,7 @@ export const updateLocation = async (req, res, next) => {
       });
     }
 
-    // Update location
+    // Persist latest pharmacy coordinates.
     const updatedPharmacy = await prisma.pharmacy.update({
       where: { id: pharmacy.id },
       data: {
@@ -1303,7 +1311,7 @@ export const updateLocation = async (req, res, next) => {
       }
     });
 
-    // Log activity
+    // Store location update in audit logs.
     await createLog(
       userId,
       LOG_ACTIONS.PHARMACY_UPDATED,
@@ -1341,10 +1349,11 @@ export const updateLocation = async (req, res, next) => {
  */
 export const getDashboardStats = async (req, res, next) => {
   try {
+    // Resolve authenticated pharmacy admin user.
     const userId = req.user.userId;
     logger.operation('PHARMACY', 'getDashboardStats', 'START', { userId });
 
-    // Get pharmacy details
+    // Load pharmacy profile and verification state.
     const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
 
     if (!pharmacy) {
@@ -1363,7 +1372,7 @@ export const getDashboardStats = async (req, res, next) => {
 
     const pharmacyId = pharmacy.id;
 
-    // --- Run all counts in parallel for speed ---
+    // Run dashboard aggregations in parallel for lower latency.
     const [
       inventoryAgg,
       lowStockCount,
@@ -1377,20 +1386,20 @@ export const getDashboardStats = async (req, res, next) => {
       recentInventory,
       stockValueAgg,
     ] = await Promise.all([
-      // 1. Total stock quantity (sum of all quantities)
+      // Total stock quantity.
       prisma.inventory.aggregate({
         where: { pharmacyId },
         _sum: { quantity: true },
       }),
-      // 2. Low stock items (quantity < 20)
+      // Low-stock item count.
       prisma.inventory.count({
         where: { pharmacyId, quantity: { gt: 0, lt: 20 } },
       }),
-      // 3. Out of stock items (quantity === 0)
+      // Out-of-stock item count.
       prisma.inventory.count({
         where: { pharmacyId, quantity: 0 },
       }),
-      // 4. Expiring within 30 days
+      // Medicines expiring in next 30 days.
       prisma.inventory.count({
         where: {
           pharmacyId,
@@ -1400,33 +1409,33 @@ export const getDashboardStats = async (req, res, next) => {
           },
         },
       }),
-      // 5. Total unique medicines
+      // Total medicine rows.
       prisma.inventory.count({
         where: { pharmacyId },
       }),
-      // 6. Total orders for this pharmacy
+      // Total order count.
       prisma.order.count({
         where: { pharmacyId },
       }),
-      // 7. Pending orders
+      // Pending orders.
       prisma.order.count({
         where: { pharmacyId, status: 'PENDING' },
       }),
-      // 8. Fulfilled/delivered orders
+      // Completed orders.
       prisma.order.count({
         where: { pharmacyId, status: { in: ['COMPLETED'] } },
       }),
-      // 9. Pending SOS requests (global pending, pharmacy can see nearby)
+      // Total pending SOS requests.
       prisma.sOSRequest.count({
         where: { status: 'pending' },
       }),
-      // 10. Recent inventory items (top 10) for dashboard preview
+      // Recent inventory preview.
       prisma.inventory.findMany({
         where: { pharmacyId },
         orderBy: [{ expiryDate: 'asc' }, { name: 'asc' }],
         take: 10,
       }),
-      // 11. Total stock value
+      // Total stock value.
       prisma.$queryRawUnsafe(
         `SELECT COALESCE(SUM(quantity * price), 0) as "totalValue" FROM "Inventory" WHERE "pharmacyId" = $1`,
         pharmacyId
@@ -1480,6 +1489,7 @@ export const getDashboardStats = async (req, res, next) => {
  */
 export const getPharmacyOrders = async (req, res, next) => {
   try {
+    // Read paging and optional status filter.
     const userId = req.user.userId;
     const { page = 1, limit = 50, status } = req.query;
 
@@ -1499,11 +1509,13 @@ export const getPharmacyOrders = async (req, res, next) => {
       });
     }
 
+    // Scope orders to current pharmacy.
     const where = { pharmacyId: pharmacy.id };
     if (status && status !== 'all') {
       where.status = String(status).toUpperCase();
     }
 
+    // Fetch paginated orders plus total count in parallel.
     const [orders, totalCount] = await Promise.all([
       prisma.order.findMany({
         where,
@@ -1534,7 +1546,7 @@ export const getPharmacyOrders = async (req, res, next) => {
       prisma.order.count({ where }),
     ]);
 
-    // Calculate revenue from completed orders
+    // Calculate total completed-order revenue.
     const revenueAgg = await prisma.order.aggregate({
       where: {
         pharmacyId: pharmacy.id,
@@ -1578,6 +1590,7 @@ export const getPharmacyOrders = async (req, res, next) => {
  */
 export const getPharmacyCustomers = async (req, res, next) => {
   try {
+    // Read current pharmacy user and optional search query.
     const userId = req.user.userId;
     const { search } = req.query;
 
@@ -1591,7 +1604,7 @@ export const getPharmacyCustomers = async (req, res, next) => {
       return res.status(403).json({ success: false, message: "Pharmacy must be verified." });
     }
 
-    // Get all orders for this pharmacy, grouped by patient
+    // Load order history with patient details.
     const orders = await prisma.order.findMany({
       where: { pharmacyId: pharmacy.id },
       include: {
@@ -1608,7 +1621,7 @@ export const getPharmacyCustomers = async (req, res, next) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Aggregate: unique patients → total orders, total spent, last purchase
+    // Group orders by patient so the dashboard can show one row per customer.
     const customerMap = new Map();
     orders.forEach((order) => {
       const pid = order.patientId;
@@ -1635,7 +1648,7 @@ export const getPharmacyCustomers = async (req, res, next) => {
     let customers = Array.from(customerMap.values())
       .sort((a, b) => b.totalOrders - a.totalOrders);
 
-    // Server-side search filter
+    // Apply optional server-side search filter.
     if (search && search.trim()) {
       const q = search.toLowerCase();
       customers = customers.filter(
@@ -1671,6 +1684,7 @@ export const getPharmacyCustomers = async (req, res, next) => {
  */
 export const getAnalyticsData = async (req, res, next) => {
   try {
+    // Resolve pharmacy user and verify onboarding state.
     const userId = req.user.userId;
 
     const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
@@ -1686,7 +1700,7 @@ export const getAnalyticsData = async (req, res, next) => {
     const pharmacyId = pharmacy.id;
     const now = new Date();
 
-    // ── Date boundaries ──
+    // Build date boundaries for analytics windows.
     const thirtyDaysAgo = new Date(now);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -1694,7 +1708,7 @@ export const getAnalyticsData = async (req, res, next) => {
     const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
 
-    // ── Parallel queries ──
+    // Run analytics source queries in parallel.
     const [
       recentOrders,
       currentMonthOrders,
@@ -1704,7 +1718,7 @@ export const getAnalyticsData = async (req, res, next) => {
       sosAcceptedCount,
       sosNearbyTotalCount,
     ] = await Promise.all([
-      // 1. Orders in last 30 days (for daily chart)
+      // Orders in last 30 days.
       prisma.order.findMany({
         where: {
           pharmacyId,
@@ -1714,7 +1728,7 @@ export const getAnalyticsData = async (req, res, next) => {
         select: { totalAmount: true, createdAt: true, status: true },
         orderBy: { createdAt: 'asc' },
       }),
-      // 2. Current month completed orders
+      // Current month completed orders.
       prisma.order.findMany({
         where: {
           pharmacyId,
@@ -1723,7 +1737,7 @@ export const getAnalyticsData = async (req, res, next) => {
         },
         select: { totalAmount: true },
       }),
-      // 3. Previous month completed orders (for comparison)
+      // Previous month completed orders.
       prisma.order.findMany({
         where: {
           pharmacyId,
@@ -1732,26 +1746,26 @@ export const getAnalyticsData = async (req, res, next) => {
         },
         select: { totalAmount: true },
       }),
-      // 4. Total lifetime orders
+      // Total lifetime orders.
       prisma.order.count({ where: { pharmacyId } }),
-      // 5. All inventory (to find top medicine by quantity sold — proxy: lowest stock + highest usage)
+      // Inventory sample used for top-medicine estimate.
       prisma.inventory.findMany({
         where: { pharmacyId },
         orderBy: { quantity: 'asc' },
         take: 10,
         select: { name: true, genericName: true, quantity: true, price: true },
       }),
-      // 6. SOS requests accepted by this pharmacy
+      // SOS accepted count.
       prisma.pharmacyResponse.count({
         where: { pharmacyId, response: 'accepted' },
       }),
-      // 7. Total SOS requests this pharmacy has been shown (accepted + rejected)
+      // SOS response denominator for response rate.
       prisma.pharmacyResponse.count({
         where: { pharmacyId },
       }),
     ]);
 
-    // ── Build daily revenue chart data (last 30 days) ──
+    // Build daily revenue points for last 30 days.
     const dailyMap = new Map();
     for (let i = 29; i >= 0; i--) {
       const d = new Date(now);
@@ -1772,19 +1786,19 @@ export const getAnalyticsData = async (req, res, next) => {
       orders: d.orders,
     }));
 
-    // ── Monthly revenue ──
+    // Calculate monthly revenue and growth.
     const currentMonthRevenue = currentMonthOrders.reduce((s, o) => s + (o.totalAmount || 0), 0);
     const prevMonthRevenue = prevMonthOrders.reduce((s, o) => s + (o.totalAmount || 0), 0);
     const revenueGrowth = prevMonthRevenue > 0
       ? Math.round(((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100)
       : currentMonthRevenue > 0 ? 100 : 0;
 
-    // ── Top medicine (best guess: lowest stock = most sold) ──
+    // Estimate top medicine from lowest remaining stock.
     const topMedicine = inventoryItems.length > 0
       ? { name: inventoryItems[0].name, genericName: inventoryItems[0].genericName }
       : { name: "N/A", genericName: "N/A" };
 
-    // ── SOS response rate ──
+    // Calculate SOS response rate percentage.
     const sosResponseRate = sosNearbyTotalCount > 0
       ? Math.round((sosAcceptedCount / sosNearbyTotalCount) * 100)
       : 0;
@@ -1820,9 +1834,11 @@ export const getAnalyticsData = async (req, res, next) => {
  */
 export const exportInventoryCSV = async (req, res, next) => {
   try {
+    // Read authenticated user and optional date filters.
     const userId = req.user.userId;
     const { startDate, endDate } = req.query;
 
+    // Parse and validate date range filters when present.
     let createdAtFilter;
     if (startDate || endDate) {
       const start = startDate ? new Date(`${startDate}T00:00:00.000Z`) : null;
@@ -1848,10 +1864,12 @@ export const exportInventoryCSV = async (req, res, next) => {
       };
     }
 
+    // Resolve pharmacy and enforce verified access.
     const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
     if (!pharmacy) return res.status(404).json({ success: false, message: "Pharmacy not found." });
     if (pharmacy.verificationStatus !== 'VERIFIED') return res.status(403).json({ success: false, message: "Not verified." });
 
+    // Fetch inventory rows within selected date range.
     const inventory = await prisma.inventory.findMany({
       where: {
         pharmacyId: pharmacy.id,
@@ -1860,7 +1878,7 @@ export const exportInventoryCSV = async (req, res, next) => {
       orderBy: { name: 'asc' },
     });
 
-    // Build CSV
+    // Build CSV header and row data.
     const headers = ['Name', 'Generic Name', 'Quantity', 'Price (NPR)', 'Expiry Date', 'Added On'];
     const rows = inventory.map((item) => [
       `"${item.name.replace(/"/g, '""')}"`,
@@ -1873,6 +1891,7 @@ export const exportInventoryCSV = async (req, res, next) => {
 
     const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
 
+    // Return downloadable CSV response.
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="inventory_${pharmacy.pharmacyName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv"`);
     return res.status(200).send(csv);
@@ -1889,9 +1908,11 @@ export const exportInventoryCSV = async (req, res, next) => {
  */
 export const exportSalesCSV = async (req, res, next) => {
   try {
+    // Read authenticated user and optional date filters.
     const userId = req.user.userId;
     const { startDate, endDate } = req.query;
 
+    // Parse and validate date range filters when present.
     let createdAtFilter;
     if (startDate || endDate) {
       const start = startDate ? new Date(`${startDate}T00:00:00.000Z`) : null;
@@ -1917,10 +1938,12 @@ export const exportSalesCSV = async (req, res, next) => {
       };
     }
 
+    // Resolve pharmacy and enforce verified access.
     const pharmacy = await pharmacyService.getPharmacyByUserId(userId);
     if (!pharmacy) return res.status(404).json({ success: false, message: "Pharmacy not found." });
     if (pharmacy.verificationStatus !== 'VERIFIED') return res.status(403).json({ success: false, message: "Not verified." });
 
+    // Fetch order rows with patient data for CSV export.
     const orders = await prisma.order.findMany({
       where: {
         pharmacyId: pharmacy.id,
@@ -1932,6 +1955,7 @@ export const exportSalesCSV = async (req, res, next) => {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Build and return sales CSV payload.
     const headers = ['Order ID', 'Patient Name', 'Patient Email', 'Patient Phone', 'Status', 'Amount (NPR)', 'Notes', 'Order Date'];
     const rows = orders.map((o) => [
       o.id,

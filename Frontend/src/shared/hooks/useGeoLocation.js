@@ -1,17 +1,5 @@
 /**
- * useGeoLocation Hook
- * 
- * Custom hook to access and manage user's geographic location
- * Uses browser's Geolocation API to get current position
- * 
- * Features:
- * - Get user's current latitude and longitude
- * - Track loading state during location fetch
- * - Handle permission errors and timeouts
- * - Manual trigger with "Locate Me" functionality
- * 
- * Usage:
- * const { location, loading, error, getLocation } = useGeoLocation();
+ * Hook for reading and tracking the user's geographic location.
  */
 
 import { useState, useEffect } from "react";
@@ -21,11 +9,9 @@ export const useGeoLocation = (autoFetch = false) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  /**
-   * Get user's current position using Geolocation API
-   */
+  // Read the user's current position.
   const getLocation = () => {
-    // Check if geolocation is supported
+    // Stop early if the browser does not support geolocation.
     if (!navigator.geolocation) {
       setError("Geolocation is not supported by your browser");
       return;
@@ -35,7 +21,7 @@ export const useGeoLocation = (autoFetch = false) => {
     setError(null);
 
     navigator.geolocation.getCurrentPosition(
-      // Success callback
+      // Save the location when the browser returns a position.
       (position) => {
         setLocation({
           latitude: position.coords.latitude,
@@ -45,7 +31,7 @@ export const useGeoLocation = (autoFetch = false) => {
         });
         setLoading(false);
       },
-      // Error callback
+      // Convert browser errors into a readable message.
       (err) => {
         let errorMessage = "Unable to retrieve your location";
 
@@ -67,19 +53,16 @@ export const useGeoLocation = (autoFetch = false) => {
         setLoading(false);
         console.error("Geolocation error:", err);
       },
-      // Options
+      // Use a precise location with a short timeout.
       {
         enableHighAccuracy: true,
-        timeout: 10000, // 10 seconds
-        maximumAge: 0, // Don't use cached position
+        timeout: 10000,
+        maximumAge: 0,
       }
     );
   };
 
-  /**
-   * Watch user's position continuously (for real-time tracking)
-   * Returns watchId that can be used to clear the watch
-   */
+  // Watch the user's position and return the watch id.
   const watchLocation = (callback) => {
     if (!navigator.geolocation) {
       setError("Geolocation is not supported by your browser");
@@ -111,27 +94,21 @@ export const useGeoLocation = (autoFetch = false) => {
     return watchId;
   };
 
-  /**
-   * Clear position watch
-   */
+  // Stop watching the user's position.
   const clearWatch = (watchId) => {
     if (watchId && navigator.geolocation) {
       navigator.geolocation.clearWatch(watchId);
     }
   };
 
-  /**
-   * Reset location state
-   */
+  // Reset the stored location state.
   const resetLocation = () => {
     setLocation(null);
     setError(null);
     setLoading(false);
   };
 
-  /**
-   * Auto-fetch location on mount if enabled
-   */
+  // Fetch the location on mount when requested.
   useEffect(() => {
     if (autoFetch) {
       getLocation();

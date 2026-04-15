@@ -4,10 +4,10 @@ import { submitReview, getPharmacyReviews } from "./review.controller.js";
 
 const router = Router();
 
-// POST /api/reviews  –  submit a review (patient only, auth required)
+// Submit a review (authenticated user).
 router.post("/", authenticate(), submitReview);
 
-// GET /api/reviews/:pharmacyId  –  list reviews for a pharmacy (auth required)
+// List reviews for one pharmacy.
 router.get("/:pharmacyId", authenticate(), getPharmacyReviews);
 
 export default router;

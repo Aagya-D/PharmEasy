@@ -42,6 +42,7 @@ export function BenefitsSection() {
   return (
     <section className="px-6 py-20 bg-white">
       <div className="max-w-7xl mx-auto">
+        {/* Intro label */}
         <p className="mb-3 text-center text-xs font-semibold tracking-[0.18em] text-[#007f95]/80">
           VALUE DELIVERED
         </p>

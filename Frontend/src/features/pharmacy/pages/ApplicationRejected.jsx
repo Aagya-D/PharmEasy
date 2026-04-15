@@ -22,26 +22,26 @@ export default function ApplicationRejected() {
     setSuccessMessage(null);
 
     try {
-      // Call backend endpoint to reset status to ONBOARDING_REQUIRED
+      // Reset the pharmacy status so onboarding can start again.
       const response = await httpClient.post("/pharmacy/reset-onboarding");
 
       if (response.data?.success) {
-        // Update local user state
+        // Update the in-memory user state.
         const updatedUser = {
           ...user,
           status: "ONBOARDING_REQUIRED",
         };
 
-        // Update AuthContext
+        // Sync the auth context.
         updateUser(updatedUser);
 
-        // Update localStorage
+        // Persist the updated user locally.
         localStorage.setItem("user", JSON.stringify(updatedUser));
 
-        // Show success message briefly before redirect
+        // Show the confirmation message before redirecting.
         setSuccessMessage("Your application has been reset. Redirecting to onboarding...");
 
-        // Redirect after a short delay
+        // Move the user back to onboarding after a short delay.
         setTimeout(() => {
           navigate("/pharmacy/onboarding");
         }, 1500);
@@ -64,7 +64,7 @@ export default function ApplicationRejected() {
     navigate("/login");
   };
 
-  // Auto-clear success message
+  // Clear the success message automatically.
   useEffect(() => {
     if (successMessage) {
       const timer = setTimeout(() => setSuccessMessage(null), 3000);
@@ -100,7 +100,7 @@ export default function ApplicationRejected() {
             </a>
           </div>
 
-          {/* Success Message */}
+          {/* Success message */}
           {successMessage && (
             <div className="mt-6 p-4 rounded-xl border bg-green-50 border-green-200 flex items-start gap-3">
               <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
@@ -108,7 +108,7 @@ export default function ApplicationRejected() {
             </div>
           )}
 
-          {/* Error Message */}
+          {/* Error message */}
           {error && (
             <div className="mt-6 bg-red-50 border border-red-200 rounded-xl p-4">
               <p className="text-sm text-red-700 font-medium">{error}</p>

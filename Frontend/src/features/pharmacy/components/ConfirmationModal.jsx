@@ -3,21 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, X } from "lucide-react";
 
 /**
- * ConfirmationModal Component
- * 
- * A reusable, classy confirmation modal for critical actions.
- * Features: Soft white background, icon, clear messaging, dual-action buttons.
- * 
- * @param {Object} props
- * @param {boolean} props.isOpen - Whether the modal is shown
- * @param {string} props.title - Modal title
- * @param {string} props.message - Modal message
- * @param {Function} props.onConfirm - Callback when user confirms
- * @param {Function} props.onCancel - Callback when user cancels
- * @param {string} props.confirmLabel - Label for confirm button (default: 'Yes, Confirm')
- * @param {string} props.cancelLabel - Label for cancel button (default: 'No, Cancel')
- * @param {boolean} props.isLoading - Show loading state on confirm button
- * @param {string} props.icon - Icon type ('check', 'warning', 'info') - default: 'check'
+ * Confirmation modal for actions that need a clear yes or no decision.
  */
 export default function ConfirmationModal({
   isOpen,
@@ -47,7 +33,7 @@ export default function ConfirmationModal({
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop with blur */}
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -57,7 +43,7 @@ export default function ConfirmationModal({
             onClick={onCancel}
           />
 
-          {/* Modal */}
+          {/* Modal content */}
           <motion.div
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -91,7 +77,7 @@ export default function ConfirmationModal({
               <p className="text-sm text-slate-600 leading-relaxed">{message}</p>
             </div>
 
-            {/* Buttons */}
+            {/* Action buttons */}
             <div className="px-6 py-5 border-t border-slate-200 flex items-center justify-end gap-3">
               <button
                 type="button"

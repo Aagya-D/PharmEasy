@@ -1,16 +1,5 @@
 /**
- * Inventory Routes - API endpoints for pharmacy inventory management
- * 
- * All routes require:
- * - JWT authentication
- * - PHARMACY_ADMIN role (roleId=2)
- * - VERIFIED pharmacy status
- * 
- * Endpoints:
- * - POST   /api/inventory               - Add new medicine to inventory
- * - GET    /api/inventory/my-stock      - Get pharmacy's inventory (with pagination)
- * - PATCH  /api/inventory/:id           - Update inventory item
- * - DELETE /api/inventory/:id           - Delete inventory item
+ * Inventory routes for pharmacy stock management.
  */
 
 import express from "express";
@@ -20,29 +9,8 @@ import inventoryController, { uploadMedicineImage } from "./inventory.controller
 
 const router = express.Router();
 
-// ============================================
-// INVENTORY MANAGEMENT ROUTES
-// All routes require verified pharmacy
-// ============================================
+// All inventory routes require a verified pharmacy.
 
-/**
- * POST /api/inventory
- * Add a new medicine to pharmacy inventory
- * 
- * Request Body:
- * {
- *   "name": "Cetamol 500mg",
- *   "genericName": "Paracetamol",
- *   "quantity": 100,
- *   "price": 5.99,
- *   "expiryDate": "2025-12-31"
- * }
- * 
- * Security:
- * - Duplicate check: Prevents adding same medicine twice
- * - Validates expiry date is in the future
- * - Validates quantity >= 0 and price > 0
- */
 router.post(
   "/inventory",
   authenticate(),

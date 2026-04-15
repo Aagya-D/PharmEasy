@@ -24,6 +24,9 @@ function fmtTime(iso) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+// Helper functions for time, grouping, and display names.
+
+
 function fmtDateLabel(iso) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -34,6 +37,9 @@ function fmtDateLabel(iso) {
   if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
   return d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
 }
+
+// Main patient chat page.
+
 
 function groupByDate(msgs) {
   const map = new Map();
@@ -73,6 +79,9 @@ export default function PatientChat() {
   const navigate = useNavigate();
 
   // ── State
+  // Page state.
+
+
   const [chatRooms, setChatRooms] = useState([]);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -87,17 +96,26 @@ export default function PatientChat() {
   const [searchQuery, setSearchQuery] = useState("");
 
   // ── Refs
+  // Refs for scrolling, input focus, and socket timing.
+
+
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const socketRef = useRef(null);
   const typingTimerRef = useRef(null);
 
   // ── Auto-scroll on new content
+  // Keep the latest message visible.
+
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typingLabel]);
 
   // ── Load chat rooms
+  // Load the room list and refresh it on a timer.
+
+
   const loadRooms = useCallback(async (silent = false) => {
     try {
       if (!silent) setIsLoadingRooms(true);
@@ -121,6 +139,9 @@ export default function PatientChat() {
   }, [loadRooms]);
 
   // Keep selected room metadata synced when room list refreshes
+  // Keep the selected room in sync when the room list refreshes.
+
+
   useEffect(() => {
     if (!selectedRoom?.id || !chatRooms.length) return;
     const refreshed = chatRooms.find((room) => room.id === selectedRoom.id);
@@ -130,6 +151,9 @@ export default function PatientChat() {
   }, [chatRooms, selectedRoom?.id]);
 
   // ── Load messages for selected room
+  // Load messages for the active room.
+
+
   useEffect(() => {
     if (!selectedRoom) return;
     async function loadMessages() {
@@ -148,6 +172,9 @@ export default function PatientChat() {
   }, [selectedRoom]);
 
   // ── Socket lifecycle
+  // Connect the socket only when a room is selected.
+
+
   useEffect(() => {
     if (!selectedRoom || !user) return;
 

@@ -91,7 +91,7 @@ export default function MedicineDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
-  const { addToCart, clearCart, isPharmacyMismatchError } = useCart();
+  const { addToCart } = useCart();
 
   const [resolvedMedicine, setResolvedMedicine] = useState(null);
 
@@ -184,26 +184,7 @@ export default function MedicineDetail() {
       await addToCart(item);
       persistMedicineSnapshot(item);
       toast.success("Added to cart");
-    } catch (error) {
-      if (isPharmacyMismatchError(error)) {
-        const shouldReplace = window.confirm(
-          "Your cart has items from another pharmacy. Clear cart and add this medicine instead?"
-        );
-
-        if (!shouldReplace) return;
-
-        try {
-          await clearCart();
-          await addToCart(item);
-          persistMedicineSnapshot(item);
-          toast.success("Added to cart");
-          return;
-        } catch {
-          toast.error("Unable to replace cart items right now");
-          return;
-        }
-      }
-
+    } catch {
       toast.error("Failed to add item to cart");
     }
   };
@@ -364,7 +345,7 @@ export default function MedicineDetail() {
         </section>
 
         <section className="bg-amber-50 border-2 border-amber-300 rounded-2xl shadow-sm p-6 sm:p-8">
-          <p className="text-xs uppercase tracking-widest text-amber-700 font-semibold">Section 2 · Safety Center</p>
+          <p className="text-xs uppercase tracking-widest text-amber-700 font-semibold">Safety center</p>
           <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
             <article className="rounded-xl border border-red-300 bg-white p-4">
               <div className="flex items-center gap-2 text-red-700 font-semibold">
@@ -414,7 +395,7 @@ export default function MedicineDetail() {
         </section>
 
         <section className="bg-white border border-blue-200 rounded-2xl shadow-sm p-6 sm:p-8">
-          <p className="text-xs uppercase tracking-widest text-blue-700 font-semibold">Section 3 · Usage Guide</p>
+          <p className="text-xs uppercase tracking-widest text-blue-700 font-semibold">Usage guide</p>
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
               <p className="text-sm text-slate-500">Step 1</p>
@@ -441,7 +422,7 @@ export default function MedicineDetail() {
         </section>
 
         <section className="bg-white border border-purple-200 rounded-2xl shadow-sm p-6 sm:p-8">
-          <p className="text-xs uppercase tracking-widest text-purple-700 font-semibold">Section 4 · Product Specs</p>
+          <p className="text-xs uppercase tracking-widest text-purple-700 font-semibold">Product specs</p>
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <div className="rounded-xl border border-slate-200 p-4 bg-slate-50">
               <p className="text-xs text-slate-500 uppercase">Strength</p>

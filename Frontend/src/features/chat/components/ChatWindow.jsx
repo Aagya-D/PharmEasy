@@ -5,15 +5,8 @@ import { connectSocket, disconnectSocket } from "../../../core/services/socket";
 import chatService from "../services/chat.service";
 
 /**
- * ChatWindow Component
- *
- * Real-time chat between Patient and Pharmacy after SOS acceptance.
- *
- * @param {Object} props
- * @param {string} props.sosRequestId - The SOS request ID (links chat to the emergency)
- * @param {Object} props.currentUser  - { id: string, name: string } – the logged-in user
- * @param {Function} [props.onClose]  - Optional callback to close/hide the chat panel
- * @param {boolean} [props.readOnly]  - If true, render read-only chat history (no message input)
+ * Chat window for SOS conversations between the patient and pharmacy.
+ * It resolves the room, loads history, and keeps the socket connection in sync.
  */
 export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnly = false }) {
   const [roomId, setRoomId] = useState(null);
@@ -23,29 +16,30 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
   const [isSending, setIsSending] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState("");
-  // "pending" = room not yet created, retrying; "ready" = roomId resolved; "error" = fatal
+  // Track whether the room is still being created, ready, or failed.
   const [roomStatus, setRoomStatus] = useState("pending");
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
   const inputRef = useRef(null);
   const retryTimerRef = useRef(null);
 
-  // Auto-scroll to latest message
+  // Keep the latest message visible.
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
   useEffect(() => {
+    // Keep the viewport pinned to the newest message after any update.
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // ── Step 1: Resolve sosRequestId → roomId (with polling retry) ─────
+  // Resolve the chat room from the SOS request and retry while it is being created.
   useEffect(() => {
     if (!sosRequestId) return;
 
     let cancelled = false;
     let attempts = 0;
-    const MAX_ATTEMPTS = 12;   // 12 × 3 s = 36 s max wait
+    const MAX_ATTEMPTS = 12;
     const RETRY_MS = 3000;
 
     const resolveRoom = async () => {
@@ -60,7 +54,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
           return;
         }
 
-        // notInitialized = room not yet created → keep retrying
+        // The backend has not created the room yet, so retry for a while.
         if (res.notInitialized && attempts < MAX_ATTEMPTS) {
           attempts += 1;
           retryTimerRef.current = setTimeout(resolveRoom, RETRY_MS);
@@ -75,7 +69,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
         }
       }
 
-      // Exhausted retries
+      // Stop retrying if the room never appears.
       setRoomStatus("error");
       setError("Could not connect to chat room. Please close and try again.");
       setIsLoading(false);
@@ -89,9 +83,9 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
     };
   }, [sosRequestId]);
 
-  // ── Step 2: Fetch chat history once roomId is known ─────────────────
+  // Load the chat history once the room is available.
   useEffect(() => {
-    // Guard: do nothing until roomId is resolved
+    // Wait until the room has been resolved.
     if (!roomId) return;
 
     let cancelled = false;
@@ -116,9 +110,9 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
     return () => { cancelled = true; };
   }, [roomId]);
 
-  // ── Step 3: Socket — only AFTER roomId AND userId are ready ────────
+  // Connect the socket only after the room and user are ready.
   useEffect(() => {
-    // Guard: do not connect until both roomId and user are available
+    // Do not connect before we know who the user is and which room to join.
     if (!roomId || !currentUser?.id) return;
 
     const socket = connectSocket();
@@ -126,7 +120,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
 
     const onConnect = () => {
       setIsConnected(true);
-      // Send both roomId and userId as required by the backend chatHandler
+      // Join the room using the identifiers required by the backend.
       socket.emit("join_room", { roomId, userId: currentUser.id });
     };
 
@@ -145,7 +139,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
 
     const onReceiveMessage = (message) => {
       setMessages((prev) => {
-        // Deduplicate by id
+        // Ignore duplicate deliveries for the same message id.
         if (prev.some((m) => m.id === message.id)) return prev;
         return [...prev, message];
       });
@@ -157,7 +151,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
     socket.on("chat_error", onChatError);
     socket.on("receive_message", onReceiveMessage);
 
-    // If already connected, join immediately
+    // Join immediately when the socket is already connected.
     if (socket.connected) {
       setIsConnected(true);
       socket.emit("join_room", { roomId, userId: currentUser.id });
@@ -174,12 +168,13 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
     };
   }, [roomId, currentUser?.id]);
 
-  // ── Send a message ───────────────────────────────────────
+  // Send a message.
   const handleSend = useCallback(() => {
     const trimmed = newMessage.trim();
     if (readOnly || !trimmed || !socketRef.current || isSending || !roomId) return;
 
     setIsSending(true);
+    // Socket emission is the low-latency path when the connection is live.
     socketRef.current.emit("send_message", {
       roomId,
       senderId: currentUser.id,
@@ -198,7 +193,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
     }
   };
 
-  // ── Helpers ──────────────────────────────────────────────
+  // Format helpers.
   const formatTime = (ts) => {
     return new Date(ts).toLocaleTimeString([], {
       hour: "2-digit",
@@ -220,7 +215,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
     });
   };
 
-  // Group messages by date
+  // Group messages by date for the visual separators.
   const groupedMessages = messages.reduce((groups, msg) => {
     const dateKey = new Date(msg.createdAt).toDateString();
     if (!groups[dateKey]) groups[dateKey] = [];
@@ -228,10 +223,10 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
     return groups;
   }, {});
 
-  // ── Render ───────────────────────────────────────────────
+  // Render the chat window.
   return (
     <div className="flex flex-col h-full bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden">
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white">
         <div className="flex items-center gap-3">
           <MessageCircle size={20} />
@@ -258,7 +253,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
         )}
       </div>
 
-      {/* ── Connection warning ── */}
+      {/* Connection warning */}
       {!isConnected && !isLoading && (
         <div className="flex items-center gap-2 px-4 py-2 bg-yellow-50 border-b border-yellow-200 text-yellow-700 text-xs">
           <WifiOff size={14} />
@@ -266,7 +261,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
         </div>
       )}
 
-      {/* ── Error banner ── */}
+      {/* Error banner */}
       {error && (
         <div className="px-4 py-2 bg-red-50 border-b border-red-200 text-red-700 text-xs">
           {error}
@@ -279,7 +274,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
         </div>
       )}
 
-      {/* ── Messages area ── */}
+      {/* Messages area */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1 min-h-0 bg-gray-50">
         {roomStatus === "pending" ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-500 px-6 text-center">
@@ -354,7 +349,7 @@ export default function ChatWindow({ sosRequestId, currentUser, onClose, readOnl
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ── Input area ── */}
+      {/* Message input */}
       {!readOnly && (
         <div className="px-4 py-3 bg-white border-t border-gray-200">
           <div className="flex items-end gap-2">

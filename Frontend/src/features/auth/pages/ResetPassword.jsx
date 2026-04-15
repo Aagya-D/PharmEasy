@@ -19,7 +19,7 @@ export function ResetPassword() {
   const [success, setSuccess] = useState("");
   const [passwordErrors, setPasswordErrors] = useState([]);
 
-  // Check if email is available
+  // If the reset handoff was lost, send the user back to request a new link.
   useEffect(() => {
     if (!email) {
       setError("Session expired. Please request password reset again.");
@@ -27,7 +27,7 @@ export function ResetPassword() {
     }
   }, [email, navigate]);
 
-  // Validate password
+  // Keep the password rules local so the user gets immediate feedback.
   const validatePassword = (pwd) => {
     const errors = [];
     if (pwd.length < 8) {
@@ -60,7 +60,7 @@ export function ResetPassword() {
     newOtp[index] = value;
     setOtp(newOtp);
 
-    // Auto-focus next input
+    // Move focus forward after each digit for faster entry.
     if (value && index < 5) {
       const nextInput = document.getElementById(`reset-otp-${index + 1}`);
       nextInput?.focus();
@@ -84,7 +84,7 @@ export function ResetPassword() {
     setError("");
     setSuccess("");
 
-    // Validation
+    // Validate the full reset payload before making the API call.
     const otpString = otp.join("");
     if (otpString.length !== 6) {
       setError("Please enter the 6-digit OTP");
@@ -120,6 +120,7 @@ export function ResetPassword() {
       setConfirmPassword("");
       setOtp(["", "", "", "", "", ""]);
 
+      // Send the user back to login after the reset has been accepted.
       setTimeout(() => {
         navigate("/login", {
           state: { message: "Password reset successfully. Please sign in." },

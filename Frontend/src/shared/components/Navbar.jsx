@@ -93,9 +93,14 @@ export function Navbar() {
         setShowSearchDropdown(false);
       }
     };
+        {/* Auth section */}
 
+
+
+        {/* User dropdown */}
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+        {/* Mobile menu button */}
   }, []);
 
   useEffect(() => {

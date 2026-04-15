@@ -10,6 +10,7 @@ export function FinalCTASection() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(0,151,178,0.28),transparent_35%),radial-gradient(circle_at_80%_85%,rgba(125,211,252,0.2),transparent_35%)]" />
 
       <div className="relative max-w-4xl mx-auto rounded-[2rem] border border-cyan-100/20 bg-white/[0.05] px-6 py-12 shadow-[0_30px_70px_rgba(2,8,23,0.5)] backdrop-blur-sm md:px-10">
+        {/* Call to action */}
         <h2 className="landing-display text-4xl text-white mb-6 md:text-5xl">
           Ready to Transform Your Healthcare Experience?
         </h2>
