@@ -11,6 +11,7 @@
 import { prisma } from "../../database/prisma.js";
 import { calculateDistance, formatDistance } from "../../utils/distance.js";
 import { NotFoundError, BadRequestError } from "../../utils/errors.js";
+import { getSafeToSellExpiryFilter } from "../../utils/inventorySafety.js";
 
 class SearchService {
   async getTopMedicinesNearLocation({
@@ -65,6 +66,7 @@ class SearchService {
 
     const baseWhere = {
       quantity: { gt: 0 },
+      expiryDate: getSafeToSellExpiryFilter(),
       pharmacy: {
         verificationStatus: "VERIFIED",
       },
@@ -268,6 +270,7 @@ class SearchService {
             },
           ],
           ...(includeOutOfStock ? {} : { quantity: { gt: 0 } }),
+          expiryDate: getSafeToSellExpiryFilter(),
           pharmacy: {
             verificationStatus: "VERIFIED",
           },
@@ -572,6 +575,7 @@ class SearchService {
       ],
       // Optionally filter out out-of-stock items
       ...(includeOutOfStock ? {} : { quantity: { gt: 0 } }),
+      expiryDate: getSafeToSellExpiryFilter(),
       // Only include inventory from verified pharmacies
       // Note: latitude and longitude are required Float fields in Pharmacy model
       // so they can never be null and don't need explicit filtering

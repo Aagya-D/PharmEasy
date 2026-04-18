@@ -18,6 +18,20 @@ export default function chatHandler(io) {
     logger.info(`[SOCKET] Client connected: ${socket.id}`);
 
     /**
+     * join_admin_room
+     * Payload: { userId: string, roleId: number }
+     * Joins the socket to admin-room for global admin alerts.
+     */
+    socket.on("join_admin_room", ({ userId, roleId }) => {
+      if (!userId || Number(roleId) !== 1) {
+        return;
+      }
+
+      socket.join("admin-room");
+      logger.info(`[SOCKET] ${socket.id} (admin: ${userId}) joined admin-room`);
+    });
+
+    /**
      * join_room
      * Payload: { roomId: string, userId: string }
      * Joins the socket to chatroom_<roomId>

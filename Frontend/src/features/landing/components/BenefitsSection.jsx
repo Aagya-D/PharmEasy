@@ -1,4 +1,6 @@
+import { motion } from "framer-motion";
 import { Zap, MapPin, Lock, BarChart3, AlertCircle, Bell } from "lucide-react";
+import { fadeUp, landingViewport, staggerChildren } from "./landingMotion";
 
 export function BenefitsSection() {
   const benefits = [
@@ -42,21 +44,40 @@ export function BenefitsSection() {
   return (
     <section className="px-6 py-20 bg-white">
       <div className="max-w-7xl mx-auto">
-        {/* Intro label */}
-        <p className="mb-3 text-center text-xs font-semibold tracking-[0.18em] text-[#007f95]/80">
-          VALUE DELIVERED
-        </p>
+        <motion.div
+          initial="hidden"
+          whileInView="show"
+          viewport={landingViewport}
+          variants={staggerChildren(0.12)}
+        >
+          <motion.p
+            variants={fadeUp(14)}
+            className="mb-3 text-center text-xs font-semibold tracking-[0.18em] text-[#007f95]/80"
+          >
+            VALUE DELIVERED
+          </motion.p>
 
-        <h2 className="landing-display text-4xl text-gray-900 mb-14 text-center md:text-5xl">
-          Why Choose PharmEasy?
-        </h2>
+          <motion.h2
+            variants={fadeUp(24)}
+            className="landing-display text-4xl text-gray-900 mb-14 text-center md:text-5xl"
+          >
+            Why Choose PharmEasy?
+          </motion.h2>
+        </motion.div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {benefits.map((benefit, idx) => {
+        <motion.div
+          initial="hidden"
+          whileInView="show"
+          viewport={landingViewport}
+          variants={staggerChildren(0.1, 0.08)}
+          className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3"
+        >
+          {benefits.map((benefit) => {
             const Icon = benefit.icon;
             return (
-              <div
-                key={idx}
+              <motion.div
+                key={benefit.title}
+                variants={fadeUp(24)}
                 className="group rounded-2xl border border-cyan-900/10 bg-[#f5fcff] p-7 text-left transition-all duration-300 hover:-translate-y-1 hover:border-[#0097b2]/45 hover:shadow-[0_22px_45px_rgba(15,23,42,0.12)]"
               >
                 <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#0097b2] text-white shadow-md transition-colors duration-300 group-hover:bg-[#007f95]">
@@ -68,10 +89,10 @@ export function BenefitsSection() {
                 <p className="text-sm leading-7 text-slate-600">
                   {benefit.description}
                 </p>
-              </div>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       </div>
     </section>
   );

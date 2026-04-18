@@ -58,23 +58,23 @@ const loggerMock = {
   error: jest.fn(),
 };
 
-jest.unstable_mockModule("../../database/prisma.js", () => ({
+jest.unstable_mockModule("../src/database/prisma.js", () => ({
   prisma: prismaMock,
 }));
 
-jest.unstable_mockModule("../../utils/jwt.js", () => ({
+jest.unstable_mockModule("../src/utils/jwt.js", () => ({
   generateAccessToken: generateAccessTokenMock,
   generateRefreshToken: generateRefreshTokenMock,
   verifyRefreshToken: verifyRefreshTokenMock,
 }));
 
-jest.unstable_mockModule("../../utils/password.js", () => ({
+jest.unstable_mockModule("../src/utils/password.js", () => ({
   hashPassword: hashPasswordMock,
   comparePassword: comparePasswordMock,
   hashToken: hashTokenMock,
 }));
 
-jest.unstable_mockModule("../../utils/validation.js", () => ({
+jest.unstable_mockModule("../src/utils/validation.js", () => ({
   validateEmail: validateEmailMock,
   validatePassword: validatePasswordMock,
   validateOTP: validateOTPMock,
@@ -82,21 +82,23 @@ jest.unstable_mockModule("../../utils/validation.js", () => ({
   validatePhone: validatePhoneMock,
 }));
 
-jest.unstable_mockModule("../../utils/otp.js", () => ({
+jest.unstable_mockModule("../src/utils/otp.js", () => ({
   generateOTP: generateOTPMock,
   generateSecureToken: generateSecureTokenMock,
 }));
 
-jest.unstable_mockModule("../../utils/email.js", () => ({
+jest.unstable_mockModule("../src/utils/email.js", () => ({
   sendOTPEmail: sendOTPEmailMock,
   sendPasswordResetEmail: sendPasswordResetEmailMock,
 }));
 
-jest.unstable_mockModule("../../utils/logger.js", () => ({
+jest.unstable_mockModule("../src/utils/logger.js", () => ({
   default: loggerMock,
 }));
 
+const authService = await import("../src/modules/auth/auth.service.js");
 const {
+  default: userService,
   register,
   verifyOTP,
   resendOTP,
@@ -105,7 +107,7 @@ const {
   logout,
   forgotPassword,
   resetPassword,
-} = await import("./auth.service.js");
+} = authService;
 
 describe("auth.service", () => {
   beforeEach(() => {
@@ -166,6 +168,19 @@ describe("auth.service", () => {
     expect(sendOTPEmailMock).toHaveBeenCalledWith("user@example.com", "123456", "User Name");
   });
 
+  it("rejects registration when the role is invalid", async () => {
+    await expect(
+      register({
+        email: "user@example.com",
+        name: "User Name",
+        password: "StrongPass123!",
+        roleId: 1,
+      })
+    ).rejects.toThrow("Invalid role");
+
+    expect(prismaMock.user.upsert).not.toHaveBeenCalled();
+  });
+
   it("verifies OTP and marks user as verified", async () => {
     prismaMock.user.findUnique.mockResolvedValue({
       id: "u-1",
@@ -183,6 +198,19 @@ describe("auth.service", () => {
     expect(result.message).toBe("Email verified successfully");
     expect(prismaMock.oTPToken.update).toHaveBeenCalled();
     expect(prismaMock.user.update).toHaveBeenCalled();
+  });
+
+  it("rejects verify OTP when the code format is invalid", async () => {
+    validateOTPMock.mockReturnValueOnce({ valid: false, error: "Invalid OTP" });
+
+    await expect(verifyOTP("user@example.com", "12")).rejects.toThrow("Invalid OTP");
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("rejects verify OTP when user is missing", async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    await expect(verifyOTP("missing-user-id", "123456")).rejects.toThrow("User not found");
   });
 
   it("throws when resend OTP target user does not exist", async () => {
@@ -259,5 +287,55 @@ describe("auth.service", () => {
     await expect(resetPassword("invalid-token", "NewStrong123!")).rejects.toThrow(
       "Invalid or expired reset token"
     );
+  });
+
+  it("resends OTP for an unverified user", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "u-2",
+      email: "user2@example.com",
+      name: "User Two",
+      isVerified: false,
+    });
+    prismaMock.oTPToken.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.oTPToken.create.mockResolvedValue({ id: "otp-2" });
+
+    const result = await resendOTP("USER2@EXAMPLE.COM");
+
+    expect(result).toEqual({ userId: "u-2", message: "OTP resent successfully" });
+    expect(prismaMock.oTPToken.updateMany).toHaveBeenCalled();
+    expect(prismaMock.oTPToken.create).toHaveBeenCalled();
+    expect(sendOTPEmailMock).toHaveBeenCalledWith("user2@example.com", "123456", "User Two");
+  });
+
+  it("rejects resend OTP for verified users", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "u-2",
+      email: "user2@example.com",
+      name: "User Two",
+      isVerified: true,
+    });
+
+    await expect(resendOTP("user2@example.com")).rejects.toThrow("User already verified");
+  });
+
+  it("rejects login for unverified user", async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: "u-1",
+      email: "user@example.com",
+      password: "stored-hash",
+      role: { name: "PATIENT" },
+      roleId: 3,
+      isVerified: false,
+      isActive: true,
+      pharmacy: null,
+    });
+
+    await expect(login("user@example.com", "StrongPass123!")).rejects.toThrow(
+      "Email not verified"
+    );
+  });
+
+  it("rejects login when password is missing", async () => {
+    await expect(login("user@example.com")).rejects.toThrow("Password is required");
   });
 });

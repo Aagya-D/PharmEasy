@@ -7,6 +7,7 @@ import {
   Edit2,
   MapPin,
   Package,
+  Minus,
   Plus,
   Wallet,
 } from "lucide-react";
@@ -17,12 +18,27 @@ import { useCart } from "../../../context/CartContext";
 import AddressModal from "../components/AddressModal";
 
 const DELIVERY_FEE = 40;
+const API_ORIGIN = (import.meta.env.VITE_API_URL || "http://localhost:5050/api").replace(/\/api\/?$/, "");
 
 const formatCurrency = (value) =>
   `Rs. ${Number(value || 0).toLocaleString("en-NP", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+
+const resolveMedicineImageUrl = (imageUrl) => {
+  if (!imageUrl || typeof imageUrl !== "string") return null;
+
+  const normalized = imageUrl.trim();
+  if (!normalized) return null;
+
+  if (/^(https?:)?\/\//i.test(normalized) || normalized.startsWith("data:") || normalized.startsWith("blob:")) {
+    return normalized;
+  }
+
+  const path = normalized.startsWith("/") ? normalized.slice(1) : normalized;
+  return `${API_ORIGIN}/${path}`;
+};
 
 const normalizePhoneNumber = (value) => String(value || "").replace(/\D/g, "").trim();
 
@@ -37,12 +53,13 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, updateShippingAddress } = useAuth();
-  const { refreshCart } = useCart();
+  const { refreshCart, updateCartItem } = useCart();
 
   const [placingOrder, setPlacingOrder] = useState(false);
   const [savedAddress, setSavedAddress] = useState(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("CASH_ON_DELIVERY");
+  const [editableItems, setEditableItems] = useState([]);
 
   const { mode, medicineId, medicine, items: selectedItems } = location.state || {};
 
@@ -92,17 +109,51 @@ export default function CheckoutPage() {
     }
   }, [medicine, medicineId, selectedItems]);
 
-  const subtotal = checkoutItems.reduce(
+  useEffect(() => {
+    setEditableItems(checkoutItems);
+  }, [checkoutItems]);
+
+  const currentItems = editableItems.length > 0 ? editableItems : checkoutItems;
+
+  const handleQuantityChange = async (item, nextQuantity) => {
+    const quantity = Math.max(1, Number(nextQuantity || 1));
+    const itemKey = item.id || item.cartItemId || item.medicineId;
+
+    setEditableItems((currentItemsList) =>
+      currentItemsList.map((currentItem) =>
+        (currentItem.id || currentItem.cartItemId || currentItem.medicineId) === itemKey
+          ? { ...currentItem, quantity }
+          : currentItem
+      )
+    );
+
+    if (mode === "cart" && itemKey) {
+      try {
+        await updateCartItem(itemKey, { quantity });
+      } catch (error) {
+        setEditableItems((currentItemsList) =>
+          currentItemsList.map((currentItem) =>
+            (currentItem.id || currentItem.cartItemId || currentItem.medicineId) === itemKey
+              ? { ...currentItem, quantity: Number(item.quantity || 1) }
+              : currentItem
+          )
+        );
+        toast.error(error?.response?.data?.message || "Failed to update quantity.");
+      }
+    }
+  };
+
+  const subtotal = currentItems.reduce(
     (acc, item) => acc + Number(item.price || 0) * Number(item.quantity || 0),
     0
   );
-  const deliveryCharge = checkoutItems.length > 0 ? DELIVERY_FEE : 0;
+  const deliveryCharge = currentItems.length > 0 ? DELIVERY_FEE : 0;
   const total = subtotal + deliveryCharge;
   const savedContactNumber = normalizePhoneNumber(savedAddress?.phone);
 
   const canConfirmOrder =
     !placingOrder &&
-    checkoutItems.length > 0 &&
+    currentItems.length > 0 &&
     savedAddress !== null &&
     /^9\d{9}$/.test(savedContactNumber) &&
     Boolean(paymentMethod);
@@ -129,10 +180,10 @@ export default function CheckoutPage() {
     if (!canConfirmOrder) return;
 
     // Send only identifiers and quantities so the backend can validate the order itself.
-    const selectedItemIds = checkoutItems
+    const selectedItemIds = currentItems
       .map((item) => item.id || item.cartItemId || item.medicineId)
       .filter(Boolean);
-    const checkoutPayloadItems = checkoutItems.map((item) => ({
+    const checkoutPayloadItems = currentItems.map((item) => ({
       id: item.id || null,
       cartItemId: item.id || item.cartItemId || null,
       inventoryId: item.medicineId || item.inventoryId || item.id,
@@ -298,46 +349,76 @@ export default function CheckoutPage() {
                   <Package size={17} className="text-blue-600" />
                   Package Items
                   <span className="text-xs font-semibold text-slate-400 ml-1">
-                    ({checkoutItems.length} item{checkoutItems.length !== 1 ? "s" : ""})
+                    ({currentItems.length} item{currentItems.length !== 1 ? "s" : ""})
                   </span>
                 </h2>
 
-                {checkoutItems.length === 0 ? (
+                {currentItems.length === 0 ? (
                   <p className="mt-4 text-sm text-slate-400 italic">No items selected for this order.</p>
                 ) : (
                   <div className="mt-4 divide-y divide-slate-100">
-                    {checkoutItems.map((item, idx) => (
+                    {currentItems.map((item, idx) => (
                       <div
                         key={item.id || `${item.medicineName}-${idx}`}
-                        className="flex items-start gap-4 py-4 first:pt-0 last:pb-0"
+                        className="flex flex-col gap-4 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center"
                       >
-                        {/* Item icon */}
-                        <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-                          <span className="text-xs font-extrabold text-blue-600 tracking-tighter">Rx</span>
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-slate-900 leading-snug">
-                            {item.medicineName}
-                          </p>
-                          {item.genericName && (
-                            <p className="text-xs text-slate-500 mt-0.5">{item.genericName}</p>
-                          )}
-                          <p className="text-xs text-slate-400 mt-1">
-                            Shipped by{" "}
-                            <span className="font-semibold text-slate-600">
-                              {item.pharmacyName || "Selected Pharmacy"}
-                            </span>
-                          </p>
-                        </div>
-
-                        <div className="text-right shrink-0">
-                          <p className="text-sm font-bold text-slate-900">
-                            {formatCurrency(
-                              Number(item.price || 0) * Number(item.quantity || 1)
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 flex items-center justify-center">
+                            {resolveMedicineImageUrl(item.imageUrl || item.medicine?.imageUrl) ? (
+                              <img
+                                src={resolveMedicineImageUrl(item.imageUrl || item.medicine?.imageUrl)}
+                                alt={item.medicineName}
+                                className="h-full w-full object-contain"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                No image
+                              </span>
                             )}
-                          </p>
-                          <p className="text-xs text-slate-400 mt-0.5">Qty: {item.quantity || 1}</p>
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-900 leading-snug">
+                              {item.medicineName}
+                            </p>
+                            {item.genericName && (
+                              <p className="text-xs text-slate-500 mt-0.5">{item.genericName}</p>
+                            )}
+                            <p className="text-xs text-slate-400 mt-1">
+                              Shipped by{" "}
+                              <span className="font-semibold text-slate-600">
+                                {item.pharmacyName || "Selected Pharmacy"}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 justify-between sm:justify-end sm:min-w-[280px]">
+                          <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden">
+                            <button
+                              onClick={() => handleQuantityChange(item, Number(item.quantity || 1) - 1)}
+                              className="px-3 py-2 hover:bg-slate-100 text-slate-700"
+                              aria-label="Decrease quantity"
+                            >
+                              <Minus size={15} />
+                            </button>
+                            <span className="px-4 text-sm font-semibold text-slate-800">{item.quantity || 1}</span>
+                            <button
+                              onClick={() => handleQuantityChange(item, Number(item.quantity || 1) + 1)}
+                              className="px-3 py-2 hover:bg-slate-100 text-slate-700"
+                              aria-label="Increase quantity"
+                            >
+                              <Plus size={15} />
+                            </button>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-bold text-slate-900">
+                              {formatCurrency(Number(item.price || 0) * Number(item.quantity || 1))}
+                            </p>
+                            <p className="text-xs text-slate-400 mt-0.5">Qty: {item.quantity || 1}</p>
+                          </div>
                         </div>
                       </div>
                     ))}

@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import {
   MapPin,
   Zap,
@@ -10,50 +11,111 @@ import {
 import pharmacyShowcase from "../../../assets/pharmacy.jpg";
 import medicineShowcase from "../../../assets/medicine.jpg";
 import serviceShowcase from "../../../assets/save.jpg";
+import {
+  fadeUp,
+  landingViewport,
+  softScale,
+  staggerChildren,
+} from "./landingMotion";
 
 export function FeaturesSection() {
+  const showcaseCards = [
+    {
+      image: pharmacyShowcase,
+      title: "Modern pharmacy",
+      subtitle: "Clean inventory visibility",
+      tone: "from-[#042b35]/80",
+    },
+    {
+      image: medicineShowcase,
+      title: "Medicine stock",
+      subtitle: "Compact product focus",
+      tone: "from-[#042b35]/76",
+    },
+    {
+      image: serviceShowcase,
+      title: "Support flow",
+      subtitle: "Helpful service moments",
+      tone: "from-[#042b35]/72",
+    },
+  ];
+
+  const features = [
+    {
+      icon: MapPin,
+      title: "Location-Based Search",
+      desc: "Find the nearest pharmacy with your required medicine. Integrated with OpenStreetMap for accurate navigation.",
+    },
+    {
+      icon: Zap,
+      title: "Real-Time Availability",
+      desc: "Instant, live updates on medicine stock across all partner pharmacies. No outdated information.",
+    },
+    {
+      icon: AlertCircle,
+      title: "Emergency SOS Requests",
+      desc: "Submit urgent requests when medicines are unavailable. Nearby pharmacies get notified instantly.",
+    },
+    {
+      icon: Database,
+      title: "Inventory Dashboards",
+      desc: "Pharmacy admins manage stock with real-time CRUD operations, thresholds, and automated alerts.",
+    },
+    {
+      icon: TrendingUp,
+      title: "Demand Analytics",
+      desc: "Data visualization tools help pharmacies understand consumption patterns and optimize inventory.",
+    },
+    {
+      icon: Activity,
+      title: "Real-Time Notifications",
+      desc: "WebSocket-powered alerts for availability updates, request status, and out-of-stock notifications.",
+    },
+  ];
+
   return (
-    <section
-      id="features"
-      className="px-6 py-20 bg-white"
-    >
+    <section id="features" className="px-6 py-20 bg-white">
       <div className="max-w-7xl mx-auto">
-        <p className="mb-3 text-center text-xs font-semibold tracking-[0.18em] text-[#007f95]/80">
-          CAPABILITIES
-        </p>
+        <motion.div
+          initial="hidden"
+          whileInView="show"
+          viewport={landingViewport}
+          variants={staggerChildren(0.12)}
+        >
+          <motion.p
+            variants={fadeUp(14)}
+            className="mb-3 text-center text-xs font-semibold tracking-[0.18em] text-[#007f95]/80"
+          >
+            CAPABILITIES
+          </motion.p>
 
-        <h2 className="landing-display text-4xl text-gray-900 mb-4 text-center md:text-5xl">
-          Powerful Features for Healthcare Access
-        </h2>
+          <motion.h2
+            variants={fadeUp(24)}
+            className="landing-display text-4xl text-gray-900 mb-4 text-center md:text-5xl"
+          >
+            Powerful Features for Healthcare Access
+          </motion.h2>
 
-        <p className="text-base text-slate-600 max-w-3xl mx-auto mb-14 text-center leading-8">
-          PharmEasy brings transparency, speed, and intelligence to
-          pharmaceutical logistics.
-        </p>
+          <motion.p
+            variants={fadeUp(18)}
+            className="text-base text-slate-600 max-w-3xl mx-auto mb-14 text-center leading-8"
+          >
+            PharmEasy brings transparency, speed, and intelligence to
+            pharmaceutical logistics.
+          </motion.p>
+        </motion.div>
 
-        <div className="mb-14 grid gap-5 lg:grid-cols-3">
-          {[
-            {
-              image: pharmacyShowcase,
-              title: "Modern pharmacy",
-              subtitle: "Clean inventory visibility",
-              tone: "from-[#042b35]/80",
-            },
-            {
-              image: medicineShowcase,
-              title: "Medicine stock",
-              subtitle: "Compact product focus",
-              tone: "from-[#042b35]/76",
-            },
-            {
-              image: serviceShowcase,
-              title: "Support flow",
-              subtitle: "Helpful service moments",
-              tone: "from-[#042b35]/72",
-            },
-          ].map((card, idx) => (
-            <div
+        <motion.div
+          initial="hidden"
+          whileInView="show"
+          viewport={landingViewport}
+          variants={staggerChildren(0.12)}
+          className="mb-14 grid gap-5 lg:grid-cols-3"
+        >
+          {showcaseCards.map((card, idx) => (
+            <motion.div
               key={card.title}
+              variants={softScale()}
               className={`group relative overflow-hidden rounded-[1.5rem] border border-cyan-900/10 bg-white shadow-[0_16px_35px_rgba(15,23,42,0.07)] ${idx === 1 ? "lg:mt-8" : idx === 2 ? "lg:mt-4" : ""}`}
             >
               <img
@@ -71,47 +133,23 @@ export function FeaturesSection() {
                   <ArrowRight size={16} />
                 </span>
               </div>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {[
-            {
-              icon: MapPin,
-              title: "Location-Based Search",
-              desc: "Find the nearest pharmacy with your required medicine. Integrated with OpenStreetMap for accurate navigation.",
-            },
-            {
-              icon: Zap,
-              title: "Real-Time Availability",
-              desc: "Instant, live updates on medicine stock across all partner pharmacies. No outdated information.",
-            },
-            {
-              icon: AlertCircle,
-              title: "Emergency SOS Requests",
-              desc: "Submit urgent requests when medicines are unavailable. Nearby pharmacies get notified instantly.",
-            },
-            {
-              icon: Database,
-              title: "Inventory Dashboards",
-              desc: "Pharmacy admins manage stock with real-time CRUD operations, thresholds, and automated alerts.",
-            },
-            {
-              icon: TrendingUp,
-              title: "Demand Analytics",
-              desc: "Data visualization tools help pharmacies understand consumption patterns and optimize inventory.",
-            },
-            {
-              icon: Activity,
-              title: "Real-Time Notifications",
-              desc: "WebSocket-powered alerts for availability updates, request status, and out-of-stock notifications.",
-            },
-          ].map((feature, idx) => {
+        <motion.div
+          initial="hidden"
+          whileInView="show"
+          viewport={landingViewport}
+          variants={staggerChildren(0.1, 0.1)}
+          className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3"
+        >
+          {features.map((feature) => {
             const Icon = feature.icon;
             return (
-              <div
-                key={idx}
+              <motion.div
+                key={feature.title}
+                variants={fadeUp(24)}
                 className="group relative overflow-hidden rounded-2xl border border-cyan-900/10 bg-[#f5fcff] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-[#0097b2]/40 hover:shadow-[0_24px_40px_rgba(15,23,42,0.1)]"
               >
                 <div className="absolute right-0 top-0 h-20 w-20 translate-x-8 -translate-y-8 rounded-full bg-cyan-100/70 transition-colors duration-300 group-hover:bg-[#0097b2]/18" />
@@ -124,10 +162,10 @@ export function FeaturesSection() {
                 <p className="relative text-sm leading-7 text-slate-600">
                   {feature.desc}
                 </p>
-              </div>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       </div>
     </section>
   );

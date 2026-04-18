@@ -16,7 +16,10 @@ const AdminPharmacies = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const statusParam = searchParams.get("status") || "PENDING_VERIFICATION";
+  const rawStatusParam = searchParams.get("status");
+  const statusParam = ["ALL", "VERIFIED", "REJECTED", "PENDING_VERIFICATION"].includes(rawStatusParam)
+    ? rawStatusParam
+    : "ALL";
 
   const [pharmacies, setPharmacies] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,7 +50,7 @@ const AdminPharmacies = () => {
       if (filterStatus === "PENDING_VERIFICATION") {
         response = await getPendingPharmacies();
       } else if (filterStatus === "ALL") {
-        response = await getAllPharmacies({ status: "ALL" });
+        response = await getAllPharmacies();
       } else {
         response = await getAllPharmacies({ status: filterStatus });
       }
@@ -107,6 +110,11 @@ const AdminPharmacies = () => {
 
   const handleStatusChange = (status) => {
     setFilterStatus(status);
+    if (status === "ALL") {
+      setSearchParams({});
+      return;
+    }
+
     setSearchParams({ status });
   };
 
@@ -126,7 +134,7 @@ const AdminPharmacies = () => {
       {/* Filter Tabs */}
       <div style={{ marginBottom: "24px", display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ display: "flex", gap: "8px" }}>
-          {["PENDING_VERIFICATION", "VERIFIED", "REJECTED", "ALL"].map((status) => (
+          {["ALL", "VERIFIED", "REJECTED", "PENDING_VERIFICATION"].map((status) => (
             <button
               key={status}
               onClick={() => handleStatusChange(status)}
@@ -142,10 +150,10 @@ const AdminPharmacies = () => {
                 transition: "all 0.2s",
               }}
             >
-              {status === "PENDING_VERIFICATION" && "Pending"}
+              {status === "ALL" && "All"}
               {status === "VERIFIED" && "Verified"}
               {status === "REJECTED" && "Rejected"}
-              {status === "ALL" && "All"}
+              {status === "PENDING_VERIFICATION" && "Pending"}
             </button>
           ))}
         </div>

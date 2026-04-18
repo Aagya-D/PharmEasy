@@ -731,6 +731,7 @@ model CartItem {
   pharmacyId      String
   medicineName    String
   genericName     String?
+  imageUrl        String?
   price           Float
   quantity        Int       @default(1)
   selected        Boolean   @default(true)

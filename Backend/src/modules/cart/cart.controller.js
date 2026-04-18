@@ -34,6 +34,40 @@ const getOrCreateCart = async (userId) => {
   });
 };
 
+const hydrateCartImages = async (cart) => {
+  if (!cart?.items?.length) {
+    return cart;
+  }
+
+  const missingImageIds = cart.items
+    .filter((item) => !item.imageUrl && item.medicineId)
+    .map((item) => item.medicineId);
+
+  if (!missingImageIds.length) {
+    return cart;
+  }
+
+  const inventoryItems = await prisma.inventory.findMany({
+    where: {
+      id: { in: missingImageIds },
+    },
+    select: {
+      id: true,
+      imageUrl: true,
+    },
+  });
+
+  const imageMap = new Map(inventoryItems.map((item) => [item.id, item.imageUrl || null]));
+
+  return {
+    ...cart,
+    items: cart.items.map((item) => ({
+      ...item,
+      imageUrl: item.imageUrl || imageMap.get(item.medicineId) || null,
+    })),
+  };
+};
+
 export const getCart = async (req, res) => {
   const userId = req.user?.userId;
   if (!userId) {
@@ -49,9 +83,11 @@ export const getCart = async (req, res) => {
       include: cartInclude,
     });
 
+    const hydratedCart = await hydrateCartImages(cart);
+
     return res.status(200).json({
       success: true,
-      data: { cart },
+      data: { cart: hydratedCart },
       message: "Cart retrieved successfully",
     });
   } catch (error) {
@@ -71,6 +107,7 @@ export const addToCart = async (req, res) => {
     pharmacyId,
     medicineName,
     genericName,
+    imageUrl,
     price,
     quantity,
     inStock,
@@ -132,6 +169,7 @@ export const addToCart = async (req, res) => {
         pharmacyAddress: pharmacyAddress || null,
         pharmacyContact: pharmacyContact || null,
       },
+      select: { id: true },
     });
 
     const refreshed = await prisma.cart.findUnique({
@@ -139,9 +177,11 @@ export const addToCart = async (req, res) => {
       include: cartInclude,
     });
 
+    const hydratedCart = await hydrateCartImages(refreshed);
+
     return res.status(200).json({
       success: true,
-      data: { cart: refreshed },
+      data: { cart: hydratedCart },
       message: "Item added to cart",
     });
   } catch (error) {
@@ -196,6 +236,7 @@ export const updateQuantity = async (req, res) => {
     await prisma.cartItem.update({
       where: { id: itemId },
       data: updateData,
+      select: { id: true },
     });
 
     const refreshed = await prisma.cart.findUnique({
@@ -203,9 +244,11 @@ export const updateQuantity = async (req, res) => {
       include: cartInclude,
     });
 
+    const hydratedCart = await hydrateCartImages(refreshed);
+
     return res.status(200).json({
       success: true,
-      data: { cart: refreshed },
+      data: { cart: hydratedCart },
       message: "Cart item updated",
     });
   } catch (error) {
@@ -241,9 +284,11 @@ export const removeItem = async (req, res) => {
       include: cartInclude,
     });
 
+    const hydratedCart = await hydrateCartImages(refreshed);
+
     return res.status(200).json({
       success: true,
-      data: { cart: refreshed },
+      data: { cart: hydratedCart },
       message: "Item removed from cart",
     });
   } catch (error) {

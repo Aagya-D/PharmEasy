@@ -984,6 +984,7 @@ export const addCartItem = async (req, res) => {
     pharmacyId,
     medicineName,
     genericName,
+    imageUrl,
     price,
     quantity,
     inStock,
@@ -1045,6 +1046,7 @@ export const addCartItem = async (req, res) => {
         pharmacyAddress: pharmacyAddress || null,
         pharmacyContact: pharmacyContact || null,
       },
+      select: { id: true },
     });
 
     const refreshed = await prisma.cart.findUnique({
@@ -1112,6 +1114,7 @@ export const updateCartItem = async (req, res) => {
     await prisma.cartItem.update({
       where: { id: itemId },
       data: updateData,
+      select: { id: true },
     });
 
     const refreshed = await prisma.cart.findUnique({

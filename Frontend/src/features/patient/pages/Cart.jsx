@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Minus, Plus, Trash2 } from "lucide-react";
 import { useCart } from "../../../context/CartContext";
 
+const API_ORIGIN = (import.meta.env.VITE_API_URL || "http://localhost:5050/api").replace(/\/api\/?$/, "");
+
 const formatCurrency = (value) => `Rs. ${Number(value || 0).toLocaleString("en-NP", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const formatExpiry = (value) => {
@@ -13,6 +15,20 @@ const formatExpiry = (value) => {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const year = date.getFullYear();
   return `${day}/${month}/${year}`;
+};
+
+const resolveMedicineImageUrl = (imageUrl) => {
+  if (!imageUrl || typeof imageUrl !== "string") return null;
+
+  const normalized = imageUrl.trim();
+  if (!normalized) return null;
+
+  if (/^(https?:)?\/\//i.test(normalized) || normalized.startsWith("data:") || normalized.startsWith("blob:")) {
+    return normalized;
+  }
+
+  const path = normalized.startsWith("/") ? normalized.slice(1) : normalized;
+  return `${API_ORIGIN}/${path}`;
 };
 
 export default function Cart() {
@@ -154,7 +170,10 @@ export default function Cart() {
                     </header>
 
                     <div className="divide-y divide-slate-100">
-                      {group.items.map((item) => (
+                      {group.items.map((item) => {
+                        const imageSource = resolveMedicineImageUrl(item.imageUrl || item.medicine?.imageUrl);
+
+                        return (
                         <div key={item.id} className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
                           <div className="flex items-start gap-3 flex-1 min-w-0">
                             <input
@@ -164,8 +183,19 @@ export default function Cart() {
                               className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                             />
 
-                            <div className="h-12 w-12 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold shrink-0">
-                              Rx
+                            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 flex items-center justify-center">
+                              {imageSource ? (
+                                <img
+                                  src={imageSource}
+                                  alt={item.medicineName}
+                                  className="h-full w-full object-contain"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                  No image
+                                </span>
+                              )}
                             </div>
 
                             <div className="min-w-0">
@@ -208,7 +238,8 @@ export default function Cart() {
                             </button>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </article>
                 ))}

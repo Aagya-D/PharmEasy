@@ -58,6 +58,7 @@ export const CartProvider = ({ children }) => {
       quantity: 1,
       inStock: Boolean(medicine?.inStock),
       expiryDate: medicine?.expiryDate || medicine?.expiry || null,
+      imageUrl: medicine?.imageUrl || null,
       pharmacyName: medicine?.pharmacy?.name || null,
       pharmacyAddress: medicine?.pharmacy?.address || null,
       pharmacyContact: medicine?.pharmacy?.contactNumber || null,
