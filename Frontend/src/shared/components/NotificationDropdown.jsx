@@ -23,9 +23,11 @@ import {
 } from "lucide-react";
 import notificationService from "../../core/services/notification.service";
 import { useNotification } from "../../context/NotificationContext";
+import { useAuth } from "../../context/AuthContext";
 
 const NotificationDropdown = ({ mode = "default" }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const {
     unreadNotifications: unreadCount,
     decrementNotifications,
@@ -39,7 +41,15 @@ const NotificationDropdown = ({ mode = "default" }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const dropdownRef = useRef(null);
-  const footerLink = mode === "admin" ? "/admin/logs" : "/notifications";
+  const getDefaultNotificationLink = () => {
+    if (mode === "admin") return "/admin/logs";
+
+    const roleId = Number(user?.roleId);
+    if (roleId === 3) return "/notifications";
+    return "/dashboard";
+  };
+
+  const footerLink = getDefaultNotificationLink();
 
   // Fetch detailed notifications when dropdown opens; sync badge count from real list
   useEffect(() => {
@@ -87,15 +97,27 @@ const NotificationDropdown = ({ mode = "default" }) => {
     }
 
     // Navigate to link if available in metadata
-    if (notif.metadata?.link) {
+    const metadataLink = typeof notif.metadata?.link === "string" ? notif.metadata.link.trim() : "";
+    if (metadataLink.startsWith("/")) {
       setIsOpen(false);
-      navigate(notif.metadata.link);
+      if (metadataLink === "/" && (notif.type === "CMS_ALERT" || notif.type === "SYSTEM_MESSAGE")) {
+        navigate(getDefaultNotificationLink());
+      } else {
+        navigate(metadataLink);
+      }
       return;
     }
 
     if (mode === "admin" && notif?.title === "NEW_PHARMACY_REGISTRATION") {
       setIsOpen(false);
       navigate("/admin/pharmacies?status=PENDING");
+      return;
+    }
+
+    // Fallback for legacy CMS alerts that stored missing/invalid links.
+    if (notif.type === "CMS_ALERT" || notif.type === "SYSTEM_MESSAGE") {
+      setIsOpen(false);
+      navigate(getDefaultNotificationLink());
     }
   };
 
@@ -302,12 +324,16 @@ const NotificationDropdown = ({ mode = "default" }) => {
           {/* Footer */}
           {!loading && !error && notifications.length > 0 && (
             <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-center">
-              <a
-                href={footerLink}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  navigate(footerLink);
+                }}
                 className="text-sm font-medium text-blue-600 hover:text-blue-700"
               >
                 View all notifications →
-              </a>
+              </button>
             </div>
           )}
         </div>

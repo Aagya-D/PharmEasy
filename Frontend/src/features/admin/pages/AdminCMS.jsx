@@ -6,6 +6,17 @@ import { httpClient } from '../../../core/services/httpClient';
 import ConfirmModal from '../../../shared/components/ui/ConfirmModal';
 
 const AdminCMS = () => {
+  const toDateTimeLocalValue = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+
+    const pad = (num) => String(num).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  const nowDateTimeLocal = () => toDateTimeLocalValue(new Date());
+
   const [activeTab, setActiveTab] = useState('healthTips');
   const [healthTips, setHealthTips] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
@@ -18,11 +29,10 @@ const AdminCMS = () => {
     title: '',
     content: '',
     category: '',
-    imageUrl: '',
     type: 'info',
     priority: 'normal',
     targetRole: '',
-    publishDate: new Date().toISOString().split('T')[0],
+    publishDate: nowDateTimeLocal(),
     expiryDate: '',
     isActive: true,
   });
@@ -55,11 +65,10 @@ const AdminCMS = () => {
       title: '',
       content: '',
       category: '',
-      imageUrl: '',
       type: 'info',
       priority: 'normal',
       targetRole: '',
-      publishDate: new Date().toISOString().split('T')[0],
+      publishDate: nowDateTimeLocal(),
       expiryDate: '',
       isActive: true,
     });
@@ -73,12 +82,11 @@ const AdminCMS = () => {
       title: item.title || '',
       content: item.content || item.message || '',
       category: item.category || '',
-      imageUrl: item.imageUrl || '',
       type: item.type || 'info',
       priority: item.priority || 'normal',
       targetRole: item.targetRole || '',
-      publishDate: item.publishDate ? new Date(item.publishDate).toISOString().split('T')[0] : '',
-      expiryDate: item.expiryDate ? new Date(item.expiryDate).toISOString().split('T')[0] : '',
+      publishDate: toDateTimeLocalValue(item.publishDate),
+      expiryDate: toDateTimeLocalValue(item.expiryDate),
       isActive: item.isActive ?? true,
     });
     setShowModal(true);
@@ -95,7 +103,6 @@ const AdminCMS = () => {
             title: formData.title,
             content: formData.content,
             category: formData.category || null,
-            imageUrl: formData.imageUrl || null,
             publishDate: formData.publishDate || new Date().toISOString(),
             expiryDate: formData.expiryDate || null,
             isActive: formData.isActive,
@@ -271,10 +278,10 @@ const AdminCMS = () => {
                         <div className="flex items-center gap-4 text-sm text-gray-600">
                           <span className="flex items-center gap-1">
                             <Calendar className="w-4 h-4" />
-                            Published: {new Date(tip.publishDate).toLocaleDateString()}
+                            Published: {new Date(tip.publishDate).toLocaleString()}
                           </span>
                           {tip.expiryDate && (
-                            <span>Expires: {new Date(tip.expiryDate).toLocaleDateString()}</span>
+                            <span>Expires: {new Date(tip.expiryDate).toLocaleString()}</span>
                           )}
                         </div>
                       </div>
@@ -346,10 +353,10 @@ const AdminCMS = () => {
                         <div className="flex items-center gap-4 text-sm text-gray-600">
                           <span className="flex items-center gap-1">
                             <Calendar className="w-4 h-4" />
-                            Published: {new Date(announcement.publishDate).toLocaleDateString()}
+                            Published: {new Date(announcement.publishDate).toLocaleString()}
                           </span>
                           {announcement.expiryDate && (
-                            <span>Expires: {new Date(announcement.expiryDate).toLocaleDateString()}</span>
+                            <span>Expires: {new Date(announcement.expiryDate).toLocaleString()}</span>
                           )}
                           {announcement.targetRole && (
                             <span>Target: {announcement.targetRole}</span>
@@ -387,15 +394,15 @@ const AdminCMS = () => {
 
         {/* Modal */}
         {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+          <div className="fixed inset-0 z-50 bg-slate-900/20 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white/95 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 backdrop-blur-md">
+              <div className="px-6 py-4 border-b border-slate-200 bg-white/90">
                 <h3 className="text-xl font-bold text-gray-900">
                   {editingItem ? 'Edit' : 'Create'} {modalType === 'healthTip' ? 'Health Tip' : 'Announcement'}
                 </h3>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <form onSubmit={handleSubmit} className="p-6 space-y-4 bg-white/90">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Title *</label>
                   <input
@@ -429,15 +436,6 @@ const AdminCMS = () => {
                         value={formData.category}
                         onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                         placeholder="e.g., Nutrition, Exercise, Mental Health"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Image URL</label>
-                      <input
-                        type="url"
-                        value={formData.imageUrl}
-                        onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
@@ -489,18 +487,18 @@ const AdminCMS = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Publish Date</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Publish Date & Time</label>
                     <input
-                      type="date"
+                      type="datetime-local"
                       value={formData.publishDate}
                       onChange={(e) => setFormData({ ...formData, publishDate: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Expiry Date (Optional)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Expiry Date & Time (Optional)</label>
                     <input
-                      type="date"
+                      type="datetime-local"
                       value={formData.expiryDate}
                       onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"

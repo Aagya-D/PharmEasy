@@ -769,6 +769,56 @@ const userService = {
 
     return { userId: user.id, message: "OTP sent to email" };
   },
+  // Verify OTP specifically for password reset without email-verification checks.
+  verifyPasswordResetOTP: async (email, otpCode) => {
+    const emailResult = validateEmail(email);
+    if (!emailResult.valid) {
+      throw new AppError(emailResult.error, 400);
+    }
+    const normalizedEmail = emailResult.data;
+
+    const otpResult = validateOTP(otpCode);
+    if (!otpResult.valid) {
+      throw new AppError(otpResult.error, 400);
+    }
+    const normalizedOtp = otpResult.data;
+
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new AppError("Invalid or expired OTP", 400);
+    }
+
+    const otpTokens = await prisma.oTPToken.findMany({
+      where: {
+        userId: user.id,
+        isUsed: false,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 1,
+    });
+
+    if (!otpTokens.length) {
+      throw new AppError("Invalid or expired OTP", 400);
+    }
+
+    const otpToken = otpTokens[0];
+    const otpHashMatch = hashToken(normalizedOtp) === otpToken.code;
+    if (!otpHashMatch) {
+      throw new AppError("Invalid or expired OTP", 400);
+    }
+
+    await prisma.oTPToken.update({
+      where: { id: otpToken.id },
+      data: { isUsed: true, usedAt: new Date() },
+    });
+
+    return { userId: user.id };
+  },
   // Backward-compatible wrapper kept for older callers.
   createAndSendOTP: async (userId, type = "EMAIL_VERIFICATION") => {
     return await register({ userId, type });

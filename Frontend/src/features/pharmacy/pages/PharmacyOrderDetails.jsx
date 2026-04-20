@@ -30,14 +30,36 @@ const STATUS_THEME = {
   CANCELLED: "bg-red-100 text-red-700 border-red-200",
 };
 
+const ORDER_ITEM_STATUS_THEME = {
+  PENDING: "bg-amber-100 text-amber-700",
+  ACCEPTED: "bg-blue-100 text-blue-700",
+  PREPARING: "bg-indigo-100 text-indigo-700",
+  READY: "bg-emerald-100 text-emerald-700",
+  COMPLETED: "bg-green-100 text-green-700",
+  DECLINED: "bg-red-100 text-red-700",
+};
+
+const getOrderItemStatusLabel = (status) => {
+  const normalizedStatus = String(status || "PENDING").toUpperCase();
+
+  if (normalizedStatus === "CANCELLED") {
+    return "DECLINED";
+  }
+
+  return normalizedStatus;
+};
+
 function StatusBadge({ status }) {
+  const normalizedStatus = String(status || "UNKNOWN").toUpperCase();
+  const displayStatus = normalizedStatus === "CANCELLED" ? "DECLINED" : normalizedStatus;
+
   return (
     <span
       className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${
-        STATUS_THEME[status] || "bg-slate-100 text-slate-700 border-slate-200"
+        STATUS_THEME[normalizedStatus] || "bg-slate-100 text-slate-700 border-slate-200"
       }`}
     >
-      {String(status || "UNKNOWN").replaceAll("_", " ")}
+      {displayStatus.replaceAll("_", " ")}
     </span>
   );
 }
@@ -79,9 +101,10 @@ export default function PharmacyOrderDetails() {
   }, [orderId]);
 
   const currentStatus = order?.status || "PENDING";
+  const orderItemStatusLabel = getOrderItemStatusLabel(currentStatus);
   const currentStepIndex = STATUS_STEPS.indexOf(currentStatus);
   const nextAllowedStatuses = process?.nextAllowedStatuses || [];
-  const canCancel = nextAllowedStatuses.includes("CANCELLED");
+  const canCancel = currentStatus === "PENDING" && nextAllowedStatuses.includes("CANCELLED");
   const hasTimelineTransition = nextAllowedStatuses.some((status) =>
     STATUS_STEPS.includes(status)
   );
@@ -116,9 +139,35 @@ export default function PharmacyOrderDetails() {
 
     try {
       setUpdating(true);
-      await pharmacyService.updatePharmacyOrderStatus(order.id, status);
+      const response = await pharmacyService.updatePharmacyOrderStatus(order.id, status);
+      const updatedOrder = response?.data?.order || response?.order || null;
+
+      if (updatedOrder?.id) {
+        setOrder((currentOrder) => ({
+          ...(currentOrder || {}),
+          ...updatedOrder,
+        }));
+
+        const updatedStatus = String(updatedOrder.status || "").toUpperCase();
+        const updatedAllowed =
+          updatedStatus === "PENDING"
+            ? ["ACCEPTED", "CANCELLED"]
+            : updatedStatus === "ACCEPTED"
+            ? ["PREPARING", "READY", "CANCELLED"]
+            : updatedStatus === "PREPARING"
+            ? ["READY", "CANCELLED"]
+            : updatedStatus === "READY"
+            ? ["COMPLETED", "CANCELLED"]
+            : [];
+
+        setProcess((currentProcess) => ({
+          ...(currentProcess || {}),
+          nextAllowedStatuses: updatedAllowed,
+        }));
+      }
+
       toast.success("Order updated. Patient has been notified.");
-      await loadOrder();
+      loadOrder();
     } catch (err) {
       console.error("[PHARMACY ORDER DETAILS] status update failed", err);
       toast.error(err?.response?.data?.message || "Failed to update order status");
@@ -299,6 +348,8 @@ export default function PharmacyOrderDetails() {
                     ? isKhaltiPending
                       ? "Payment is not completed yet, so processing steps are locked. You can reject/cancel this order."
                       : "Processing steps are locked for this status. You can reject/cancel this order."
+                    : currentStatus === "ACCEPTED" || currentStatus === "PREPARING" || currentStatus === "READY"
+                    ? "Order is already in fulfillment. Use Admin intervention (Danger Zone) for forced cancellation after acceptance."
                     : "No further processing actions are available for this order."}
                 </p>
                 {canCancel && (
@@ -345,8 +396,8 @@ export default function PharmacyOrderDetails() {
                         <td className="px-3 py-3 text-slate-700">Rs. {Number(item.unitPrice || 0).toLocaleString()}</td>
                         <td className="px-3 py-3 font-semibold text-slate-900">Rs. {Number(item.lineTotal || 0).toLocaleString()}</td>
                         <td className="px-3 py-3">
-                          <span className="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                            {currentStatus === "PENDING" ? "Awaiting Acceptance" : "Accepted"}
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${ORDER_ITEM_STATUS_THEME[orderItemStatusLabel] || "bg-slate-100 text-slate-700"}`}>
+                            {orderItemStatusLabel.replaceAll("_", " ")}
                           </span>
                         </td>
                       </tr>

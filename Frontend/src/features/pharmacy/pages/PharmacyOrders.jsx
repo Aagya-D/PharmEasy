@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { ClipboardList, Package, RefreshCw, Search, ChevronRight } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ClipboardList, Package, RefreshCw, Search, ChevronRight, CalendarDays, ArrowUpDown } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import httpClient from "../../../core/services/httpClient";
+import { motion } from "framer-motion";
 
 // Loading placeholder card.
 function SkeletonStatCard() {
@@ -34,16 +35,31 @@ function SkeletonRow() {
 
 export default function PharmacyOrders() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [orders, setOrders] = useState([]);
   const [orderStats, setOrderStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filterStatus, setFilterStatus] = useState("all");
   const [orderSearch, setOrderSearch] = useState("");
+  const [sortMode, setSortMode] = useState("latest");
+  const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
+  const moreFiltersRef = useRef(null);
 
   useEffect(() => {
     fetchOrders();
-  }, [filterStatus]);
+  }, []);
+
+  useEffect(() => {
+    const onClickOutside = (event) => {
+      if (!moreFiltersRef.current?.contains(event.target)) {
+        setIsMoreFiltersOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
 
   const fetchOrders = async () => {
     try {
@@ -51,7 +67,7 @@ export default function PharmacyOrders() {
       setError(null);
 
       const response = await httpClient.get("/pharmacy/orders", {
-        params: { page: 1, limit: 50, status: filterStatus }
+        params: { page: 1, limit: 200, status: "all" }
       });
 
       if (response.data.success && response.data.data) {
@@ -73,6 +89,7 @@ export default function PharmacyOrders() {
   };
 
   const getStatusBadge = (status) => {
+    const normalizedStatus = String(status || "").toUpperCase();
     const styles = {
       PENDING: "bg-yellow-100 text-yellow-700",
       ACCEPTED: "bg-blue-100 text-blue-700",
@@ -80,13 +97,31 @@ export default function PharmacyOrders() {
       READY: "bg-emerald-100 text-emerald-700",
       COMPLETED: "bg-green-100 text-green-700",
       CANCELLED: "bg-red-100 text-red-700",
+      DECLINED: "bg-red-100 text-red-700",
     };
+
+    const label = normalizedStatus === "CANCELLED" ? "DECLINED" : normalizedStatus;
+
     return (
-      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${styles[status] || "bg-gray-100 text-slate-700"}`}>
-        {status?.replaceAll("_", " ")}
+      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${styles[label] || styles[normalizedStatus] || "bg-gray-100 text-slate-700"}`}>
+        {label.replaceAll("_", " ")}
       </span>
     );
   };
+
+  useEffect(() => {
+    const updatedOrder = location.state?.updatedOrder;
+    if (!updatedOrder?.id) return;
+
+    const normalizedUpdatedStatus = String(updatedOrder.status || "").toUpperCase();
+    setOrders((currentOrders) =>
+      currentOrders.map((order) =>
+        order.id === updatedOrder.id
+          ? { ...order, ...updatedOrder, status: normalizedUpdatedStatus || order.status }
+          : order
+      )
+    );
+  }, [location.state]);
 
   const statCards = orderStats ? [
     { title: "Total Orders", value: orderStats.total.toString() },
@@ -96,14 +131,66 @@ export default function PharmacyOrders() {
   ] : [];
 
   const normalizedQuery = orderSearch.trim().toLowerCase();
-  const filteredOrders = normalizedQuery
-    ? orders.filter((order) => {
+
+  const statusCounts = useMemo(() => {
+    const counts = {
+      all: orders.length,
+      PENDING: 0,
+      ACCEPTED: 0,
+      COMPLETED: 0,
+      DECLINED: 0,
+    };
+
+    orders.forEach((order) => {
+      const status = String(order.status || "").toUpperCase();
+      if (status === "PENDING") counts.PENDING += 1;
+      if (status === "ACCEPTED") counts.ACCEPTED += 1;
+      if (status === "COMPLETED") counts.COMPLETED += 1;
+      if (status === "CANCELLED") counts.DECLINED += 1;
+    });
+
+    return counts;
+  }, [orders]);
+
+  const filteredOrders = useMemo(() => {
+    let next = [...orders];
+
+    if (normalizedQuery) {
+      next = next.filter((order) => {
         const orderId = String(order.id || "").toLowerCase();
         const patientName = String(order.patient?.name || "").toLowerCase();
         const status = String(order.status || "").toLowerCase();
         return orderId.includes(normalizedQuery) || patientName.includes(normalizedQuery) || status.includes(normalizedQuery);
-      })
-    : orders;
+      });
+    }
+
+    if (filterStatus !== "all") {
+      next = next.filter((order) => {
+        const status = String(order.status || "").toUpperCase();
+        if (filterStatus === "DECLINED") {
+          return status === "CANCELLED";
+        }
+        return status === filterStatus;
+      });
+    }
+
+    if (sortMode === "price-asc") {
+      next.sort((a, b) => Number(a.totalAmount || 0) - Number(b.totalAmount || 0));
+    } else if (sortMode === "price-desc") {
+      next.sort((a, b) => Number(b.totalAmount || 0) - Number(a.totalAmount || 0));
+    } else if (sortMode === "oldest") {
+      next.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    } else {
+      next.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+
+    return next;
+  }, [orders, normalizedQuery, filterStatus, sortMode]);
+
+  const applySortMode = (mode) => {
+    setSortMode(mode);
+    setIsMoreFiltersOpen(false);
+  };
 
   const isStatusFilterActive = filterStatus !== "all";
   const statusFilterPills = [
@@ -130,6 +217,12 @@ export default function PharmacyOrders() {
       value: "COMPLETED",
       idle: "border-green-300 text-green-700 hover:border-green-400 hover:text-green-800",
       active: "border-green-600 bg-green-600 text-white",
+    },
+    {
+      label: "Declined",
+      value: "DECLINED",
+      idle: "border-red-300 text-red-700 hover:border-red-400 hover:text-red-800",
+      active: "border-red-600 bg-red-600 text-white",
     },
   ];
 
@@ -206,19 +299,84 @@ export default function PharmacyOrders() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="inline-flex items-center gap-1 rounded-xl bg-slate-100/60 p-1">
             {statusFilterPills.map((pill) => {
               const isActive = filterStatus === pill.value;
+              const countKey = pill.value === "all" ? "all" : pill.value;
+              const count = statusCounts[countKey] || 0;
+
               return (
                 <button
                   key={pill.value}
                   type="button"
                   onClick={() => setFilterStatus(pill.value)}
-                  className={`px-3.5 py-1.5 rounded-full border text-sm font-medium transition-all duration-200 ${isActive ? pill.active : pill.idle}`}
+                  className={`relative rounded-lg px-3.5 py-1.5 text-sm transition-all duration-200 ${
+                    isActive ? "text-blue-700 font-semibold" : "text-slate-500 font-medium hover:text-slate-700"
+                  }`}
                 >
-                  {pill.label}
+                  {isActive && (
+                    <motion.span
+                      layoutId="pharmacy-orders-filter-active"
+                      className="absolute inset-0 rounded-lg bg-white shadow-sm"
+                      transition={{ type: "spring", stiffness: 360, damping: 30 }}
+                    />
+                  )}
+                  <span className="relative z-10 inline-flex items-center gap-2">
+                    {pill.label}
+                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                      {count}
+                    </span>
+                  </span>
                 </button>
               );
             })}
+            </div>
+
+            <div className="relative" ref={moreFiltersRef}>
+              <button
+                type="button"
+                onClick={() => setIsMoreFiltersOpen((open) => !open)}
+                className="rounded-lg border border-slate-200 bg-white px-3.5 py-1.5 text-sm font-medium text-slate-600 hover:border-slate-300 hover:text-slate-800"
+              >
+                More Filters
+              </button>
+              {isMoreFiltersOpen && (
+              <div className="absolute right-0 z-20 mt-2 w-52 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => applySortMode("latest")}
+                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  <CalendarDays size={14} />
+                  Sort by Date (Latest)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applySortMode("oldest")}
+                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  <CalendarDays size={14} />
+                  Sort by Date (Oldest)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applySortMode("price-asc")}
+                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  <ArrowUpDown size={14} />
+                  Sort by Price (Low)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applySortMode("price-desc")}
+                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  <ArrowUpDown size={14} />
+                  Sort by Price (High)
+                </button>
+              </div>
+              )}
+            </div>
 
             {isStatusFilterActive && (
               <button
@@ -283,15 +441,17 @@ export default function PharmacyOrders() {
                         {new Date(order.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4">
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/pharmacy/orders/${order.id}`)}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
-                          title="View order details"
-                          aria-label="View order details"
-                        >
-                          <ChevronRight size={18} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/pharmacy/orders/${order.id}`)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                            title="View order details"
+                            aria-label="View order details"
+                          >
+                            <ChevronRight size={18} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

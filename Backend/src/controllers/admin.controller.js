@@ -5,6 +5,7 @@ import { prisma } from "../database/prisma.js";
 import { AppError } from "../middlewares/errorHandler.js";
 import { createLog, getLogs as getActivityLogs, LOG_ACTIONS } from "../utils/activityLogger.js";
 import notificationService from "../modules/notifications/notification.service.js";
+import { purgeExpiredCmsContent } from "../services/cmsExpiry.service.js";
 
 // Return the pharmacies that still need review.
 export const getPendingPharmacies = async (req, res, next) => {
@@ -777,9 +778,11 @@ export const sendRestockAlert = async (req, res, next) => {
 // Return all health tips.
 export const getHealthTips = async (req, res, next) => {
   try {
+    await purgeExpiredCmsContent();
+
     const healthTips = await prisma.healthTip.findMany({
       orderBy: {
-        createdAt: "desc",
+        publishDate: "desc",
       },
     });
 
@@ -797,15 +800,32 @@ export const getHealthTips = async (req, res, next) => {
 // Create a new health tip.
 export const createHealthTip = async (req, res, next) => {
   try {
+    await purgeExpiredCmsContent();
+
     // Require admin authentication.
     if (!req.user || !req.user.userId) {
       throw new AppError("Unauthorized: Admin authentication required", 401);
     }
 
-    const { title, content, category, imageUrl, isActive } = req.body;
+    const { title, content, category, publishDate, expiryDate, isActive } = req.body;
 
     if (!title || !content || !category) {
       throw new AppError("Title, content, and category are required", 400);
+    }
+
+    const publishAt = publishDate ? new Date(publishDate) : new Date();
+    const expiryAt = expiryDate ? new Date(expiryDate) : null;
+
+    if (Number.isNaN(publishAt.getTime())) {
+      throw new AppError("Invalid publish date/time", 400);
+    }
+
+    if (expiryAt && Number.isNaN(expiryAt.getTime())) {
+      throw new AppError("Invalid expiry date/time", 400);
+    }
+
+    if (expiryAt && expiryAt <= publishAt) {
+      throw new AppError("Expiry date/time must be later than publish date/time", 400);
     }
 
     const healthTip = await prisma.healthTip.create({
@@ -813,7 +833,9 @@ export const createHealthTip = async (req, res, next) => {
         title,
         content,
         category,
-        imageUrl,
+        imageUrl: null,
+        publishDate: publishAt,
+        expiryDate: expiryAt,
         isActive: isActive !== undefined ? isActive : true,
         createdBy: req.user.userId,
       },
@@ -842,18 +864,46 @@ export const createHealthTip = async (req, res, next) => {
 // Update a health tip.
 export const updateHealthTip = async (req, res, next) => {
   try {
+    await purgeExpiredCmsContent();
+
     const { id } = req.params;
-    const { title, content, category, imageUrl, isActive } = req.body;
+    const { title, content, category, publishDate, expiryDate, isActive } = req.body;
+
+    const updateData = {
+      ...(title && { title }),
+      ...(content && { content }),
+      ...(category && { category }),
+      ...(isActive !== undefined && { isActive }),
+      imageUrl: null,
+    };
+
+    if (publishDate !== undefined) {
+      const parsedPublishDate = publishDate ? new Date(publishDate) : null;
+      if (!parsedPublishDate || Number.isNaN(parsedPublishDate.getTime())) {
+        throw new AppError("Invalid publish date/time", 400);
+      }
+      updateData.publishDate = parsedPublishDate;
+    }
+
+    if (expiryDate !== undefined) {
+      if (!expiryDate) {
+        updateData.expiryDate = null;
+      } else {
+        const parsedExpiryDate = new Date(expiryDate);
+        if (Number.isNaN(parsedExpiryDate.getTime())) {
+          throw new AppError("Invalid expiry date/time", 400);
+        }
+        updateData.expiryDate = parsedExpiryDate;
+      }
+    }
+
+    if (updateData.publishDate && updateData.expiryDate && updateData.expiryDate <= updateData.publishDate) {
+      throw new AppError("Expiry date/time must be later than publish date/time", 400);
+    }
 
     const healthTip = await prisma.healthTip.update({
       where: { id },
-      data: {
-        ...(title && { title }),
-        ...(content && { content }),
-        ...(category && { category }),
-        ...(imageUrl !== undefined && { imageUrl }),
-        ...(isActive !== undefined && { isActive }),
-      },
+      data: updateData,
     });
 
     // Record the update in the audit trail.
@@ -907,9 +957,11 @@ export const deleteHealthTip = async (req, res, next) => {
 // Return all announcements.
 export const getAnnouncements = async (req, res, next) => {
   try {
+    await purgeExpiredCmsContent();
+
     const announcements = await prisma.announcement.findMany({
       orderBy: {
-        createdAt: "desc",
+        publishDate: "desc",
       },
     });
 
@@ -927,6 +979,8 @@ export const getAnnouncements = async (req, res, next) => {
 // Create a new announcement.
 export const createAnnouncement = async (req, res, next) => {
   try {
+    await purgeExpiredCmsContent();
+
     // Require admin authentication.
     if (!req.user || !req.user.userId) {
       throw new AppError("Unauthorized: Admin authentication required", 401);
@@ -947,6 +1001,21 @@ export const createAnnouncement = async (req, res, next) => {
       throw new AppError("Title and message are required", 400);
     }
 
+    const publishAt = publishDate ? new Date(publishDate) : new Date();
+    const expiryAt = expiryDate ? new Date(expiryDate) : null;
+
+    if (Number.isNaN(publishAt.getTime())) {
+      throw new AppError("Invalid publish date/time", 400);
+    }
+
+    if (expiryAt && Number.isNaN(expiryAt.getTime())) {
+      throw new AppError("Invalid expiry date/time", 400);
+    }
+
+    if (expiryAt && expiryAt <= publishAt) {
+      throw new AppError("Expiry date/time must be later than publish date/time", 400);
+    }
+
     const announcement = await prisma.announcement.create({
       data: {
         title,
@@ -954,8 +1023,8 @@ export const createAnnouncement = async (req, res, next) => {
         type: type || "info",
         priority: priority || "normal",
         targetRole,
-        publishDate: publishDate ? new Date(publishDate) : new Date(),
-        expiryDate: expiryDate ? new Date(expiryDate) : null,
+        publishDate: publishAt,
+        expiryDate: expiryAt,
         isActive: isActive !== undefined ? isActive : true,
         createdBy: req.user.userId,
       },
@@ -1012,6 +1081,8 @@ export const createAnnouncement = async (req, res, next) => {
 // Update an announcement.
 export const updateAnnouncement = async (req, res, next) => {
   try {
+    await purgeExpiredCmsContent();
+
     const { id } = req.params;
     const {
       title,
@@ -1024,20 +1095,42 @@ export const updateAnnouncement = async (req, res, next) => {
       isActive,
     } = req.body;
 
+    const updateData = {
+      ...(title && { title }),
+      ...(message && { message }),
+      ...(type && { type }),
+      ...(priority && { priority }),
+      ...(targetRole !== undefined && { targetRole }),
+      ...(isActive !== undefined && { isActive }),
+    };
+
+    if (publishDate !== undefined) {
+      const parsedPublishDate = publishDate ? new Date(publishDate) : null;
+      if (!parsedPublishDate || Number.isNaN(parsedPublishDate.getTime())) {
+        throw new AppError("Invalid publish date/time", 400);
+      }
+      updateData.publishDate = parsedPublishDate;
+    }
+
+    if (expiryDate !== undefined) {
+      if (!expiryDate) {
+        updateData.expiryDate = null;
+      } else {
+        const parsedExpiryDate = new Date(expiryDate);
+        if (Number.isNaN(parsedExpiryDate.getTime())) {
+          throw new AppError("Invalid expiry date/time", 400);
+        }
+        updateData.expiryDate = parsedExpiryDate;
+      }
+    }
+
+    if (updateData.publishDate && updateData.expiryDate && updateData.expiryDate <= updateData.publishDate) {
+      throw new AppError("Expiry date/time must be later than publish date/time", 400);
+    }
+
     const announcement = await prisma.announcement.update({
       where: { id },
-      data: {
-        ...(title && { title }),
-        ...(message && { message }),
-        ...(type && { type }),
-        ...(priority && { priority }),
-        ...(targetRole !== undefined && { targetRole }),
-        ...(publishDate && { publishDate: new Date(publishDate) }),
-        ...(expiryDate !== undefined && {
-          expiryDate: expiryDate ? new Date(expiryDate) : null,
-        }),
-        ...(isActive !== undefined && { isActive }),
-      },
+      data: updateData,
     });
 
     // Record the update in the audit trail.

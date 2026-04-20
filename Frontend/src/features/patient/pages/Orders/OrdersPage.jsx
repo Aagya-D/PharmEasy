@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../../../shared/components/ui";
 import { OrderCard } from "../../components/Dashboard/OrderCard";
 import patientService from "../../services/patient.service";
+import { motion } from "framer-motion";
 import {
   Package,
   Search,
   AlertCircle,
+  CalendarDays,
+  ArrowUpDown,
 } from "lucide-react";
 
 export function OrdersPage() {
@@ -17,6 +20,9 @@ export function OrdersPage() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [sortMode, setSortMode] = useState("latest");
+  const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
+  const moreFiltersRef = useRef(null);
 
   const statusPills = [
     {
@@ -43,6 +49,12 @@ export function OrdersPage() {
       idle: "border-green-300 text-green-700 hover:border-green-400 hover:text-green-800",
       active: "border-green-600 bg-green-600 text-white",
     },
+    {
+      value: "cancelled",
+      label: "Cancelled",
+      idle: "border-red-200 text-red-600 hover:border-red-300 hover:text-red-700",
+      active: "bg-red-600 text-white",
+    },
   ];
 
   useEffect(() => {
@@ -50,8 +62,15 @@ export function OrdersPage() {
   }, []);
 
   useEffect(() => {
-    filterOrders();
-  }, [orders, searchTerm, statusFilter]);
+    const onClickOutside = (event) => {
+      if (!moreFiltersRef.current?.contains(event.target)) {
+        setIsMoreFiltersOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
 
   const loadOrders = async () => {
     try {
@@ -67,7 +86,27 @@ export function OrdersPage() {
     }
   };
 
-  const filterOrders = () => {
+  const statusCounts = useMemo(() => {
+    const counts = {
+      all: orders.length,
+      pending: 0,
+      accepted: 0,
+      completed: 0,
+      cancelled: 0,
+    };
+
+    orders.forEach((order) => {
+      const status = String(order.status || "").toLowerCase();
+      if (status === "pending") counts.pending += 1;
+      if (status === "accepted") counts.accepted += 1;
+      if (status === "completed") counts.completed += 1;
+      if (status === "cancelled") counts.cancelled += 1;
+    });
+
+    return counts;
+  }, [orders]);
+
+  const filteredResult = useMemo(() => {
     let filtered = orders;
 
     if (searchTerm) {
@@ -87,7 +126,26 @@ export function OrdersPage() {
       );
     }
 
-    setFilteredOrders(filtered);
+    if (sortMode === "price-asc") {
+      filtered = [...filtered].sort((a, b) => Number(a.totalAmount || 0) - Number(b.totalAmount || 0));
+    } else if (sortMode === "price-desc") {
+      filtered = [...filtered].sort((a, b) => Number(b.totalAmount || 0) - Number(a.totalAmount || 0));
+    } else if (sortMode === "oldest") {
+      filtered = [...filtered].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    } else {
+      filtered = [...filtered].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+
+    return filtered;
+  }, [orders, searchTerm, statusFilter, sortMode]);
+
+  useEffect(() => {
+    setFilteredOrders(filteredResult);
+  }, [filteredResult]);
+
+  const applySortMode = (mode) => {
+    setSortMode(mode);
+    setIsMoreFiltersOpen(false);
   };
 
   return (
@@ -124,19 +182,83 @@ export function OrdersPage() {
 
             {/* Filter Pills */}
             <div className="flex items-center gap-2 flex-wrap">
+              <div className="inline-flex items-center gap-1 rounded-xl bg-slate-100/60 p-1">
               {statusPills.map((pill) => {
                 const isActive = statusFilter === pill.value;
+                const count = statusCounts[pill.value] || 0;
+
                 return (
                   <button
                     key={pill.value}
                     type="button"
                     onClick={() => setStatusFilter(pill.value)}
-                    className={`px-3.5 py-1.5 rounded-full border text-sm font-medium transition-all duration-200 ${isActive ? pill.active : pill.idle}`}
+                    className={`relative rounded-lg px-3.5 py-1.5 text-sm transition-all duration-200 ${
+                      isActive ? "text-blue-700 font-semibold" : "text-slate-500 font-medium hover:text-slate-700"
+                    }`}
                   >
-                    {pill.label}
+                    {isActive && (
+                      <motion.span
+                        layoutId="patient-orders-filter-active"
+                        className="absolute inset-0 rounded-lg bg-white shadow-sm"
+                        transition={{ type: "spring", stiffness: 360, damping: 30 }}
+                      />
+                    )}
+                    <span className="relative z-10 inline-flex items-center gap-2">
+                      {pill.label}
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                        {count}
+                      </span>
+                    </span>
                   </button>
                 );
               })}
+              </div>
+
+              <div className="relative" ref={moreFiltersRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsMoreFiltersOpen((open) => !open)}
+                  className="rounded-lg border border-slate-200 bg-white px-3.5 py-1.5 text-sm font-medium text-slate-600 hover:border-slate-300 hover:text-slate-800"
+                >
+                  More Filters
+                </button>
+                {isMoreFiltersOpen && (
+                <div className="absolute right-0 z-20 mt-2 w-52 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => applySortMode("latest")}
+                    className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <CalendarDays size={14} />
+                    Sort by Date (Latest)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applySortMode("oldest")}
+                    className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <CalendarDays size={14} />
+                    Sort by Date (Oldest)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applySortMode("price-asc")}
+                    className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <ArrowUpDown size={14} />
+                    Sort by Price (Low)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applySortMode("price-desc")}
+                    className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <ArrowUpDown size={14} />
+                    Sort by Price (High)
+                  </button>
+                </div>
+                )}
+              </div>
 
               {(searchTerm || statusFilter !== "all") && (
                 <button

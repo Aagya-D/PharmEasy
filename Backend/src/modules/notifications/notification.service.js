@@ -448,7 +448,7 @@ class NotificationService {
 
       const roleEnum = ROLE_TO_ENUM[announcement.targetRole] || null;
       const notifTargetRole = ROLE_TO_NOTIF[announcement.targetRole] || null;
-      const actionLink = ROLE_TO_LINK[notifTargetRole] || "/";
+      const actionLink = ROLE_TO_LINK[notifTargetRole] || "/dashboard";
 
       const whereClause = {
         isActive: true,
@@ -489,6 +489,50 @@ class NotificationService {
     } catch (error) {
       logger.error("Failed to broadcast announcement notification", {
         announcementId: announcement.id,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  // Broadcast newly published health tips to patient users.
+  async notifyHealthTip(healthTip) {
+    try {
+      const users = await prisma.user.findMany({
+        where: {
+          isActive: true,
+          role: {
+            name: "PATIENT",
+          },
+        },
+        select: { id: true },
+      });
+
+      const userIds = users.map((u) => u.id);
+      if (userIds.length === 0) {
+        console.warn("[NOTIFICATION] notifyHealthTip: No active patient users found");
+        return 0;
+      }
+
+      const snippet = String(healthTip.content || "").trim();
+      const message = snippet.length > 200 ? `${snippet.slice(0, 200)}…` : snippet;
+
+      return this.broadcastNotification(
+        userIds,
+        "New Health Tip Available",
+        message || "A new health tip has been published by the admin team.",
+        "CMS_ALERT",
+        {
+          healthTipId: healthTip.id,
+          category: healthTip.category || null,
+          link: "/patient",
+        },
+        "PATIENT",
+        "normal"
+      );
+    } catch (error) {
+      logger.error("Failed to broadcast health tip notification", {
+        healthTipId: healthTip?.id,
         error: error.message,
       });
       throw error;

@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   AlertCircle,
   CalendarClock,
@@ -75,6 +76,9 @@ function StatCard({ title, value, subtitle, icon: Icon, iconClass, loading }) {
 }
 
 export default function PharmacyDashboard() {
+  const location = useLocation();
+  const announcementRef = useRef(null);
+  const [announcementForceToken, setAnnouncementForceToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState(null);
@@ -132,6 +136,28 @@ export default function PharmacyDashboard() {
     const id = window.setInterval(loadDashboard, 30000);
     return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const shouldFocusAnnouncement =
+      params.get("focus") === "announcement" ||
+      location.hash === "#announcement";
+
+    if (!shouldFocusAnnouncement) return;
+
+    const scrollToAnnouncement = () => {
+      announcementRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+
+    window.requestAnimationFrame(scrollToAnnouncement);
+  }, [location.hash, location.search]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const reopenFlag = params.get("reopenAnnouncement");
+    if (!reopenFlag) return;
+    setAnnouncementForceToken(`${reopenFlag}-${Date.now()}`);
+  }, [location.search]);
 
   const data = useMemo(() => {
     // Normalize the raw API payload into the exact cards and charts this page renders.
@@ -274,8 +300,8 @@ export default function PharmacyDashboard() {
         </div>
       )}
 
-      <div className="mb-4">
-        <AnnouncementBanner targetRole="PHARMACY" />
+      <div id="announcement" ref={announcementRef} className="mb-4">
+        <AnnouncementBanner targetRole="PHARMACY" forceShowToken={announcementForceToken} />
       </div>
 
       <div className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">

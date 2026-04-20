@@ -125,6 +125,27 @@ export function ProfilePage() {
     }
   };
 
+  const handleAvatarRemove = async () => {
+    if (!user?.avatarUrl) {
+      toast.error("No profile photo to remove");
+      return;
+    }
+
+    try {
+      setAvatarUploading(true);
+      setError(null);
+      await patientService.removeAvatar();
+      await refreshUser();
+      setAvatarFile(null);
+      setAvatarPreview("");
+      toast.success("Profile photo removed successfully");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to remove profile photo");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   const initials = (formData.name || formData.email || "P")
     .split(" ")
     .map((part) => part[0])
@@ -228,6 +249,14 @@ export function ProfilePage() {
                   >
                     {avatarUploading ? <Loader className="animate-spin" size={16} /> : <Camera size={16} />}
                     Save Photo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAvatarRemove}
+                    disabled={!user?.avatarUrl || avatarUploading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Remove Photo
                   </button>
                 </div>
               </div>

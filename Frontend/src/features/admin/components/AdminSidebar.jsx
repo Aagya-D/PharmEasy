@@ -63,18 +63,21 @@ const AdminSidebar = ({ isOpen, onClose, onToggle }) => {
         <div className="border-b border-slate-800 px-5 py-5">
           <div className="rounded-2xl border border-slate-700 bg-slate-800/80 p-4 shadow-sm">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white shadow-lg shadow-blue-600/30">
-                {initials}
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-600 text-sm font-bold text-white shadow-lg shadow-blue-600/30">
+                {user?.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt={user?.name || "System Admin avatar"}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span>{initials}</span>
+                )}
               </div>
               <div className="min-w-0">
                 <p className="truncate text-base font-bold text-white">{user?.name || "System Admin"}</p>
                 <p className="truncate text-xs text-slate-400">{user?.email || "admin@pharmeasy.com"}</p>
               </div>
-            </div>
-
-            <div className="mt-4 flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 ring-1 ring-slate-700">
-              <Pill className="text-blue-400" size={16} />
-              <span className="text-xs font-semibold text-slate-300">PharmEasy Intelligence Hub</span>
             </div>
           </div>
 

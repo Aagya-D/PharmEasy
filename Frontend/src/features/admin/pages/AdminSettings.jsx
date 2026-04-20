@@ -17,9 +17,13 @@ import {
   Key,
   Copy,
   RefreshCw,
+  Camera,
+  Upload,
+  Loader,
 } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import adminService from "../../../core/services/admin.service";
+import httpClient from "../../../core/services/httpClient";
 import AdminLayout from "../components/AdminLayout";
 import ConfirmModal from "../../../shared/components/ui/ConfirmModal";
 
@@ -156,6 +160,9 @@ const AdminSettings = () => {
   const [backupCodes, setBackupCodes] = useState([]);
   const [verificationCode, setVerificationCode] = useState("");
   const [confirmDisable2FA, setConfirmDisable2FA] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(user?.avatarUrl || "");
 
   // Profile form
   const {
@@ -191,10 +198,19 @@ const AdminSettings = () => {
         email: user.email || "",
         phone: user.phone || "",
       });
+      setAvatarPreview(user.avatarUrl || "");
       // Fetch 2FA status
       fetch2FAStatus();
     }
   }, [user, resetProfile]);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreview?.startsWith("blob:")) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+    };
+  }, [avatarPreview]);
 
   const fetch2FAStatus = async () => {
     try {
@@ -321,6 +337,106 @@ const AdminSettings = () => {
     }
   };
 
+  const handleAvatarFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      setToast({ type: "error", message: "Only JPG, PNG, or WEBP images are allowed" });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setToast({ type: "error", message: "Profile photo must be under 2MB" });
+      return;
+    }
+
+    if (avatarPreview?.startsWith("blob:")) {
+      URL.revokeObjectURL(avatarPreview);
+    }
+
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const handleAvatarUpload = async () => {
+    if (!avatarFile) {
+      setToast({ type: "error", message: "Please choose a photo first" });
+      return;
+    }
+
+    try {
+      setAvatarUploading(true);
+
+      const formData = new FormData();
+      formData.append("avatar", avatarFile);
+
+      const response = await httpClient.patch("/user/avatar", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      const updatedAvatarUser = response.data?.data?.user;
+      if (updatedAvatarUser) {
+        updateUser({
+          ...user,
+          ...updatedAvatarUser,
+        });
+        setAvatarFile(null);
+        setAvatarPreview(updatedAvatarUser.avatarUrl || "");
+      }
+
+      setToast({ type: "success", message: "Profile photo updated successfully!" });
+    } catch (error) {
+      setToast({
+        type: "error",
+        message: error.response?.data?.message || "Failed to upload profile photo",
+      });
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  // Handle avatar removal
+  const handleAvatarRemove = async () => {
+    if (!user?.avatarUrl) {
+      setToast({ type: "error", message: "No profile photo to remove" });
+      return;
+    }
+
+    try {
+      setAvatarUploading(true);
+
+      const response = await httpClient.delete("/user/avatar");
+
+      const updatedAvatarUser = response.data?.data?.user;
+      if (updatedAvatarUser) {
+        updateUser({
+          ...user,
+          ...updatedAvatarUser,
+        });
+        setAvatarFile(null);
+        setAvatarPreview("");
+      }
+
+      setToast({ type: "success", message: "Profile photo removed successfully!" });
+    } catch (error) {
+      setToast({
+        type: "error",
+        message: error.response?.data?.message || "Failed to remove profile photo",
+      });
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const initials = (user?.name || user?.email || "A")
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
   // Handle password change
   const onPasswordSubmit = async (data) => {
     try {
@@ -379,6 +495,74 @@ const AdminSettings = () => {
             </p>
           </div>
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6"
+        >
+          <div className="bg-gradient-to-r from-slate-900 to-slate-700 px-6 py-4 flex items-center gap-3">
+            <Camera className="text-white" size={24} />
+            <div>
+              <h2 className="text-xl font-semibold text-white">Profile Photo</h2>
+              <p className="text-slate-200 text-sm">Upload the avatar used across admin screens</p>
+            </div>
+          </div>
+
+          <div className="p-6 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="h-24 w-24 overflow-hidden rounded-full border-4 border-blue-100 bg-gray-100 flex items-center justify-center text-white shadow-sm">
+                {avatarPreview ? (
+                  <img
+                    src={avatarPreview}
+                    alt={user?.name || "Admin avatar"}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-700 to-blue-600 text-2xl font-bold">
+                    {initials}
+                  </div>
+                )}
+              </div>
+              <div>
+                <p className="text-lg font-semibold text-gray-900">{user?.name || "System Admin"}</p>
+                <p className="text-sm text-gray-600">{user?.email || "admin@pharmeasy.com"}</p>
+                <p className="mt-1 text-xs text-gray-500">Recommended: JPG, PNG, or WEBP up to 2MB.</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                <Upload size={16} />
+                Choose Photo
+                <input
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  onChange={handleAvatarFileChange}
+                  className="hidden"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={handleAvatarUpload}
+                disabled={!avatarFile || avatarUploading}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {avatarUploading ? <Loader className="animate-spin" size={16} /> : <Camera size={16} />}
+                Save Photo
+              </button>
+              <button
+                type="button"
+                onClick={handleAvatarRemove}
+                disabled={!user?.avatarUrl || avatarUploading}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Remove Photo
+              </button>
+            </div>
+          </div>
+        </motion.div>
 
         <div className="space-y-6">
           {/* General profile section */}

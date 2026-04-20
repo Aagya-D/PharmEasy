@@ -39,17 +39,17 @@ const hydrateCartImages = async (cart) => {
     return cart;
   }
 
-  const missingImageIds = cart.items
-    .filter((item) => !item.imageUrl && item.medicineId)
-    .map((item) => item.medicineId);
+  const medicineIds = [...new Set(cart.items
+    .filter((item) => item.medicineId)
+    .map((item) => item.medicineId))];
 
-  if (!missingImageIds.length) {
+  if (!medicineIds.length) {
     return cart;
   }
 
   const inventoryItems = await prisma.inventory.findMany({
     where: {
-      id: { in: missingImageIds },
+      id: { in: medicineIds },
     },
     select: {
       id: true,
@@ -63,7 +63,10 @@ const hydrateCartImages = async (cart) => {
     ...cart,
     items: cart.items.map((item) => ({
       ...item,
-      imageUrl: item.imageUrl || imageMap.get(item.medicineId) || null,
+      imageUrl: imageMap.get(item.medicineId) || null,
+      medicine: {
+        imageUrl: imageMap.get(item.medicineId) || null,
+      },
     })),
   };
 };
@@ -107,7 +110,6 @@ export const addToCart = async (req, res) => {
     pharmacyId,
     medicineName,
     genericName,
-    imageUrl,
     price,
     quantity,
     inStock,

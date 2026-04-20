@@ -10,7 +10,7 @@ import logger from "../../utils/logger.js";
 import { createLog, LOG_ACTIONS } from "../../utils/activityLogger.js";
 import { hashPassword, comparePassword } from "../../utils/password.js";
 import { prisma } from "../../database/prisma.js";
-import { isValidNepaliPhone } from "../../utils/validation.js";
+import { isValidNepaliPhone, validatePassword } from "../../utils/validation.js";
 import notificationService from "../notifications/notification.service.js";
 
 // Normalize shipping address payload from either nested or flat request shape.
@@ -647,15 +647,22 @@ export const resetPassword = async (req, res, next) => {
   try {
     const { email, otp, newPassword } = req.body;
 
-    // Verify OTP before allowing password change.
-    await userService.verifyOTP(email, otp, "PASSWORD_RESET");
+    if (!email || !otp || !newPassword) {
+      throw new ValidationError("Email, OTP, and new password are required");
+    }
 
-    // Load user by email after OTP verification.
-    const user = await userService.getUserByEmail(email);
-    if (!user) throw new ValidationError("User not found");
+    const passwordResult = validatePassword(newPassword);
+    if (!passwordResult.valid) {
+      throw new ValidationError(passwordResult.error);
+    }
+
+    // Verify reset OTP without email-verification constraints.
+    const { userId } = await userService.verifyPasswordResetOTP(email, otp);
+    if (!userId) throw new ValidationError("User not found");
 
     // Save new password hash.
-    await userService.setPassword(user.id, newPassword);
+    await userService.setPassword(userId, newPassword);
+    await userService.clearRefreshToken(userId);
 
     res.json({
       message: "Password reset successful. You can now login.",

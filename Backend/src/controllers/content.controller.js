@@ -2,10 +2,13 @@
 
 import { prisma } from "../database/prisma.js";
 import { AppError } from "../utils/errors.js";
+import { purgeExpiredCmsContent } from "../services/cmsExpiry.service.js";
 
 // Get all currently active and published health tips.
 export const getActiveHealthTips = async (req, res, next) => {
   try {
+    await purgeExpiredCmsContent();
+
     // Return only active records already published and not expired.
     const healthTips = await prisma.healthTip.findMany({
       where: {
@@ -26,7 +29,6 @@ export const getActiveHealthTips = async (req, res, next) => {
         title: true,
         content: true,
         category: true,
-        imageUrl: true,
         publishDate: true,
         createdAt: true,
       },
@@ -46,6 +48,8 @@ export const getActiveHealthTips = async (req, res, next) => {
 // Get the latest active health tip.
 export const getLatestHealthTip = async (req, res, next) => {
   try {
+    await purgeExpiredCmsContent();
+
     const healthTip = await prisma.healthTip.findFirst({
       where: {
         isActive: true,
@@ -65,7 +69,6 @@ export const getLatestHealthTip = async (req, res, next) => {
         title: true,
         content: true,
         category: true,
-        imageUrl: true,
         publishDate: true,
       },
     });
@@ -83,6 +86,8 @@ export const getLatestHealthTip = async (req, res, next) => {
 // Get active announcements, optionally filtered by target role.
 export const getActiveAnnouncements = async (req, res, next) => {
   try {
+    await purgeExpiredCmsContent();
+
     const { targetRole } = req.query;
 
     const whereClause = {
@@ -137,6 +142,8 @@ export const getActiveAnnouncements = async (req, res, next) => {
 // Get highest-priority active announcement for a target role.
 export const getHighPriorityAnnouncement = async (req, res, next) => {
   try {
+    await purgeExpiredCmsContent();
+
     const { targetRole } = req.query;
 
     if (!targetRole) {
@@ -193,6 +200,8 @@ export const getHighPriorityAnnouncement = async (req, res, next) => {
 // Get active health tips by category.
 export const getHealthTipsByCategory = async (req, res, next) => {
   try {
+    await purgeExpiredCmsContent();
+
     const { category } = req.params;
 
     const healthTips = await prisma.healthTip.findMany({
@@ -215,7 +224,6 @@ export const getHealthTipsByCategory = async (req, res, next) => {
         title: true,
         content: true,
         category: true,
-        imageUrl: true,
         publishDate: true,
       },
     });

@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Navigation,
   CalendarDays,
+  Pill,
 } from "lucide-react";
 import { MapContainer as LeafletMap, Marker, Popup, TileLayer } from "react-leaflet";
 import L from "leaflet";
@@ -29,6 +30,53 @@ const formatCurrency = (price) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+
+const API_ORIGIN = (() => {
+  try {
+    const configured = import.meta.env.VITE_API_URL || "http://localhost:5050/api";
+    return new URL(configured).origin;
+  } catch {
+    return "http://localhost:5050";
+  }
+})();
+
+const resolveMedicineImageUrl = (imageUrl) => {
+  const raw = String(imageUrl || "").trim();
+  if (!raw) return null;
+
+  if (/^(https?:)?\/\//i.test(raw) || raw.startsWith("data:")) {
+    return raw;
+  }
+
+  const normalizedPath = raw.startsWith("/") ? raw : `/${raw}`;
+  return `${API_ORIGIN}${normalizedPath}`;
+};
+
+function StorefrontMedicineImage({ imageUrl, alt }) {
+  const [hasError, setHasError] = useState(false);
+  const resolvedImage = resolveMedicineImageUrl(imageUrl);
+  const showFallback = !resolvedImage || hasError;
+
+  return (
+    <div className="h-36 w-full overflow-hidden rounded-t-2xl border-b border-slate-200 bg-slate-50">
+      {showFallback ? (
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-sky-100 bg-white shadow-sm">
+            <Pill size={26} className="text-sky-500" />
+          </div>
+        </div>
+      ) : (
+        <img
+          src={resolvedImage}
+          alt={alt}
+          className="h-full w-full object-contain p-3"
+          loading="lazy"
+          onError={() => setHasError(true)}
+        />
+      )}
+    </div>
+  );
+}
 
 const formatExpiryDate = (value) => {
   if (!value) return "N/A";
@@ -355,53 +403,60 @@ export default function PharmacyStorefront() {
                   <article
                     key={item.id}
                     onClick={() => handleOpenMedicineDetail(item)}
-                    className="rounded-2xl border border-slate-200 p-4 bg-slate-50 hover:bg-white shadow-sm transition-colors cursor-pointer"
+                    className="cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm transition-colors hover:bg-white"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-semibold text-slate-900">{item.name}</h3>
-                        <p className="text-sm text-slate-600 mt-1">{item.genericName || "N/A"}</p>
+                    <StorefrontMedicineImage
+                      imageUrl={item?.imageUrl}
+                      alt={item?.name || "Medicine"}
+                    />
+
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-semibold text-slate-900">{item.name}</h3>
+                          <p className="mt-1 text-sm text-slate-600">{item.genericName || "N/A"}</p>
+                        </div>
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full border ${
+                            inStock
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-rose-50 text-rose-700 border-rose-200"
+                          }`}
+                        >
+                          {inStock ? `In Stock (${item.quantity})` : "Out of Stock"}
+                        </span>
                       </div>
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full border ${
-                          inStock
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : "bg-rose-50 text-rose-700 border-rose-200"
-                        }`}
-                      >
-                        {inStock ? `In Stock (${item.quantity})` : "Out of Stock"}
-                      </span>
-                    </div>
 
-                    <p className="mt-3 text-blue-700 font-bold text-lg">{formatCurrency(item.price)}</p>
-                    <p className="mt-2 text-sm text-slate-600 inline-flex items-center gap-2">
-                      <CalendarDays size={15} className="text-slate-500" />
-                      Expiry: {formatExpiryDate(item.expiryDate)}
-                    </p>
+                      <p className="mt-3 text-lg font-bold text-blue-700">{formatCurrency(item.price)}</p>
+                      <p className="mt-2 inline-flex items-center gap-2 text-sm text-slate-600">
+                        <CalendarDays size={15} className="text-slate-500" />
+                        Expiry: {formatExpiryDate(item.expiryDate)}
+                      </p>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <button
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleAddToCart(item);
-                        }}
-                        disabled={!inStock}
-                        className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <ShoppingCart size={16} />
-                        Add to Cart
-                      </button>
-                      <button
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handlePlaceOrder(item);
-                        }}
-                        disabled={!inStock}
-                        className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Truck size={16} />
-                        Order
-                      </button>
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <button
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleAddToCart(item);
+                          }}
+                          disabled={!inStock}
+                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <ShoppingCart size={16} />
+                          Add to Cart
+                        </button>
+                        <button
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handlePlaceOrder(item);
+                          }}
+                          disabled={!inStock}
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Truck size={16} />
+                          Order
+                        </button>
+                      </div>
                     </div>
                   </article>
                 );

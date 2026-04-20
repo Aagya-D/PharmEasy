@@ -100,11 +100,8 @@ export const CartProvider = ({ children }) => {
     setCartItems([]);
   };
 
-  // Compute total quantity across all cart lines.
-  const cartCount = useMemo(
-    () => cartItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
-    [cartItems]
-  );
+  // Compute unique line-item count for cart badge display.
+  const cartCount = useMemo(() => cartItems.length, [cartItems]);
 
   // Compute selected quantity used for checkout actions.
   const selectedCount = useMemo(

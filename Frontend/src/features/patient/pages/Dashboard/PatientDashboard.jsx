@@ -199,7 +199,7 @@ export function PatientDashboard() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [topMedicines, setTopMedicines] = useState([]);
   const [medicinesLoading, setMedicinesLoading] = useState(true);
-  const [healthTip, setHealthTip] = useState(null);
+  const [healthTips, setHealthTips] = useState([]);
   const [tipLoading, setTipLoading] = useState(true);
   const [announcements, setAnnouncements] = useState([]);
   const [announcementsLoading, setAnnouncementsLoading] = useState(true);
@@ -225,30 +225,24 @@ export function PatientDashboard() {
   }, []);
 
   useEffect(() => {
-    // Fall back to a local tip if the CMS call fails or returns empty data.
-    const loadHealthTip = async () => {
+    // Show only CMS-provided health tips and limit the dashboard list to three.
+    const loadHealthTips = async () => {
       try {
         setTipLoading(true);
-        const response = await contentService.getLatestHealthTip();
-        if (response?.success && response?.data) {
-          setHealthTip(response.data);
-          return;
-        }
+        const response = await contentService.getHealthTips();
+        const list = Array.isArray(response?.data) ? response.data : [];
+        const sorted = [...list].sort(
+          (a, b) => new Date(b.publishDate || b.createdAt || 0) - new Date(a.publishDate || a.createdAt || 0)
+        );
+        setHealthTips(sorted.slice(0, 3));
       } catch {
-        // fallback below
+        setHealthTips([]);
       } finally {
         setTipLoading(false);
       }
-
-      setHealthTip({
-        title: "Hydration + Timing Improves Outcomes",
-        content:
-          "Take daily medicines at consistent times and maintain hydration. A steady routine improves response, especially for blood pressure and sugar control.",
-        category: "Medication Routine",
-      });
     };
 
-    loadHealthTip();
+    loadHealthTips();
   }, []);
 
   useEffect(() => {
@@ -623,10 +617,12 @@ export function PatientDashboard() {
 
                 <div className="mb-4 rounded-xl border border-blue-200 bg-white p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-sm font-black text-slate-900">Latest Health Tip</p>
-                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black uppercase text-blue-700">
-                      CMS Tip
-                    </span>
+                    <p className="text-sm font-black text-slate-900">Latest Health Tips</p>
+                    {healthTips.length > 0 && (
+                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black uppercase text-blue-700">
+                        CMS Tip
+                      </span>
+                    )}
                   </div>
                   {tipLoading ? (
                     <div className="space-y-2">
@@ -634,18 +630,24 @@ export function PatientDashboard() {
                       <div className="h-4 w-5/6 animate-pulse rounded bg-blue-100" />
                       <div className="h-4 w-3/4 animate-pulse rounded bg-blue-100" />
                     </div>
+                  ) : healthTips.length === 0 ? (
+                    <p className="text-xs leading-relaxed text-slate-600">No tip published yet.</p>
                   ) : (
-                    <>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-                        {healthTip?.category || "Health Tip"}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-700">
-                        {healthTip?.title || "Daily care reminder"}
-                      </p>
-                      <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                        {healthTip?.content || "CMS health guidance will appear here when published by the admin team."}
-                      </p>
-                    </>
+                    <div className="space-y-3">
+                      {healthTips.map((tip) => (
+                        <div key={tip.id} className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+                            {tip.category || "Health Tip"}
+                          </p>
+                          <p className="mt-1 text-sm font-semibold leading-relaxed text-slate-700">
+                            {tip.title}
+                          </p>
+                          <p className="mt-1 text-xs leading-relaxed text-slate-600 line-clamp-2">
+                            {tip.content}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
 

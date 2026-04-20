@@ -200,6 +200,7 @@ export default function MedicineDetail() {
             pharmacyId: activeMedicine?.pharmacy?.id || activeMedicine?.pharmacyId || null,
             medicineName,
             genericName: activeMedicine?.genericName || null,
+            imageUrl: activeMedicine?.imageUrl || null,
             quantity: 1,
             price: Number(activeMedicine?.price || 0),
             pharmacyName: activeMedicine?.pharmacy?.name || "Unknown Pharmacy",

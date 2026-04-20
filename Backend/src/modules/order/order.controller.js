@@ -320,6 +320,34 @@ const deductOrderInventory = async (tx, order, pharmacyId) => {
   }
 };
 
+// Revert previously deducted inventory for each order line item.
+const revertOrderInventory = async (tx, order, pharmacyId) => {
+  const items = Array.isArray(order.items) ? order.items : [];
+
+  if (items.length === 0) {
+    return;
+  }
+
+  for (const item of items) {
+    const updated = await tx.inventory.updateMany({
+      where: {
+        id: item.inventoryId,
+        pharmacyId,
+      },
+      data: {
+        quantity: { increment: item.quantity },
+      },
+    });
+
+    if (updated.count !== 1) {
+      throw createHttpError(
+        409,
+        `Unable to restore inventory for ${item.medicineName || "an order item"}`
+      );
+    }
+  }
+};
+
 export const placeOrderFromCart = async (req, res) => {
   const startTime = Date.now();
   const userId = req.user?.userId || req.user?.id;
@@ -450,6 +478,15 @@ export const placeOrderFromCart = async (req, res) => {
         include: {
           items: {
             orderBy: { createdAt: "asc" },
+            select: {
+              id: true,
+              medicineId: true,
+              pharmacyId: true,
+              quantity: true,
+              medicineName: true,
+              genericName: true,
+              createdAt: true,
+            },
           },
         },
       });
@@ -465,7 +502,7 @@ export const placeOrderFromCart = async (req, res) => {
               requestedItemIds.includes(String(item.id)) ||
               requestedItemIds.includes(String(item.medicineId))
           )
-        : cart.items.filter((item) => item.selected);
+        : cart.items.filter((item) => item.selected !== false);
 
       if (eligibleItems.length === 0) {
         return res.status(400).json({ success: false, message: "No cart items selected for checkout" });
@@ -497,6 +534,19 @@ export const placeOrderFromCart = async (req, res) => {
 
     // Split checkout into one order per pharmacy inside a single transaction.
     const createdOrders = await prisma.$transaction(async (tx) => {
+      const pharmacies = await tx.pharmacy.findMany({
+        where: {
+          id: { in: groupedPharmacyIds },
+        },
+        select: {
+          id: true,
+          userId: true,
+          pharmacyName: true,
+        },
+      });
+
+      const pharmacyById = new Map(pharmacies.map((pharmacy) => [String(pharmacy.id), pharmacy]));
+
       const inventoryIds = [...new Set(eligibleItems.map((item) => item.medicineId))];
       const inventoryList = await tx.inventory.findMany({
         where: {
@@ -518,6 +568,18 @@ export const placeOrderFromCart = async (req, res) => {
         inventoryList.map((entry) => [`${entry.pharmacyId}::${entry.id}`, entry])
       );
 
+      const getPharmacyName = (pharmacyId) =>
+        String(pharmacyById.get(String(pharmacyId))?.pharmacyName || "Unknown Pharmacy");
+
+      const buildOutOfStockError = ({ medicineName, pharmacyName }) =>
+        createHttpError(
+          400,
+          `Order failed: ${medicineName || "Medicine"} is out of stock at ${pharmacyName || "Unknown Pharmacy"}.`,
+          {
+            errorCode: "INSUFFICIENT_INVENTORY",
+          }
+        );
+
       const insufficientItems = eligibleItems
         .map((item) => {
           const key = `${item.pharmacyId}::${item.medicineId}`;
@@ -527,6 +589,8 @@ export const placeOrderFromCart = async (req, res) => {
               itemId: item.id,
               medicineId: item.medicineId,
               pharmacyId: item.pharmacyId,
+              medicineName: item.medicineName || item.genericName || "Medicine",
+              pharmacyName: getPharmacyName(item.pharmacyId),
               reason: "NOT_FOUND",
             };
           }
@@ -536,6 +600,8 @@ export const placeOrderFromCart = async (req, res) => {
               itemId: item.id,
               medicineId: item.medicineId,
               pharmacyId: item.pharmacyId,
+              medicineName: inv.name || item.medicineName || item.genericName || "Medicine",
+              pharmacyName: getPharmacyName(item.pharmacyId),
               requestedQuantity: item.quantity,
               availableQuantity: inv.quantity,
               reason: "INSUFFICIENT_STOCK",
@@ -547,10 +613,7 @@ export const placeOrderFromCart = async (req, res) => {
         .filter(Boolean);
 
       if (insufficientItems.length > 0) {
-        throw createHttpError(409, "One or more items are out of stock", {
-          errorCode: "INSUFFICIENT_INVENTORY",
-          data: { insufficientItems },
-        });
+        throw buildOutOfStockError(insufficientItems[0]);
       }
 
       const pharmacySubtotals = new Map();
@@ -576,19 +639,24 @@ export const placeOrderFromCart = async (req, res) => {
 
       const orderIds = [];
       const groupedEntries = [...groupedItemsByPharmacy.entries()];
+      const patientCart = await tx.cart.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
 
       for (let index = 0; index < groupedEntries.length; index += 1) {
         const [pharmacyId, itemsForPharmacy] = groupedEntries[index];
         const pharmacyItemsSubtotal = pharmacySubtotals.get(pharmacyId) || 0;
         const pharmacyDeliveryFee = index === 0 ? deliveryFee : 0;
         const orderTotalAmount = pharmacyItemsSubtotal + pharmacyDeliveryFee;
+        const pharmacy = pharmacyById.get(String(pharmacyId));
 
         const order = await tx.order.create({
           data: {
             patientId: userId,
             pharmacyId,
             status: "PENDING",
-            inventoryDeducted: !isKhaltiPayment,
+            inventoryDeducted: true,
             paymentStatus: isKhaltiPayment ? "INITIATED" : "NOT_REQUIRED",
             totalAmount: orderTotalAmount,
             deliveryAddress: normalizedDeliveryAddress,
@@ -617,40 +685,58 @@ export const placeOrderFromCart = async (req, res) => {
           }),
         });
 
-        if (!isKhaltiPayment) {
-          for (const item of itemsForPharmacy) {
-            const updated = await tx.inventory.updateMany({
-              where: {
-                id: item.medicineId,
-                pharmacyId,
-                quantity: { gte: item.quantity },
-              },
-              data: { quantity: { decrement: item.quantity } },
-            });
+        // Deduct inventory immediately per split order so checkout reserves stock atomically.
+        for (const item of itemsForPharmacy) {
+          const inv = inventoryByCompositeKey.get(`${pharmacyId}::${item.medicineId}`);
+          const updated = await tx.inventory.updateMany({
+            where: {
+              id: item.medicineId,
+              pharmacyId,
+              quantity: { gte: item.quantity },
+            },
+            data: {
+              quantity: { decrement: item.quantity },
+            },
+          });
 
-            if (updated.count !== 1) {
-              throw createHttpError(409, "Inventory changed during checkout. Please try again.");
-            }
+          if (updated.count !== 1) {
+            throw buildOutOfStockError({
+              medicineName: inv?.name || item.medicineName || item.genericName || "Medicine",
+              pharmacyName: getPharmacyName(pharmacyId),
+            });
           }
         }
 
-        if (!isDirectPurchase && cart && !isKhaltiPayment) {
-          const selectedCartItemIds = itemsForPharmacy
-            .map((item) => item.id)
-            .filter(Boolean)
-            .map((value) => String(value));
-
-          if (selectedCartItemIds.length > 0) {
-            await tx.cartItem.deleteMany({
-              where: {
-                cartId: cart.id,
-                id: { in: selectedCartItemIds },
+        // Persist per-pharmacy order notification (with sound metadata) in the same transaction.
+        if (pharmacy?.userId) {
+          await tx.notification.create({
+            data: {
+              userId: pharmacy.userId,
+              title: "New Order Received",
+              message: `A new patient order has been placed at ${pharmacy.pharmacyName || "your pharmacy"}.`,
+              type: "NEW_ORDER",
+              metadata: {
+                orderId: order.id,
+                pharmacyId,
+                link: "/pharmacy/orders",
+                sound: "new-order-alert",
               },
-            });
-          }
+              targetRole: "PHARMACY",
+              priority: "high",
+            },
+          });
         }
 
         orderIds.push(order.id);
+      }
+
+      // Clear cart only after all split orders are created successfully.
+      if (patientCart?.id) {
+        await tx.cartItem.deleteMany({
+          where: {
+            cartId: patientCart.id,
+          },
+        });
       }
 
       return tx.order.findMany({
@@ -798,7 +884,8 @@ export const placeOrderFromCart = async (req, res) => {
     }
 
     try {
-      if (normalizedPaymentMethod !== "KHALTI") {
+      const io = req.app.get("io");
+      if (io) {
         const pharmacies = await prisma.pharmacy.findMany({
           where: {
             id: { in: [...new Set(orderedCheckoutOrders.map((order) => order.pharmacyId))] },
@@ -806,41 +893,23 @@ export const placeOrderFromCart = async (req, res) => {
           select: {
             id: true,
             userId: true,
-            pharmacyName: true,
           },
         });
 
         const pharmacyById = new Map(pharmacies.map((pharmacy) => [pharmacy.id, pharmacy]));
-        const io = req.app.get("io");
 
         for (const order of orderedCheckoutOrders) {
           const pharmacy = pharmacyById.get(order.pharmacyId);
           if (!pharmacy?.userId) continue;
 
-          await notificationService.createNotification(
-            pharmacy.userId,
-            "New Order Received",
-            `A new patient order has been placed at ${pharmacy.pharmacyName || "your pharmacy"}.`,
-            "NEW_ORDER",
-            {
-              orderId: order.id,
-              checkoutGroupId,
-              link: "/pharmacy/orders",
-              sound: "standard",
-            },
-            "PHARMACY",
-            "high"
-          );
-
-          if (io) {
-            io.emit("NEW_ORDER", {
-              orderId: order.id,
-              checkoutGroupId,
-              recipientId: pharmacy.userId,
-              pharmacyId: order.pharmacyId,
-              patientId: userId,
-            });
-          }
+          io.emit("NEW_ORDER", {
+            orderId: order.id,
+            checkoutGroupId,
+            recipientId: pharmacy.userId,
+            pharmacyId: order.pharmacyId,
+            patientId: userId,
+            sound: "new-order-alert",
+          });
         }
       }
     } catch (notificationError) {
@@ -1202,7 +1271,8 @@ export const updateOrderStatus = async (req, res) => {
   // Read authenticated pharmacy user and target order/status inputs.
   const userId = req.user?.userId;
   const orderId = String(req.params?.orderId || req.params?.id || "").trim();
-  const nextStatus = normalizeStatus(req.body?.status);
+  const requestedStatus = normalizeStatus(req.body?.status);
+  const nextStatus = requestedStatus === "DECLINED" ? "CANCELLED" : requestedStatus;
 
   if (!userId) {
     return res.status(401).json({ success: false, message: "Authentication required" });
@@ -1216,7 +1286,7 @@ export const updateOrderStatus = async (req, res) => {
   if (!nextStatus || !ORDER_STATUS_ENUM_VALUES.includes(nextStatus)) {
     return res.status(400).json({
       success: false,
-      message: `Invalid order status. Allowed values: ${ORDER_STATUS_ENUM_VALUES.join(", ")}`,
+      message: `Invalid order status. Allowed values: ${[...ORDER_STATUS_ENUM_VALUES, "DECLINED"].join(", ")}`,
     });
   }
 
@@ -1280,19 +1350,26 @@ export const updateOrderStatus = async (req, res) => {
         );
       }
 
-      // Deduct inventory if the transition requires it.
+      // Deduct inventory only for active fulfillment statuses.
       if (shouldAttemptInventoryDeduction(nextStatus) && !order.inventoryDeducted) {
         await deductOrderInventory(tx, order, pharmacy.id);
       }
 
+      // Declined/cancelled orders must not keep reserved stock deducted.
+      if (nextStatus === "CANCELLED" && order.inventoryDeducted) {
+        await revertOrderInventory(tx, order, pharmacy.id);
+      }
+
       const markInventoryDeducted =
         shouldAttemptInventoryDeduction(nextStatus) && !order.inventoryDeducted;
+      const markInventoryReverted = nextStatus === "CANCELLED" && order.inventoryDeducted;
 
       return tx.order.update({
         where: { id: orderId },
         data: {
           status: nextStatus,
           ...(markInventoryDeducted ? { inventoryDeducted: true } : {}),
+          ...(markInventoryReverted ? { inventoryDeducted: false } : {}),
         },
       });
     });

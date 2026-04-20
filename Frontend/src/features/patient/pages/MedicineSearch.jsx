@@ -12,6 +12,7 @@ import {
   Loader,
   CheckCircle,
   Heart,
+  Pill,
 } from "lucide-react";
 import searchService from "../../../core/services/search.service";
 import patientService from "../services/patient.service";
@@ -19,7 +20,6 @@ import useGeoLocation from "../../../shared/hooks/useGeoLocation";
 import { useLocation } from "../../../context/LocationContext";
 import { useCart } from "../../../context/CartContext";
 import StarRating from "../../../shared/components/StarRating";
-import MedicineImage from "../../../shared/components/ui/MedicineImage";
 
 const formatCurrency = (value) => {
   const amount = Number(value || 0);
@@ -28,6 +28,53 @@ const formatCurrency = (value) => {
     maximumFractionDigits: 2,
   })}`;
 };
+
+const API_ORIGIN = (() => {
+  try {
+    const configured = import.meta.env.VITE_API_URL || "http://localhost:5050/api";
+    return new URL(configured).origin;
+  } catch {
+    return "http://localhost:5050";
+  }
+})();
+
+const resolveMedicineImageUrl = (imageUrl) => {
+  const raw = String(imageUrl || "").trim();
+  if (!raw) return null;
+
+  if (/^(https?:)?\/\//i.test(raw) || raw.startsWith("data:")) {
+    return raw;
+  }
+
+  const normalizedPath = raw.startsWith("/") ? raw : `/${raw}`;
+  return `${API_ORIGIN}${normalizedPath}`;
+};
+
+function MedicineCardImage({ imageUrl, alt }) {
+  const [hasError, setHasError] = useState(false);
+  const resolvedImage = resolveMedicineImageUrl(imageUrl);
+  const showFallback = !resolvedImage || hasError;
+
+  return (
+    <div className="h-36 w-full overflow-hidden rounded-t-2xl border-b border-slate-200 bg-slate-50">
+      {showFallback ? (
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-sky-100 bg-white shadow-sm">
+            <Pill size={26} className="text-sky-500" />
+          </div>
+        </div>
+      ) : (
+        <img
+          src={resolvedImage}
+          alt={alt}
+          className="h-full w-full object-contain p-3"
+          loading="lazy"
+          onError={() => setHasError(true)}
+        />
+      )}
+    </div>
+  );
+}
 
 /**
  * Medicine search page with pharmacy availability and filters.
@@ -152,6 +199,7 @@ export default function MedicineSearch() {
             pharmacyId: medicine?.pharmacy?.id || medicine?.pharmacyId || null,
             medicineName: medicine?.medicine || medicine?.brandName || "Medicine",
             genericName: medicine?.genericName || null,
+            imageUrl: medicine?.imageUrl || null,
             quantity: 1,
             price: Number(medicine?.price || 0),
             pharmacyName: medicine?.pharmacy?.name || "Unknown Pharmacy",
@@ -408,8 +456,13 @@ export default function MedicineSearch() {
                   }}
                   role="button"
                   tabIndex={0}
-                  className="mx-auto w-full max-w-xs rounded-2xl border border-white/70 bg-white/90 p-3 shadow-[0_14px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_48px_rgba(15,23,42,0.12)] relative cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="relative mx-auto w-full max-w-xs cursor-pointer overflow-hidden rounded-2xl border border-white/70 bg-white/95 shadow-[0_14px_40px_rgba(15,23,42,0.08)] backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_48px_rgba(15,23,42,0.12)] focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
+                  <MedicineCardImage
+                    imageUrl={medicine?.imageUrl}
+                    alt={medicine?.medicine || medicine?.brandName || "Medicine"}
+                  />
+
                   {/* Favorite Heart Button */}
                   <button
                     onClick={(e) => {
@@ -417,7 +470,7 @@ export default function MedicineSearch() {
                       toggleFavorite(medicine);
                     }}
                     disabled={togglingFav === (medicine.medicine || medicine.brandName)}
-                    className="absolute top-2 right-2 p-1.5 rounded-full hover:bg-pink-50 transition-colors z-10"
+                    className="absolute right-3 top-3 z-10 rounded-full bg-white/90 p-1.5 shadow-sm transition-colors hover:bg-pink-50"
                     title={favoritedNames.has(medicine.medicine || medicine.brandName) ? "Remove from favorites" : "Add to favorites"}
                   >
                     <Heart
@@ -430,112 +483,108 @@ export default function MedicineSearch() {
                     />
                   </button>
 
-                  <div className="mb-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 aspect-[4/3]">
-                    <MedicineImage
-                      src={medicine?.imageUrl}
-                      alt={medicine?.medicine || medicine?.brandName || "Medicine"}
-                      className="object-cover"
-                    />
-                  </div>
-
-                  {/* Medicine Name */}
-                  <h3 className="text-base font-bold text-gray-900 leading-tight line-clamp-2">
-                    {medicine.medicine || medicine.brandName}
-                  </h3>
-                  <p className="text-xs text-gray-600 mt-1 line-clamp-1">
-                    {medicine.genericName && `Generic: ${medicine.genericName}`}
-                  </p>
-
-                  {/* Price & Availability */}
-                  <div className="mt-3 mb-3 space-y-1.5 rounded-2xl bg-slate-50/90 p-2.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs uppercase tracking-wide text-slate-500">Price</span>
-                      <span className="text-sm font-black text-blue-700">
-                        {formatCurrency(medicine.price)}
-                      </span>
+                  <div className="space-y-3 p-4">
+                    {/* Medicine Name */}
+                    <div>
+                      <h3 className="line-clamp-2 text-base font-bold leading-tight text-gray-900">
+                        {medicine.medicine || medicine.brandName}
+                      </h3>
+                      <p className="mt-1 line-clamp-1 text-xs text-gray-600">
+                        {medicine.genericName && `Generic: ${medicine.genericName}`}
+                      </p>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs uppercase tracking-wide text-slate-500">Stock</span>
-                      <span className={`text-sm font-medium ${medicine.inStock ? 'text-green-600' : 'text-red-600'}`}>
-                        {medicine.quantity > 0 ? `${medicine.quantity} available` : 'Out of stock'}
-                      </span>
-                    </div>
-                  </div>
+                    {/* Price & Availability */}
+                    <div className="space-y-1.5 rounded-2xl bg-slate-50/90 p-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs uppercase tracking-wide text-slate-500">Price</span>
+                        <span className="text-sm font-black text-blue-700">
+                          {formatCurrency(medicine.price)}
+                        </span>
+                      </div>
 
-                  {/* Top Pharmacy */}
-                  {medicine.pharmacy && (
-                    <div
-                      className="mb-3 rounded-2xl border border-slate-200 bg-white/80 p-3 cursor-pointer hover:bg-blue-50/80 transition-colors"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleOpenStore(medicine?.pharmacy?.id);
-                      }}
-                    >
-                      <p className="text-[11px] uppercase tracking-wide text-slate-500">Available at</p>
-                      <p
-                        className="text-sm font-semibold text-gray-900 hover:text-blue-700 hover:underline underline-offset-2 leading-tight"
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs uppercase tracking-wide text-slate-500">Stock</span>
+                        <span className={`text-sm font-medium ${medicine.inStock ? "text-green-600" : "text-red-600"}`}>
+                          {medicine.quantity > 0 ? `${medicine.quantity} available` : "Out of stock"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Top Pharmacy */}
+                    {medicine.pharmacy && (
+                      <div
+                        className="cursor-pointer rounded-2xl border border-slate-200 bg-white/80 p-3 transition-colors hover:bg-blue-50/80"
                         onClick={(event) => {
                           event.stopPropagation();
                           handleOpenStore(medicine?.pharmacy?.id);
                         }}
                       >
-                        {medicine.pharmacy.name}
-                      </p>
-                      <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">{medicine.pharmacy.address}</p>
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className="inline-flex items-center rounded-full bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-700">
-                          {medicine.distanceFormatted || (medicine.distance ? `${parseFloat(medicine.distance).toFixed(1)} km` : 'Distance unavailable')} away
-                        </span>
-                        <span className="text-[11px] font-medium text-blue-600 truncate">
-                          {medicine.pharmacy.contactNumber}
-                        </span>
-                      </div>
-                      {(medicine.pharmacy.averageRating > 0 || medicine.pharmacy.totalReviews > 0) && (
-                        <div className="mt-2 pt-2 border-t border-gray-200">
-                          <StarRating
-                            rating={medicine.pharmacy.averageRating || 0}
-                            totalReviews={medicine.pharmacy.totalReviews}
-                            size={12}
-                          />
+                        <p className="text-[11px] uppercase tracking-wide text-slate-500">Available at</p>
+                        <p
+                          className="text-sm font-semibold leading-tight text-gray-900 underline-offset-2 hover:text-blue-700 hover:underline"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleOpenStore(medicine?.pharmacy?.id);
+                          }}
+                        >
+                          {medicine.pharmacy.name}
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-[11px] text-gray-500">{medicine.pharmacy.address}</p>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center rounded-full bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-700">
+                            {medicine.distanceFormatted || (medicine.distance ? `${parseFloat(medicine.distance).toFixed(1)} km` : "Distance unavailable")} away
+                          </span>
+                          <span className="truncate text-[11px] font-medium text-blue-600">
+                            {medicine.pharmacy.contactNumber}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  )}
+                        {(medicine.pharmacy.averageRating > 0 || medicine.pharmacy.totalReviews > 0) && (
+                          <div className="mt-2 border-t border-gray-200 pt-2">
+                            <StarRating
+                              rating={medicine.pharmacy.averageRating || 0}
+                              totalReviews={medicine.pharmacy.totalReviews}
+                              size={12}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                  {/* Failsafe Warning */}
-                  {medicine.failsafeNote && (
-                    <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
-                      <p className="text-xs text-amber-700 flex items-start gap-2">
-                        <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
-                        <span>{medicine.failsafeNote}</span>
-                      </p>
-                    </div>
-                  )}
+                    {/* Failsafe Warning */}
+                    {medicine.failsafeNote && (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                        <p className="flex items-start gap-2 text-xs text-amber-700">
+                          <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+                          <span>{medicine.failsafeNote}</span>
+                        </p>
+                      </div>
+                    )}
 
-                  {/* Action Buttons */}
-                  <div className="space-y-2">
-                    <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleAddToCart(medicine);
-                      }}
-                      className="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
-                    >
-                      Add to Cart
-                    </button>
-                    <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handlePlaceOrder(medicine);
-                      }}
-                      className="w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
-                    >
-                      Place Order
-                    </button>
+                    {/* Action Buttons */}
+                    <div className="space-y-2">
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleAddToCart(medicine);
+                        }}
+                        className="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                      >
+                        Add to Cart
+                      </button>
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handlePlaceOrder(medicine);
+                        }}
+                        className="w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                      >
+                        Place Order
+                      </button>
+                    </div>
                   </div>
                 </div>
-              ))}
+                ))}
                 </div>
               </>
             )}

@@ -10,8 +10,8 @@ const AdminHeader = ({ onOpenSidebar }) => {
     <DashboardHeader
       onOpenSidebar={onOpenSidebar}
       userName={user?.name || "System Admin"}
-      title="Admin Intelligence Hub"
-      subtitle="Platform overview"
+      title=""
+      subtitle=""
       searchPlaceholder="Search users, pharmacies, reports..."
       notificationSlot={<NotificationDropdown mode="admin" />}
     />

@@ -144,10 +144,29 @@ export function NotificationProvider({ children }) {
       playNotificationSound("urgent");
     };
 
-    // Handle admin announcement broadcasts.
-    const onAdminBroadcast = () => {
+    // Handle admin/cms broadcasts (announcements and health tips) with role-aware filtering.
+    const onAdminBroadcast = (payload = {}) => {
+      const roleId = Number(user?.roleId);
+      const myRole =
+        roleId === 1 ? "ADMIN" :
+        roleId === 2 ? "PHARMACY" :
+        roleId === 3 ? "PATIENT" :
+        null;
+
+      const targetRole = String(payload?.targetRole || "").toUpperCase();
+      const isTargetedToMe =
+        !targetRole ||
+        targetRole === "ALL" ||
+        targetRole === myRole ||
+        (myRole === "PHARMACY" && targetRole === "PHARMACY_ADMIN");
+
+      if (!isTargetedToMe) return;
+
       setUnreadNotifications((c) => c + 1);
-      playNotificationSound("standard");
+      if (payload?.priority === "high") {
+        setHasHighPriority(true);
+      }
+      playNotificationSound("cms");
     };
 
     // Handle new order events.

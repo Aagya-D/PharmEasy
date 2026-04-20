@@ -92,3 +92,40 @@ export const updateAvatar = async (req, res, next) => {
     next(error);
   }
 };
+
+// Remove authenticated user's avatar URL (clear profile photo).
+export const deleteAvatar = async (req, res, next) => {
+  try {
+    // Resolve authenticated user ID.
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    // Clear avatar URL from user profile.
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { avatarUrl: null },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatarUrl: true,
+        roleId: true,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile photo removed successfully",
+      data: {
+        user: updatedUser,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

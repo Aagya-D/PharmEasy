@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, AlertCircle, Info, AlertTriangle, CheckCircle } from 'lucide-react';
 import contentService from '../../core/services/content.service';
 
@@ -9,14 +9,25 @@ import contentService from '../../core/services/content.service';
  * @param {string} targetRole - The user role to filter announcements (PATIENT, PHARMACY, ADMIN)
  * @param {string} className - Additional CSS classes
  */
-export function AnnouncementBanner({ targetRole, className = '' }) {
+export function AnnouncementBanner({ targetRole, className = '', forceShowToken = null }) {
   const [announcement, setAnnouncement] = useState(null);
   const [isVisible, setIsVisible] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const dismissedKey = useMemo(
+    () => `dismissedAnnouncement:${String(targetRole || 'ALL').toUpperCase()}`,
+    [targetRole]
+  );
 
   useEffect(() => {
     loadAnnouncement();
   }, [targetRole]);
+
+  useEffect(() => {
+    if (!forceShowToken) return;
+    sessionStorage.removeItem(dismissedKey);
+    setIsVisible(true);
+    loadAnnouncement();
+  }, [forceShowToken, dismissedKey]);
 
   const loadAnnouncement = async () => {
     try {
@@ -24,7 +35,7 @@ export function AnnouncementBanner({ targetRole, className = '' }) {
       const response = await contentService.getHighPriorityAnnouncement(targetRole);
       if (response.success && response.data) {
         // Check if user has dismissed this announcement in this session
-        const dismissedId = sessionStorage.getItem('dismissedAnnouncement');
+        const dismissedId = sessionStorage.getItem(dismissedKey);
         if (dismissedId !== response.data.id) {
           setAnnouncement(response.data);
           setIsVisible(true);
@@ -41,7 +52,7 @@ export function AnnouncementBanner({ targetRole, className = '' }) {
     setIsVisible(false);
     // Store dismissed announcement ID in session storage
     if (announcement) {
-      sessionStorage.setItem('dismissedAnnouncement', announcement.id);
+      sessionStorage.setItem(dismissedKey, announcement.id);
     }
   };
 

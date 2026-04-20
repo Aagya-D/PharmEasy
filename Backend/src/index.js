@@ -26,6 +26,7 @@ import chatRoutes from "./modules/chat/chat.routes.js";
 import reviewRoutes from "./modules/review/review.routes.js";
 import userRoutes from "./modules/user/user.routes.js";
 import chatHandler from "./sockets/chatHandler.js";
+import { purgeExpiredCmsContent } from "./services/cmsExpiry.service.js";
 // adminExtendedRoutes still uses CommonJS and is handled separately.
 
 // Resolve __dirname for ES modules.
@@ -49,6 +50,7 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 const PORT = process.env.PORT || 5050;
 const HOST =
   process.env.HOST || (NODE_ENV === "production" ? "0.0.0.0" : "localhost");
+const CMS_EXPIRY_SWEEP_MS = Number(process.env.CMS_EXPIRY_SWEEP_MS || 30000);
 
 // Middleware.
 
@@ -319,6 +321,8 @@ app.use(errorHandler);
 // Start the server.
 
 const startServer = async () => {
+  let cmsExpiryInterval = null;
+
   try {
     // Check the database connection.
     await prisma.$queryRaw`SELECT 1`;
@@ -350,6 +354,16 @@ const startServer = async () => {
     // Make io available to controllers.
     app.set("io", io);
     console.log("Socket.IO initialized with chat handler");
+
+    // Start a lightweight recurring cleanup so expired CMS records are deleted close to their exact expiry time.
+    await purgeExpiredCmsContent({ logResult: true });
+    cmsExpiryInterval = setInterval(() => {
+      purgeExpiredCmsContent({ logResult: true }).catch((error) => {
+        logger.error("[CMS_EXPIRY] Scheduled cleanup failed", {
+          error: error?.message,
+        });
+      });
+    }, CMS_EXPIRY_SWEEP_MS);
 
     // Handle port-in-use errors and retry once.
     server.on("error", async (err) => {
@@ -399,6 +413,10 @@ const startServer = async () => {
     // Graceful shutdown.
     const gracefulShutdown = async (signal) => {
       console.log(`\n${signal} received, shutting down gracefully...`);
+      if (cmsExpiryInterval) {
+        clearInterval(cmsExpiryInterval);
+        cmsExpiryInterval = null;
+      }
       server.close(async () => {
         await prisma.$disconnect();
         console.log("Server closed");

@@ -1512,7 +1512,8 @@ export const getPharmacyOrders = async (req, res, next) => {
     // Scope orders to current pharmacy.
     const where = { pharmacyId: pharmacy.id };
     if (status && status !== 'all') {
-      where.status = String(status).toUpperCase();
+      const normalizedStatus = String(status).toUpperCase();
+      where.status = normalizedStatus === "DECLINED" ? "CANCELLED" : normalizedStatus;
     }
 
     // Fetch paginated orders plus total count in parallel.
@@ -1566,6 +1567,7 @@ export const getPharmacyOrders = async (req, res, next) => {
           preparing: await prisma.order.count({ where: { pharmacyId: pharmacy.id, status: 'PREPARING' } }),
           ready: await prisma.order.count({ where: { pharmacyId: pharmacy.id, status: 'READY' } }),
           fulfilled: await prisma.order.count({ where: { pharmacyId: pharmacy.id, status: 'COMPLETED' } }),
+          cancelled: await prisma.order.count({ where: { pharmacyId: pharmacy.id, status: 'CANCELLED' } }),
           revenue: revenueAgg._sum.totalAmount || 0,
         },
         pagination: {

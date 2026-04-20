@@ -3,11 +3,10 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import LoadingSpinner from "../shared/components/ui/LoadingSpinner";
 
-// Role ID to role name mapping.
-const ROLE_MAP = {
-  1: 'ADMIN',
-  2: 'PHARMACY',
-  3: 'PATIENT'
+const ROLE_NAME_TO_ID = {
+  ADMIN: 1,
+  PHARMACY: 2,
+  PATIENT: 3,
 };
 
 /**
@@ -35,32 +34,27 @@ export function ProtectedRoute({ allowedRoles, children }) {
   // Check role-based access when the route requires it.
   if (allowedRoles && allowedRoles.length > 0) {
     const userRoleId = Number(user.roleId);
-    const userRole = ROLE_MAP[userRoleId];
+    const normalizedAllowedRoleIds = allowedRoles
+      .map((role) => {
+        if (typeof role === "number") return role;
+        const roleName = String(role || "").toUpperCase();
+        return ROLE_NAME_TO_ID[roleName];
+      })
+      .filter((roleId) => Number.isFinite(roleId));
 
-    const isSysAdmin = userRoleId === 1;
-    const isPharmacyRoute = allowedRoles.includes('PHARMACY');
-
-    console.log('[ProtectedRoute] 🔐 AUTHORIZATION CHECK', {
+    console.log('[ProtectedRoute] RBAC CHECK', {
       userRoleId,
-      userRole,
-      requiredRoles: allowedRoles,
-      isSysAdmin,
-      isPharmacyRoute,
+      normalizedAllowedRoleIds,
     });
 
-    // System admin can access non-pharmacy routes even when a role list is provided.
-    const hasRole = userRole && allowedRoles.includes(userRole);
-    const hasMasterKey = isSysAdmin && !isPharmacyRoute;
-    const isAuthorized = hasRole || hasMasterKey;
+    const isAuthorized = normalizedAllowedRoleIds.includes(userRoleId);
 
     if (!isAuthorized) {
       console.error('[ProtectedRoute] ❌ UNAUTHORIZED - missing required role', {
         userRoleId,
-        userRole,
         requiredRoles: allowedRoles,
-        message: `User role "${userRole}" is not in "${allowedRoles.join(', ')}"`,
       });
-      return <Navigate to="/unauthorized" replace />;
+      return <Navigate to="/access-denied" replace />;
     }
 
     console.log('[ProtectedRoute] ✅ AUTHORIZED - user has required role');

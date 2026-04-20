@@ -11,14 +11,20 @@ import {
   AlertCircle,
   Mail,
   Phone,
+  Camera,
+  Upload,
 } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext";
 import httpClient from "../../../core/services/httpClient";
+import patientService from "../../patient/services/patient.service";
 
 export default function PatientSettings() {
   const { user, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
   const [loading, setLoading] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(user?.avatarUrl || "");
   const [notification, setNotification] = useState(null);
 
   // Profile form state
@@ -108,6 +114,73 @@ export default function PatientSettings() {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle avatar file change
+  const handleAvatarFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      showNotification("error", "Only JPG, PNG, or WEBP images are allowed");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      showNotification("error", "Profile photo must be under 2MB");
+      return;
+    }
+
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  // Handle avatar upload
+  const handleAvatarUpload = async () => {
+    if (!avatarFile) {
+      showNotification("error", "Please choose an image first");
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      await patientService.uploadAvatar(avatarFile);
+      await refreshUser();
+      setAvatarFile(null);
+      showNotification("success", "Profile photo updated successfully");
+    } catch (error) {
+      showNotification(
+        "error",
+        error.response?.data?.message || "Failed to upload profile photo"
+      );
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  // Handle avatar removal
+  const handleAvatarRemove = async () => {
+    if (!user?.avatarUrl) {
+      showNotification("error", "No profile photo to remove");
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      await patientService.removeAvatar();
+      await refreshUser();
+      setAvatarFile(null);
+      setAvatarPreview("");
+      showNotification("success", "Profile photo removed successfully");
+    } catch (error) {
+      showNotification(
+        "error",
+        error.response?.data?.message || "Failed to remove profile photo"
+      );
+    } finally {
+      setAvatarUploading(false);
     }
   };
 
@@ -264,6 +337,43 @@ export default function PatientSettings() {
                         className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Enter your phone number"
                       />
+                    </div>
+                  </div>
+
+                  {/* Profile Photo */}
+                  <div className="border-t pt-6 mt-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Profile Photo
+                    </label>
+                    <p className="text-xs text-gray-500 mb-3">Upload JPG, PNG, or WEBP up to 2MB.</p>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                        <Upload size={16} />
+                        Choose Photo
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/webp"
+                          onChange={handleAvatarFileChange}
+                          className="hidden"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleAvatarUpload}
+                        disabled={!avatarFile || avatarUploading}
+                        className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {avatarUploading ? <Loader className="animate-spin" size={16} /> : <Camera size={16} />}
+                        Upload Photo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAvatarRemove}
+                        disabled={!user?.avatarUrl || avatarUploading}
+                        className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Remove Photo
+                      </button>
                     </div>
                   </div>
 

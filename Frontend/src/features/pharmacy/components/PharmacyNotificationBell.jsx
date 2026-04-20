@@ -108,8 +108,18 @@ function timeAgo(dateStr) {
 function getActionLink(n) {
   try {
     const meta = typeof n.metadata === "string" ? JSON.parse(n.metadata) : n.metadata;
-    return meta?.link || null;
+    const rawLink = typeof meta?.link === "string" ? meta.link.trim() : "";
+
+    // CMS announcements for pharmacy should always open the dashboard announcement section.
+    if (n?.type === "CMS_ALERT") {
+      return "/pharmacy/dashboard?focus=announcement&reopenAnnouncement=1";
+    }
+
+    return rawLink || null;
   } catch {
+    if (n?.type === "CMS_ALERT") {
+      return "/pharmacy/dashboard?focus=announcement&reopenAnnouncement=1";
+    }
     return null;
   }
 }

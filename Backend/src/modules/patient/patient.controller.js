@@ -244,7 +244,7 @@ export const updateProfile = async (req, res) => {
 export const getOrders = async (req, res) => {
   const startTime = Date.now();
   const patientId = req.user?.userId;
-  const { limit = 10, status } = req.query;
+  const { status } = req.query;
 
   // Validate user identity
   if (!patientId) {
@@ -262,7 +262,6 @@ export const getOrders = async (req, res) => {
 
     const orders = await prisma.order.findMany({
       where: whereClause,
-      take: parseInt(limit) || 10,
       orderBy: { createdAt: 'desc' },
       include: {
         items: {

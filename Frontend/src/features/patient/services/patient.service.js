@@ -33,6 +33,12 @@ const patientService = {
     return response.data;
   },
 
+  // Remove patient avatar/profile photo
+  removeAvatar: async () => {
+    const response = await httpClient.delete("/user/avatar");
+    return response.data;
+  },
+
   // Get patient orders
   getOrders: async (filters = {}) => {
     const response = await httpClient.get("/patient/orders", { params: filters });

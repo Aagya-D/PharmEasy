@@ -18,11 +18,51 @@ import logger from "../../../utils/logger";
 import MedicineForm from "../components/MedicineForm";
 import MedicineDetailModal from "../components/MedicineDetailModal";
 
+const LOW_STOCK_THRESHOLD = 20;
+const EXPIRING_SOON_DAYS = 30;
+
+const STATUS_FILTERS = [
+  { key: "ALL", label: "All" },
+  { key: "IN_STOCK", label: "In Stock" },
+  { key: "LOW_STOCK", label: "Low Stock" },
+  { key: "OUT_OF_STOCK", label: "Out of Stock" },
+  { key: "EXPIRING_SOON", label: "Expiring Soon" },
+  { key: "EXPIRED", label: "Expired" },
+];
+
+const getDaysUntilExpiry = (expiryDate) => {
+  return Math.floor((new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
+};
+
+const matchesStatusFilter = (item, status) => {
+  const qty = Number(item?.quantity || 0);
+  const daysUntilExpiry = getDaysUntilExpiry(item?.expiryDate);
+  const isExpired = daysUntilExpiry < 0;
+
+  switch (status) {
+    case "IN_STOCK":
+      // "In Stock" is the healthy bucket: available, not low stock, and not expired.
+      return qty >= LOW_STOCK_THRESHOLD && !isExpired;
+    case "LOW_STOCK":
+      return qty > 0 && qty < LOW_STOCK_THRESHOLD && !isExpired;
+    case "OUT_OF_STOCK":
+      return qty === 0;
+    case "EXPIRING_SOON":
+      return daysUntilExpiry >= 0 && daysUntilExpiry <= EXPIRING_SOON_DAYS;
+    case "EXPIRED":
+      return daysUntilExpiry < 0;
+    case "ALL":
+    default:
+      return true;
+  }
+};
+
 export default function PharmacyInventory() {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
@@ -40,13 +80,11 @@ export default function PharmacyInventory() {
   const stats = React.useMemo(() => {
     // Keep the summary cards derived from the current in-memory inventory.
     const totalItems = inventory.length;
-    const lowStockItems = inventory.filter(item => item.quantity > 0 && item.quantity < 20).length;
+    const lowStockItems = inventory.filter(item => item.quantity > 0 && item.quantity < LOW_STOCK_THRESHOLD).length;
     const outOfStockItems = inventory.filter(item => item.quantity === 0).length;
     const expiringItems = inventory.filter(item => {
-      const daysUntilExpiry = Math.floor(
-        (new Date(item.expiryDate) - new Date()) / (1000 * 60 * 60 * 24)
-      );
-      return daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
+      const daysUntilExpiry = getDaysUntilExpiry(item.expiryDate);
+      return daysUntilExpiry >= 0 && daysUntilExpiry <= EXPIRING_SOON_DAYS;
     }).length;
 
     return [
@@ -101,17 +139,26 @@ export default function PharmacyInventory() {
     }
   };
 
-  // Filter inventory based on search
+  // Filter inventory based on search and selected stock status.
   const filteredInventory = inventory.filter(item => {
     // Search across medicine name, generic name, and category.
     const searchLower = searchTerm.toLowerCase();
     const normalizedCategory = (item.category || "").toLowerCase().replace(/_/g, " ");
-    return (
+    const matchesSearch = (
       item.name.toLowerCase().includes(searchLower) ||
       item.genericName.toLowerCase().includes(searchLower) ||
       normalizedCategory.includes(searchLower)
     );
+
+    return matchesSearch && matchesStatusFilter(item, statusFilter);
   });
+
+  const statusCounts = React.useMemo(() => {
+    return STATUS_FILTERS.reduce((acc, filter) => {
+      acc[filter.key] = inventory.filter((item) => matchesStatusFilter(item, filter.key)).length;
+      return acc;
+    }, {});
+  }, [inventory]);
 
   const handleView = async (item) => {
     try {
@@ -197,7 +244,7 @@ export default function PharmacyInventory() {
     // Map quantity to a compact visual status label.
     if (quantity === 0) {
       return <span className="px-2.5 py-1 rounded-full text-xs bg-red-50 text-red-600">Out of Stock</span>;
-    } else if (quantity < 20) {
+    } else if (quantity < LOW_STOCK_THRESHOLD) {
       return <span className="px-2.5 py-1 rounded-full text-xs bg-orange-50 text-orange-600">Low Stock</span>;
     } else {
       return <span className="px-2.5 py-1 rounded-full text-xs bg-green-50 text-green-600">In Stock</span>;
@@ -207,13 +254,11 @@ export default function PharmacyInventory() {
   // Get expiry badge
   const getExpiryBadge = (expiryDate) => {
     // Show expiry warnings inline so the table stays readable.
-    const daysUntilExpiry = Math.floor(
-      (new Date(expiryDate) - new Date()) / (1000 * 60 * 60 * 24)
-    );
+    const daysUntilExpiry = getDaysUntilExpiry(expiryDate);
 
     if (daysUntilExpiry < 0) {
       return <span className="text-xs text-red-600">Expired</span>;
-    } else if (daysUntilExpiry <= 30) {
+    } else if (daysUntilExpiry <= EXPIRING_SOON_DAYS) {
       return <span className="text-xs text-orange-600">Expires in {daysUntilExpiry} days</span>;
     } else {
       return <span className="text-xs text-slate-600">{new Date(expiryDate).toLocaleDateString()}</span>;
@@ -294,6 +339,35 @@ export default function PharmacyInventory() {
             </button>
           </div>
 
+          <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50">
+            <div className="flex flex-wrap gap-2">
+              {STATUS_FILTERS.map((filter) => {
+                const isActive = statusFilter === filter.key;
+                const count = statusCounts?.[filter.key] ?? 0;
+                return (
+                  <button
+                    key={filter.key}
+                    onClick={() => setStatusFilter(filter.key)}
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      isActive
+                        ? "border-blue-600 bg-blue-600 text-white"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>{filter.label}</span>
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                        isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead className="text-slate-500 border-b border-slate-200">
@@ -314,14 +388,14 @@ export default function PharmacyInventory() {
                     <td colSpan="8" className="px-6 py-16 text-center">
                       <Package className="mx-auto mb-3 text-gray-300" size={48} />
                       <p className="text-slate-700 font-semibold text-lg">
-                        {searchTerm ? "No matches found" : "No medicines in inventory"}
+                        {searchTerm || statusFilter !== "ALL" ? "No matches found" : "No medicines in inventory"}
                       </p>
                       <p className="text-slate-500 text-sm mt-1">
-                        {searchTerm
-                          ? `No medicines match "${searchTerm}". Try a different search term.`
+                        {searchTerm || statusFilter !== "ALL"
+                          ? `No medicines match your current search/filter criteria.`
                           : "Add your first medicine to start managing your inventory."}
                       </p>
-                      {!searchTerm && (
+                      {!searchTerm && statusFilter === "ALL" && (
                         <button
                           onClick={() => setIsAddModalOpen(true)}
                           className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"

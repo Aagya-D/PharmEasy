@@ -66,50 +66,7 @@ import Layout from "../shared/layouts/Layout";
 import PatientLayout from "../shared/layouts/PatientLayout";
 import ProtectedPharmacyLayout from "../shared/layouts/ProtectedPharmacyLayout";
 import ErrorBoundary from "../shared/components/ErrorBoundary";
-
-// Unauthorized page shown when user lacks required permissions.
-function UnauthorizedPage() {
-  const handleClearSession = () => {
-    // Clear all persisted auth/session values.
-    console.log("Clearing session data");
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
-    localStorage.removeItem("pendingUserId");
-    localStorage.removeItem("pendingEmail");
-    
-    // Redirect to login after clearing session.
-    window.location.href = '/login';
-  };
-
-  return (
-    <Layout>
-      <div className="p-6 text-center max-w-[600px] mx-auto">
-        <h1 className="text-5xl mb-4">🚫</h1>
-        <h2 className="mb-4">Access Denied</h2>
-        <p className="text-[var(--color-text-secondary)] mb-6">
-          You don't have permission to access this page.
-        </p>
-        <div className="flex gap-4 justify-center flex-wrap">
-          <button
-            onClick={() => window.location.href = "/dashboard"}
-            className="px-6 py-4 bg-[var(--color-primary)] text-white border-none rounded-lg cursor-pointer hover:opacity-80 transition"
-          >
-            Go to Dashboard
-          </button>
-          {/* Session reset helper for permission edge cases. */}
-          <button
-            onClick={handleClearSession}
-            className="px-6 py-4 bg-red-600 text-white border-none rounded-lg cursor-pointer hover:opacity-80 transition"
-            title="Clear cached session and return to login"
-          >
-            Clear Session & Login
-          </button>
-        </div>
-      </div>
-    </Layout>
-  );
-}
+import AccessDenied from "../shared/pages/AccessDenied";
 
 // Not-found page for unmatched routes.
 function NotFoundPage() {
@@ -329,8 +286,12 @@ export const routes = [
     ),
   },
   {
+    path: "/access-denied",
+    element: <AccessDenied />,
+  },
+  {
     path: "/unauthorized",
-    element: <UnauthorizedPage />,
+    element: <Navigate to="/access-denied" replace />,
   },
   {
     path: "/patient/payment/khalti/callback",
@@ -341,7 +302,7 @@ export const routes = [
   {
     path: "/patient/chat",
     element: (
-      <ProtectedRoute allowedRoles={['PATIENT']}>
+      <ProtectedRoute allowedRoles={[3]}>
         <PatientChat />
       </ProtectedRoute>
     ),
@@ -351,7 +312,7 @@ export const routes = [
   {
     path: "/patient",
     element: (
-      <ProtectedRoute allowedRoles={['PATIENT']}>
+      <ProtectedRoute allowedRoles={[3]}>
         <PatientLayout>
           <Outlet />
         </PatientLayout>
@@ -360,6 +321,10 @@ export const routes = [
     children: [
       {
         path: "",
+        element: <PatientDashboard />,
+      },
+      {
+        path: "dashboard",
         element: <PatientDashboard />,
       },
       {
@@ -411,7 +376,7 @@ export const routes = [
   {
     path: "/",
     element: (
-      <ProtectedRoute allowedRoles={['PATIENT']}>
+      <ProtectedRoute allowedRoles={[3]}>
         <PatientLayout>
           <Outlet />
         </PatientLayout>
@@ -453,7 +418,7 @@ export const routes = [
   {
     path: "/pharmacy",
     element: (
-      <ProtectedRoute allowedRoles={['PHARMACY']}>
+      <ProtectedRoute allowedRoles={[2]}>
         <PharmacyStatusGate />
       </ProtectedRoute>
     ),
@@ -538,7 +503,7 @@ export const routes = [
   {
     path: "/admin",
     element: (
-      <ProtectedRoute allowedRoles={['ADMIN']}>
+      <ProtectedRoute allowedRoles={[1]}>
         <Outlet />
       </ProtectedRoute>
     ),

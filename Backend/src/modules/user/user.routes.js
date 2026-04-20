@@ -1,6 +1,6 @@
 import express from "express";
 import { authenticate } from "../../middlewares/auth.js";
-import { updateAvatar, uploadAvatar } from "./user.controller.js";
+import { updateAvatar, uploadAvatar, deleteAvatar } from "./user.controller.js";
 
 const router = express.Router();
 
@@ -18,5 +18,8 @@ router.patch("/avatar", authenticate(), (req, res, next) => {
     return next();
   });
 }, updateAvatar);
+
+// Delete authenticated user's avatar.
+router.delete("/avatar", authenticate(), deleteAvatar);
 
 export default router;

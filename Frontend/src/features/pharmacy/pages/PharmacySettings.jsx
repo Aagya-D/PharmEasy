@@ -453,6 +453,32 @@ export default function PharmacySettings() {
     }
   };
 
+  // Handle avatar removal
+  const handleAvatarRemove = async () => {
+    if (!user?.avatarUrl) {
+      showNotification("error", "No profile photo to remove");
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      const response = await httpClient.delete("/user/avatar");
+      if (response.data?.success) {
+        await refreshUser();
+        setAvatarFile(null);
+        setAvatarPreview("");
+        showNotification("success", "Profile photo removed successfully");
+      }
+    } catch (error) {
+      showNotification(
+        "error",
+        error.response?.data?.message || "Failed to remove profile photo"
+      );
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   // Password strength calculator
   const getPasswordStrength = (password) => {
     if (!password) return { strength: 0, label: "None", color: "gray" };
@@ -602,6 +628,14 @@ export default function PharmacySettings() {
                           >
                             {avatarUploading ? <Loader className="animate-spin" size={16} /> : <Save size={16} />}
                             Save Photo
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleAvatarRemove}
+                            disabled={!user?.avatarUrl || avatarUploading}
+                            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Remove Photo
                           </button>
                         </div>
                         <p className="mt-2 text-xs text-gray-500">JPG, PNG, WEBP up to 2MB.</p>

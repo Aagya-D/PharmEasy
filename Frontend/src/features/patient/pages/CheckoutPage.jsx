@@ -78,6 +78,7 @@ export default function CheckoutPage() {
           pharmacyId: medicine?.pharmacy?.id || medicine?.pharmacyId || null,
           medicineName: medicine?.medicine || medicine?.brandName || "Selected Medicine",
           genericName: medicine?.genericName || null,
+          imageUrl: medicine?.imageUrl || null,
           quantity: 1,
           price: Number(medicine?.price || 0),
           pharmacyName: medicine?.pharmacy?.name || "Selected Pharmacy",
@@ -99,6 +100,7 @@ export default function CheckoutPage() {
           pharmacyId: parsed?.pharmacy?.id || parsed?.pharmacyId || null,
           medicineName: parsed?.medicine || parsed?.brandName || "Selected Medicine",
           genericName: parsed?.genericName || null,
+          imageUrl: parsed?.imageUrl || null,
           quantity: 1,
           price: Number(parsed?.price || 0),
           pharmacyName: parsed?.pharmacy?.name || "Selected Pharmacy",
@@ -188,7 +190,12 @@ export default function CheckoutPage() {
       cartItemId: item.id || item.cartItemId || null,
       inventoryId: item.medicineId || item.inventoryId || item.id,
       medicineId: item.medicineId || item.inventoryId || item.id,
-      pharmacyId: item.pharmacyId || null,
+      pharmacyId:
+        item.pharmacyId ||
+        item.pharmacy?.id ||
+        item.medicine?.pharmacy?.id ||
+        null,
+      pharmacyName: item.pharmacyName || item.pharmacy?.name || null,
       quantity: Number(item.quantity || 1),
     }));
 
