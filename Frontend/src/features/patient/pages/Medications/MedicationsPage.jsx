@@ -61,6 +61,31 @@ export function MedicationsPage() {
     navigate(`/medicine-search?q=${encodeURIComponent(medication?.medicineName || "")}`);
   };
 
+  const handleBuyAgain = (medication) => {
+    const medicineId = String(medication.medicineId || medication.inventoryId || medication.id);
+    
+    navigate("/patient/checkout", {
+      state: {
+        mode: "buy-now",
+        items: [
+          {
+            id: medicineId,
+            medicineId: medicineId,
+            pharmacyId: medication.lastPharmacyId || null,
+            medicineName: medication.medicineName,
+            genericName: medication.genericName || null,
+            imageUrl: medication.imageUrl || null,
+            quantity: 1,
+            price: Number(medication.lastPrice || medication.price || 0),
+            pharmacyName: medication.lastPharmacyName || "Unknown Pharmacy",
+            pharmacyAddress: medication.lastPharmacyAddress || null,
+            pharmacyContact: medication.lastPharmacyContact || null,
+          },
+        ],
+      },
+    });
+  };
+
   useEffect(() => {
     loadMedications();
   }, []);
@@ -221,7 +246,7 @@ export function MedicationsPage() {
                       <div className="w-full lg:w-auto lg:self-center">
                         <button
                           type="button"
-                          onClick={() => openMedication(medication)}
+                          onClick={() => handleBuyAgain(medication)}
                           className="w-full lg:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                         >
                           Buy Again

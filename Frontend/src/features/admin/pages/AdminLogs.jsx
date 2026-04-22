@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -28,13 +28,15 @@ import adminService from "../../../core/services/admin.service";
 
 const AdminLogs = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [logs, setLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [timeFilter, setTimeFilter] = useState("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
+  const globalSearch = searchParams.get("q") || "";
+  const [searchQuery, setSearchQuery] = useState(globalSearch);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedLog, setSelectedLog] = useState(null);
 
@@ -43,6 +45,10 @@ const AdminLogs = () => {
       navigate("/dashboard");
     }
   }, [user, navigate]);
+
+  useEffect(() => {
+    setSearchQuery((prev) => (prev === globalSearch ? prev : globalSearch));
+  }, [globalSearch]);
 
 
   useEffect(() => {

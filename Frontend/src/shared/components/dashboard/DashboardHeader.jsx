@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Menu, Search } from "lucide-react";
 
 export default function DashboardHeader({
@@ -7,10 +7,15 @@ export default function DashboardHeader({
   title = "Intelligence Hub",
   subtitle = "Operational command center",
   searchPlaceholder = "Search insights, records, trends...",
+  searchValue = "",
   onSearch,
   notificationSlot = null,
 }) {
   const [searchText, setSearchText] = useState("");
+
+  useEffect(() => {
+    setSearchText(searchValue || "");
+  }, [searchValue]);
 
   const hubMeta = useMemo(() => {
     if (title && subtitle) return `${title} · ${subtitle}`;

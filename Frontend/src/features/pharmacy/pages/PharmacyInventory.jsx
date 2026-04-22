@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { 
   Package, 
@@ -58,10 +59,12 @@ const matchesStatusFilter = (item, status) => {
 };
 
 export default function PharmacyInventory() {
+  const [searchParams] = useSearchParams();
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const globalSearch = searchParams.get("q") || "";
+  const [searchTerm, setSearchTerm] = useState(globalSearch);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -99,6 +102,10 @@ export default function PharmacyInventory() {
   useEffect(() => {
     fetchInventory();
   }, []);
+
+  useEffect(() => {
+    setSearchTerm((prev) => (prev === globalSearch ? prev : globalSearch));
+  }, [globalSearch]);
 
   const fetchInventory = async (page = 1) => {
     try {

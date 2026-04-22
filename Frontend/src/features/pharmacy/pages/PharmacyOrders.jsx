@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ClipboardList, Package, RefreshCw, Search, ChevronRight, CalendarDays, ArrowUpDown } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import httpClient from "../../../core/services/httpClient";
 import { motion } from "framer-motion";
 
@@ -36,12 +36,14 @@ function SkeletonRow() {
 export default function PharmacyOrders() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
   const [orderStats, setOrderStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filterStatus, setFilterStatus] = useState("all");
-  const [orderSearch, setOrderSearch] = useState("");
+  const globalSearch = searchParams.get("q") || "";
+  const [orderSearch, setOrderSearch] = useState(globalSearch);
   const [sortMode, setSortMode] = useState("latest");
   const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false);
   const moreFiltersRef = useRef(null);
@@ -49,6 +51,10 @@ export default function PharmacyOrders() {
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  useEffect(() => {
+    setOrderSearch((prev) => (prev === globalSearch ? prev : globalSearch));
+  }, [globalSearch]);
 
   useEffect(() => {
     const onClickOutside = (event) => {

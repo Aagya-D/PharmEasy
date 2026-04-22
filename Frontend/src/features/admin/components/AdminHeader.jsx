@@ -3,7 +3,7 @@ import { useAuth } from "../../../context/AuthContext";
 import NotificationDropdown from "../../../shared/components/NotificationDropdown";
 import DashboardHeader from "../../../shared/components/dashboard/DashboardHeader";
 
-const AdminHeader = ({ onOpenSidebar }) => {
+const AdminHeader = ({ onOpenSidebar, onSearch, searchValue = "" }) => {
   const { user } = useAuth();
 
   return (
@@ -13,6 +13,8 @@ const AdminHeader = ({ onOpenSidebar }) => {
       title=""
       subtitle=""
       searchPlaceholder="Search users, pharmacies, reports..."
+      onSearch={onSearch}
+      searchValue={searchValue}
       notificationSlot={<NotificationDropdown mode="admin" />}
     />
   );

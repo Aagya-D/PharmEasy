@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 import { Users as UsersIcon, Search, Shield, CheckCircle, User, Building, AlertCircle } from "lucide-react";
 import AdminLayout from "../components/AdminLayout";
@@ -7,11 +7,13 @@ import adminService from "../../../core/services/admin.service";
 
 const AdminUsers = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const globalSearch = searchParams.get("q") || "";
+  const [searchQuery, setSearchQuery] = useState(globalSearch);
   const [roleFilter, setRoleFilter] = useState("ALL");
 
   useEffect(() => {
@@ -19,6 +21,10 @@ const AdminUsers = () => {
       navigate("/dashboard");
     }
   }, [user, navigate]);
+
+  useEffect(() => {
+    setSearchQuery((prev) => (prev === globalSearch ? prev : globalSearch));
+  }, [globalSearch]);
 
   // Debounced search and filter effect
   useEffect(() => {
@@ -92,7 +98,10 @@ const AdminUsers = () => {
     return config;
   };
 
-  const filteredUsers = users;
+  const filteredUsers = users.filter((u) =>
+    u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const SkeletonRow = () => (
     <tr style={{ borderTop: "1px solid #F3F4F6" }}>

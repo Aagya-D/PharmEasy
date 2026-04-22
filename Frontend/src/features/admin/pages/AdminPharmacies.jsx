@@ -17,6 +17,7 @@ const AdminPharmacies = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const rawStatusParam = searchParams.get("status");
+  const qParam = searchParams.get("q") || "";
   const statusParam = ["ALL", "VERIFIED", "REJECTED", "PENDING_VERIFICATION"].includes(rawStatusParam)
     ? rawStatusParam
     : "ALL";
@@ -29,7 +30,7 @@ const AdminPharmacies = () => {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(qParam);
   const [confirmApprove, setConfirmApprove] = useState({ open: false, pharmacyId: null });
 
   useEffect(() => {
@@ -41,6 +42,10 @@ const AdminPharmacies = () => {
   useEffect(() => {
     fetchPharmacies();
   }, [filterStatus]);
+
+  useEffect(() => {
+    setSearchQuery((prev) => (prev === qParam ? prev : qParam));
+  }, [qParam]);
 
   const fetchPharmacies = async () => {
     setIsLoading(true);
@@ -110,12 +115,13 @@ const AdminPharmacies = () => {
 
   const handleStatusChange = (status) => {
     setFilterStatus(status);
+    const nextParams = new URLSearchParams(searchParams);
     if (status === "ALL") {
-      setSearchParams({});
-      return;
+      nextParams.delete("status");
+    } else {
+      nextParams.set("status", status);
     }
-
-    setSearchParams({ status });
+    setSearchParams(nextParams);
   };
 
   const filteredPharmacies = pharmacies.filter((pharmacy) =>

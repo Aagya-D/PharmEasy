@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Users,
   TrendingUp,
@@ -18,12 +19,18 @@ import {
 import pharmacyService from "../../../core/services/pharmacy.service";
 
 export default function PharmacyCustomers() {
+  const [searchParams] = useSearchParams();
   const [customers, setCustomers] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const globalSearch = searchParams.get("q") || "";
+  const [searchQuery, setSearchQuery] = useState(globalSearch);
   const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    setSearchQuery((prev) => (prev === globalSearch ? prev : globalSearch));
+  }, [globalSearch]);
 
   // Debounce search input (300ms)
   useEffect(() => {

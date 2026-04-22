@@ -22,6 +22,7 @@ import { playNotificationSound } from "../../../utils/notificationSound";
 import { useSOSContext } from "../../../context/SOSContext";
 import ChatWindow from "../../chat/components/ChatWindow";
 import ConfirmationModal from "../components/ConfirmationModal";
+import SOSMapModal from "../components/SOSMapModal";
 
 export default function PharmacySOSRequests() {
   const { updateSOSCount } = useSOSContext();
@@ -43,6 +44,8 @@ export default function PharmacySOSRequests() {
   const [caseToComplete, setCaseToComplete] = useState(null);
   const [isCompletingConfirmed, setIsCompletingConfirmed] = useState(false);
   const [caseSearch, setCaseSearch] = useState("");
+  const [pharmacyLocation, setPharmacyLocation] = useState(null);
+  const [mapModalState, setMapModalState] = useState({ open: false, request: null });
 
   useEffect(() => {
     try {
@@ -154,6 +157,14 @@ export default function PharmacySOSRequests() {
         const sosData = response.data.data.sosRequests || [];
         setSosRequests(sosData);
         updateSOSCount(sosData);
+        const pharmacy = response.data?.data?.pharmacy || null;
+        if (pharmacy?.latitude != null && pharmacy?.longitude != null) {
+          setPharmacyLocation({
+            name: pharmacy.name || "Your Pharmacy",
+            latitude: Number(pharmacy.latitude),
+            longitude: Number(pharmacy.longitude),
+          });
+        }
 
       }
     } catch (err) {
@@ -399,6 +410,31 @@ export default function PharmacySOSRequests() {
     return "bg-orange-100 text-orange-700 border-orange-200";
   };
 
+  const hasValidCoordinates = (request) => {
+    const lat = Number(request?.latitude);
+    const lng = Number(request?.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lng);
+  };
+
+  const openDirections = (request) => {
+    const destinationLat = Number(request?.latitude);
+    const destinationLng = Number(request?.longitude);
+    if (!Number.isFinite(destinationLat) || !Number.isFinite(destinationLng)) {
+      toast.error("Location is not available for this SOS request.");
+      return;
+    }
+
+    const originLat = Number(pharmacyLocation?.latitude);
+    const originLng = Number(pharmacyLocation?.longitude);
+    const hasOrigin = Number.isFinite(originLat) && Number.isFinite(originLng);
+
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destinationLat},${destinationLng}${
+      hasOrigin ? `&origin=${originLat},${originLng}` : ""
+    }`;
+
+    window.open(mapsUrl, "_blank", "noopener,noreferrer");
+  };
+
   if (loading && !caseRooms.length) {
     return (
       <div className="h-[calc(100vh-80px)] bg-white flex items-center justify-center">
@@ -527,6 +563,24 @@ export default function PharmacySOSRequests() {
                     >
                       Reject
                     </button>
+                    {hasValidCoordinates(request) && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setMapModalState({ open: true, request })}
+                          className="px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 text-sm font-medium hover:bg-indigo-100"
+                        >
+                          View Map
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openDirections(request)}
+                          className="px-3 py-2 rounded-lg bg-cyan-50 text-cyan-700 text-sm font-medium hover:bg-cyan-100"
+                        >
+                          Directions
+                        </button>
+                      </>
+                    )}
                     {(request.prescription || request.prescriptionUrl) && (
                       <button
                         onClick={() => {
@@ -799,6 +853,13 @@ export default function PharmacySOSRequests() {
           </div>
         </div>
       )}
+
+      <SOSMapModal
+        isOpen={mapModalState.open}
+        onClose={() => setMapModalState({ open: false, request: null })}
+        sosRequest={mapModalState.request}
+        pharmacyLocation={pharmacyLocation}
+      />
     </div>
   );
 }

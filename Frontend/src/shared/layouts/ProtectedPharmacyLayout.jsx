@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { SOSProvider, useSOSContext } from "../../context/SOSContext";
 import Sidebar from "../components/Sidebar";
@@ -13,11 +14,14 @@ import DashboardHeader from "../components/dashboard/DashboardHeader";
  * Inner pharmacy layout that keeps SOS and chat state ready for approved pharmacies.
  */
 function ProtectedPharmacyLayoutInner({ children, isApprovedPharmacy }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { fetchSOSRequests } = useSOSContext();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatBadge, setChatBadge] = useState(0);
+  const searchablePharmacyPaths = ["/pharmacy/inventory", "/pharmacy/orders", "/pharmacy/customers"];
 
   // Build the user object used by the chat drawer.
   const currentUser = user
@@ -45,6 +49,34 @@ function ProtectedPharmacyLayoutInner({ children, isApprovedPharmacy }) {
     setChatOpen(true);
   }, []);
 
+  const searchValue = React.useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("q") || "";
+  }, [location.search]);
+
+  const handleHeaderSearch = useCallback((value) => {
+    const params = new URLSearchParams(location.search);
+    const query = String(value || "").trim();
+    const currentPath = location.pathname;
+    const canSearchHere = searchablePharmacyPaths.some((path) => currentPath.startsWith(path));
+    const targetPath = canSearchHere ? currentPath : "/pharmacy/inventory";
+
+    if (query) {
+      params.set("q", query);
+    } else {
+      params.delete("q");
+    }
+
+    const nextSearch = params.toString();
+    navigate(
+      {
+        pathname: targetPath,
+        search: nextSearch ? `?${nextSearch}` : "",
+      },
+      { replace: true }
+    );
+  }, [location.pathname, location.search, navigate]);
+
   if (!isApprovedPharmacy) {
     return <main className="min-h-screen w-full">{children}</main>;
   }
@@ -60,6 +92,8 @@ function ProtectedPharmacyLayoutInner({ children, isApprovedPharmacy }) {
             title=""
             subtitle=""
             searchPlaceholder="Search medicines, customers, SOS records..."
+            onSearch={handleHeaderSearch}
+            searchValue={searchValue}
             notificationSlot={(
               <div className="flex items-center gap-2">
                 <button
